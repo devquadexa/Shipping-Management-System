@@ -1,0 +1,313 @@
+/* Mobile Responsive Styles for Super Shine Cargo Service */
+
+/* Base responsive utilities */
+@media (max-width: 768px) {
+  /* Mobile Menu */
+  .mobile-menu-btn {
+    display: block !important;
+  }
+
+  .desktop-menu {
+    display: none !important;
+  }
+
+  /* Navbar Mobile */
+  .navbar {
+    padding: 1rem;
+  }
+
+  .navbar-left {
+    gap: 1rem;
+  }
+
+  .navbar-brand-text h1 {
+    font-size: 1rem;
+  }
+
+  .navbar-brand-text p {
+    display: none;
+  }
+
+  .navbar-brand .logo {
+    width: 35px;
+    height: 35px;
+  }
+
+  .navbar-right {
+    gap: 0.5rem;
+  }
+
+  .user-info {
+    display: none;
+  }
+
+  .btn-logout {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  /* Container */
+  .container {
+    padding: 0 1rem;
+    margin: 1rem auto;
+  }
+
+  /* Cards */
+  .card {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .card h2 {
+    font-size: 1.25rem;
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .stat-card {
+    padding: 1.5rem;
+  }
+
+  .stat-card .value {
+    font-size: 2rem;
+  }
+
+  /* Forms */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Tables */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    min-width: 600px;
+    font-size: 0.85rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.5rem;
+    white-space: nowrap;
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons .btn {
+    width: 100%;
+  }
+
+  /* Modal */
+  .modal {
+    width: 95%;
+    padding: 1rem;
+    max-height: 85vh;
+  }
+
+  .modal-header h2 {
+    font-size: 1.25rem;
+  }
+
+  /* Bill Preview */
+  .bill-preview {
+    font-size: 0.75rem;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+
+  /* Page Header */
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .page-header p {
+    font-size: 0.9rem;
+  }
+
+  /* Login */
+  .login-container {
+    padding: 0.5rem;
+  }
+
+  .login-box {
+    max-width: 100%;
+  }
+
+  .login-header {
+    padding: 1.5rem 1rem;
+  }
+
+  .login-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .logo-icon {
+    font-size: 2rem;
+  }
+
+  .login-form {
+    padding: 1.5rem 1rem;
+  }
+
+  /* Empty State */
+  .empty-state-icon {
+    font-size: 3rem;
+  }
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .navbar ul {
+    gap: 1rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .table {
+    font-size: 0.9rem;
+  }
+
+  .container {
+    max-width: 95%;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .navbar-brand .logo {
+    font-size: 1.5rem;
+  }
+
+  .navbar-brand-text h1 {
+    font-size: 1rem;
+  }
+
+  .stat-card .value {
+    font-size: 1.75rem;
+  }
+
+  .table {
+    font-size: 0.75rem;
+  }
+
+  .btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .card h2 {
+    font-size: 1.1rem;
+  }
+}
+
+/* Landscape mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .navbar {
+    padding: 0.5rem 1rem;
+  }
+
+  .navbar-left {
+    flex-direction: row;
+  }
+
+  .navbar ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .navbar-right {
+    flex-direction: row;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Print styles */
+@media print {
+  .navbar,
+  .btn,
+  .action-buttons {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+
+  .bill-preview {
+    border: none;
+    background: white;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .btn {
+    min-height: 44px; /* iOS touch target size */
+  }
+
+  .navbar a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .table tr {
+    cursor: pointer;
+  }
+
+  /* Larger touch targets for mobile */
+  input,
+  select,
+  textarea,
+  button {
+    min-height: 44px;
+  }
+}
+
+/* Accessibility - High contrast mode */
+@media (prefers-contrast: high) {
+  .card {
+    border: 2px solid #000;
+  }
+
+  .btn-primary {
+    border: 2px solid #000;
+  }
+
+  .status-badge {
+    border: 1px solid #000;
+  }
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  /* Add dark mode styles if needed in future */
+}
