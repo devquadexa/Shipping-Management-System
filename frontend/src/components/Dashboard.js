@@ -70,12 +70,12 @@ function Dashboard() {
         {user?.role !== 'User' && (
           <>
             <div className="stat-card">
-              <h3>Total Bills</h3>
+              <h3>Total Invoices</h3>
               <div className="value">{stats.totalBills}</div>
               <div className="label">Generated</div>
             </div>
             <div className="stat-card">
-              <h3>Unpaid Bills</h3>
+              <h3>Unpaid Invoices</h3>
               <div className="value">{stats.unpaidBills}</div>
               <div className="label">Outstanding</div>
             </div>
