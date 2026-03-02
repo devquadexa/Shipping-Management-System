@@ -199,7 +199,7 @@ function Billing() {
     console.log('generateBill - payItems length:', selectedJob.payItems?.length);
     
     if (!selectedJob.payItems || selectedJob.payItems.length === 0) {
-      setMessage('Please add pay items before generating bill');
+      setMessage('Please add pay items before generating invoice');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -225,14 +225,14 @@ function Billing() {
       
       await billingService.createBill(billData);
       
-      setMessage('Bill generated successfully!');
+      setMessage('Invoice generated successfully!');
       setSelectedJob(null);
       fetchBills();
       setTimeout(() => setMessage(''), 3000);
       console.log('=== GENERATE BILL END ===');
     } catch (error) {
-      console.error('Error generating bill:', error);
-      setMessage('Error generating bill');
+      console.error('Error generating invoice:', error);
+      setMessage('Error generating invoice');
       setTimeout(() => setMessage(''), 3000);
     }
   };
@@ -250,7 +250,7 @@ function Billing() {
     try {
       await billingService.updateBill(billId, { paymentStatus: 'Paid' });
       fetchBills();
-      setMessage('Bill marked as paid!');
+      setMessage('Invoice marked as paid!');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error marking bill as paid:', error);
@@ -262,7 +262,7 @@ function Billing() {
     const customer = getCustomerDetails(bill.customerId);
     
     if (!job || !customer) {
-      setMessage('Unable to print bill - missing data');
+      setMessage('Unable to print invoice - missing data');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -500,15 +500,15 @@ function Billing() {
   return (
     <div className="billing-page">
       <div className="page-header">
-        <h1>Billing Management</h1>
-        <p>Generate bills and track profitability</p>
+        <h1>Invoicing Management</h1>
+        <p>Generate invoices and track profitability</p>
       </div>
 
       {message && <div className={`alert ${message.includes('Error') ? 'alert-error' : 'alert-success'}`}>{message}</div>}
 
       <div className="card">
         <div className="card-header">
-          <h2>Generate New Bill</h2>
+          <h2>Generate New Invoice</h2>
         </div>
         <div className="card-body">
           <div className="form-group">
@@ -714,7 +714,7 @@ function Billing() {
                     </table>
                     <div className="generate-bill-section">
                       <button onClick={generateBill} className="btn btn-success btn-large">
-                        Generate Bill
+                        Generate Invoice
                       </button>
                     </div>
                   </div>
@@ -731,12 +731,12 @@ function Billing() {
 
       <div className="card">
         <div className="card-header">
-          <h2>Generated Bills ({bills.length})</h2>
+          <h2>Generated Invoices ({bills.length})</h2>
         </div>
         {bills.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">📄</div>
-            <p>No bills generated yet</p>
+            <p>No invoices generated yet</p>
           </div>
         ) : (
           <div className="billing-table-wrapper">
@@ -778,7 +778,7 @@ function Billing() {
                         <button 
                           onClick={() => printBill(bill)} 
                           className="btn btn-primary btn-small"
-                          title="Print Bill"
+                          title="Print Invoice"
                         >
                           Print
                         </button>
