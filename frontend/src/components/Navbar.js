@@ -49,7 +49,7 @@ function Navbar() {
             )}
             <li><Link to="/jobs" className={isActive('/jobs')}>Jobs</Link></li>
             {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
-              <li><Link to="/billing" className={isActive('/billing')}>Billing</Link></li>
+              <li><Link to="/billing" className={isActive('/billing')}>Invoicing</Link></li>
             )}
             <li><Link to="/petty-cash" className={isActive('/petty-cash')}>Petty Cash</Link></li>
             {user?.role === 'Super Admin' && (
@@ -95,7 +95,7 @@ function Navbar() {
           </Link></li>
           {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
             <li><Link to="/billing" className={isActive('/billing')} onClick={closeMobileMenu}>
-              <span className="menu-icon">💰</span> Billing
+              <span className="menu-icon">💰</span> Invoicing
             </Link></li>
           )}
           <li><Link to="/petty-cash" className={isActive('/petty-cash')} onClick={closeMobileMenu}>
