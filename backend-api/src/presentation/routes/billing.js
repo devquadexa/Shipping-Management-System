@@ -17,7 +17,7 @@ const billingController = new BillingController(
 );
 
 // Routes
-router.post('/', auth, checkRole('Admin', 'Super Admin'), (req, res) => 
+router.post('/', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
   billingController.create(req, res)
 );
 
@@ -29,11 +29,11 @@ router.get('/:id', auth, (req, res) =>
   billingController.getById(req, res)
 );
 
-router.patch('/:id/pay', auth, checkRole('Admin', 'Super Admin'), (req, res) => 
+router.patch('/:id/pay', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
   billingController.markAsPaid(req, res)
 );
 
-router.put('/:id', auth, checkRole('Admin', 'Super Admin'), (req, res) => 
+router.put('/:id', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
   billingController.markAsPaid(req, res)
 );
 

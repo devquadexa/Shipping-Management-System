@@ -28,10 +28,12 @@ class CustomerController {
 
   async getAll(req, res) {
     try {
+      console.log('📋 Getting all customers... User:', req.user?.username, 'Role:', req.user?.role);
       const customers = await this.getAllCustomers.execute(req.query);
+      console.log('✅ Found', customers.length, 'customers');
       res.json(customers);
     } catch (error) {
-      console.error('Get customers error:', error);
+      console.error('❌ Get customers error:', error);
       res.status(500).json({ message: 'Server error' });
     }
   }

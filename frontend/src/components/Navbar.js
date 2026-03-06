@@ -6,6 +6,7 @@ function Navbar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   const isActive = (path) => location.pathname === path ? 'active' : '';
 
@@ -17,9 +18,28 @@ function Navbar() {
     setIsMobileMenuOpen(false);
   };
 
+  const toggleProfileDropdown = () => {
+    setIsProfileDropdownOpen(!isProfileDropdownOpen);
+  };
+
+  const closeProfileDropdown = () => {
+    setIsProfileDropdownOpen(false);
+  };
+
   const handleLogout = () => {
     closeMobileMenu();
+    closeProfileDropdown();
     logout();
+  };
+
+  // Get user initials from full name
+  const getUserInitials = () => {
+    if (!user?.fullName) return 'U';
+    const names = user.fullName.trim().split(' ');
+    if (names.length === 1) {
+      return names[0].charAt(0).toUpperCase();
+    }
+    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
   };
 
   return (
@@ -44,14 +64,15 @@ function Navbar() {
           
           <ul className="desktop-menu">
             <li><Link to="/" className={isActive('/')}>Dashboard</Link></li>
-            {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
-              <li><Link to="/customers" className={isActive('/customers')}>Customers</Link></li>
-            )}
+            <li><Link to="/customers" className={isActive('/customers')}>Customers</Link></li>
             <li><Link to="/jobs" className={isActive('/jobs')}>Jobs</Link></li>
-            {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+            {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
               <li><Link to="/billing" className={isActive('/billing')}>Invoicing</Link></li>
             )}
             <li><Link to="/petty-cash" className={isActive('/petty-cash')}>Petty Cash</Link></li>
+            {user?.role === 'Super Admin' && (
+              <li><Link to="/accounting" className={isActive('/accounting')}>Accounting</Link></li>
+            )}
             {user?.role === 'Super Admin' && (
               <li><Link to="/users" className={isActive('/users')}>Users</Link></li>
             )}
@@ -59,11 +80,61 @@ function Navbar() {
         </div>
         
         <div className="navbar-right">
-          <div className="user-info">
-            <div className="user-name">{user?.fullName}</div>
-            <div className="user-role">{user?.role}</div>
+          <div className="profile-container">
+            <button 
+              className="profile-button" 
+              onClick={toggleProfileDropdown}
+              aria-label="User menu"
+            >
+              <div className="profile-avatar">
+                {getUserInitials()}
+              </div>
+            </button>
+            
+            {isProfileDropdownOpen && (
+              <>
+                <div className="profile-dropdown-overlay" onClick={closeProfileDropdown}></div>
+                <div className="profile-dropdown">
+                  <div className="profile-dropdown-header">
+                    <div className="profile-dropdown-avatar">
+                      {getUserInitials()}
+                    </div>
+                    <div className="profile-dropdown-info">
+                      <div className="profile-dropdown-name">{user?.fullName}</div>
+                      <div className="profile-dropdown-role">{user?.role}</div>
+                    </div>
+                  </div>
+                  <div className="profile-dropdown-divider"></div>
+                  <div className="profile-dropdown-menu">
+                    {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+                      <Link 
+                        to="/settings" 
+                        className="profile-dropdown-item"
+                        onClick={closeProfileDropdown}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="3"></circle>
+                          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                        Settings
+                      </Link>
+                    )}
+                    <button 
+                      className="profile-dropdown-item logout-item"
+                      onClick={handleLogout}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                      </svg>
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-          <button onClick={logout} className="btn-logout">Logout</button>
         </div>
       </nav>
 
@@ -83,34 +154,83 @@ function Navbar() {
         
         <ul className="mobile-menu">
           <li><Link to="/" className={isActive('/')} onClick={closeMobileMenu}>
-            <span className="menu-icon">📊</span> Dashboard
+            <span className="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </span> Dashboard
           </Link></li>
-          {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
-            <li><Link to="/customers" className={isActive('/customers')} onClick={closeMobileMenu}>
-              <span className="menu-icon">👥</span> Customers
-            </Link></li>
-          )}
+          <li><Link to="/customers" className={isActive('/customers')} onClick={closeMobileMenu}>
+            <span className="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </span> Customers
+          </Link></li>
           <li><Link to="/jobs" className={isActive('/jobs')} onClick={closeMobileMenu}>
-            <span className="menu-icon">📦</span> Jobs
+            <span className="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+            </span> Jobs
           </Link></li>
-          {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+          {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
             <li><Link to="/billing" className={isActive('/billing')} onClick={closeMobileMenu}>
-              <span className="menu-icon">💰</span> Invoicing
+              <span className="menu-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                  <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
+              </span> Invoicing
             </Link></li>
           )}
           <li><Link to="/petty-cash" className={isActive('/petty-cash')} onClick={closeMobileMenu}>
-            <span className="menu-icon">💵</span> Petty Cash
+            <span className="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </span> Petty Cash
           </Link></li>
           {user?.role === 'Super Admin' && (
+            <li><Link to="/accounting" className={isActive('/accounting')} onClick={closeMobileMenu}>
+              <span className="menu-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                  <circle cx="12" cy="12" r="10"></circle>
+                </svg>
+              </span> Accounting
+            </Link></li>
+          )}
+          {user?.role === 'Super Admin' && (
             <li><Link to="/users" className={isActive('/users')} onClick={closeMobileMenu}>
-              <span className="menu-icon">👤</span> Users
+              <span className="menu-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </span> Users
             </Link></li>
           )}
         </ul>
         
         <div className="mobile-sidebar-footer">
           <button onClick={handleLogout} className="mobile-logout-btn">
-            <span className="menu-icon">🚪</span> Logout
+            <span className="menu-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </span> Logout
           </button>
         </div>
       </div>

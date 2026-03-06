@@ -19,9 +19,11 @@ class MSSQLContactPersonRepository extends IContactPersonRepository {
       .input('customerId', this.sql.VarChar, contactPerson.customerId)
       .input('name', this.sql.VarChar, contactPerson.name)
       .input('phone', this.sql.VarChar, contactPerson.phone)
+      .input('email', this.sql.VarChar, contactPerson.email)
+      .input('designation', this.sql.VarChar, contactPerson.designation)
       .query(`
-        INSERT INTO ContactPersons (ContactPersonId, CustomerId, Name, Phone)
-        VALUES (@contactPersonId, @customerId, @name, @phone)
+        INSERT INTO ContactPersons (ContactPersonId, CustomerId, Name, Phone, Email, Designation)
+        VALUES (@contactPersonId, @customerId, @name, @phone, @email, @designation)
       `);
     
     return contactPerson;
@@ -52,7 +54,9 @@ class MSSQLContactPersonRepository extends IContactPersonRepository {
       contactPersonId: row.ContactPersonId,
       customerId: row.CustomerId,
       name: row.Name,
-      phone: row.Phone
+      phone: row.Phone,
+      email: row.Email,
+      designation: row.Designation
     });
   }
 

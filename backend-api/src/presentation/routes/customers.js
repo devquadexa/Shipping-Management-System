@@ -19,7 +19,6 @@ router.get('/categories/all',
 
 router.post('/', 
   auth, 
-  checkRole('Admin', 'Super Admin'), 
   (req, res) => customerController.create(req, res)
 );
 
@@ -35,13 +34,13 @@ router.get('/:id',
 
 router.put('/:id', 
   auth, 
-  checkRole('Admin', 'Super Admin'), 
+  checkRole('Admin', 'Super Admin', 'Manager'), 
   (req, res) => customerController.update(req, res)
 );
 
 router.delete('/:id', 
   auth, 
-  checkRole('Admin', 'Super Admin'), 
+  checkRole('Admin', 'Super Admin', 'Manager'), 
   (req, res) => customerController.delete(req, res)
 );
 

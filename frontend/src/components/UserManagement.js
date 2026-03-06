@@ -74,8 +74,8 @@ function UserManagement() {
           <h1>User Management</h1>
           <p>Manage system users and their roles</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary btn-large">
-          + Create New User
+        <button onClick={() => setShowModal(true)} className="btn btn-primary">
+          + New User
         </button>
       </div>
 
@@ -226,6 +226,7 @@ function UserManagement() {
                     <label>Role *</label>
                     <select name="role" value={formData.role} onChange={handleChange} required>
                       <option value="User">User</option>
+                      <option value="Manager">Manager</option>
                       <option value="Admin">Admin</option>
                       <option value="Super Admin">Super Admin</option>
                     </select>
@@ -234,7 +235,7 @@ function UserManagement() {
               </div>
               
               <div className="form-actions">
-                <button type="submit" className="btn btn-primary btn-large">Create User</button>
+                <button type="submit" className="btn btn-primary">Create User</button>
                 <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Cancel</button>
               </div>
             </form>
