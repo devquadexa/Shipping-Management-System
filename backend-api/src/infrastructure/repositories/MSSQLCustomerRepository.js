@@ -29,10 +29,11 @@ class MSSQLCustomerRepository extends ICustomerRepository {
       .input('isSameLocation', this.sql.Bit, customer.isSameLocation)
       .input('website', this.sql.VarChar, customer.website || null)
       .input('registrationDate', this.sql.DateTime, customer.registrationDate)
+      .input('creditPeriodDays', this.sql.Int, customer.creditPeriodDays || 30)
       .input('isActive', this.sql.Bit, customer.isActive)
       .query(`
-        INSERT INTO Customers (CustomerId, Name, MainPhone, Email, Address, OfficeLocation, IsSameLocation, Website, RegistrationDate, IsActive)
-        VALUES (@customerId, @name, @mainPhone, @email, @address, @officeLocation, @isSameLocation, @website, @registrationDate, @isActive)
+        INSERT INTO Customers (CustomerId, Name, MainPhone, Email, Address, OfficeLocation, IsSameLocation, Website, RegistrationDate, creditPeriodDays, IsActive)
+        VALUES (@customerId, @name, @mainPhone, @email, @address, @officeLocation, @isSameLocation, @website, @registrationDate, @creditPeriodDays, @isActive)
       `);
     
     // Insert contact persons with IDs starting from 1 (will be formatted as 000001, 000002, etc.)
@@ -44,7 +45,9 @@ class MSSQLCustomerRepository extends ICustomerRepository {
           contactPersonId: i + 1, // IDs: 1, 2, 3 (displayed as 000001, 000002, 000003)
           customerId: customer.customerId,
           name: cp.name,
-          phone: cp.phone
+          phone: cp.phone,
+          email: cp.email || null,
+          designation: cp.designation || null
         });
         await this.contactPersonRepository.create(contactPerson);
       }
@@ -121,12 +124,13 @@ class MSSQLCustomerRepository extends ICustomerRepository {
       .input('officeLocation', this.sql.VarChar, customer.officeLocation || customer.address)
       .input('isSameLocation', this.sql.Bit, customer.isSameLocation)
       .input('website', this.sql.VarChar, customer.website || null)
+      .input('creditPeriodDays', this.sql.Int, customer.creditPeriodDays || 30)
       .input('isActive', this.sql.Bit, customer.isActive !== undefined ? customer.isActive : true)
       .query(`
         UPDATE Customers 
         SET Name = @name, MainPhone = @mainPhone, Email = @email, Address = @address,
             OfficeLocation = @officeLocation, IsSameLocation = @isSameLocation, Website = @website,
-            IsActive = @isActive
+            creditPeriodDays = @creditPeriodDays, IsActive = @isActive
         WHERE CustomerId = @customerId
       `);
     
@@ -140,7 +144,9 @@ class MSSQLCustomerRepository extends ICustomerRepository {
           contactPersonId: i + 1, // IDs: 1, 2, 3 (displayed as 000001, 000002, 000003)
           customerId: customerId,
           name: cp.name,
-          phone: cp.phone
+          phone: cp.phone,
+          email: cp.email || null,
+          designation: cp.designation || null
         });
         await this.contactPersonRepository.create(contactPerson);
       }
@@ -213,6 +219,7 @@ class MSSQLCustomerRepository extends ICustomerRepository {
       isSameLocation: row.IsSameLocation,
       website: row.Website,
       registrationDate: row.RegistrationDate,
+      creditPeriodDays: row.creditPeriodDays || 30,
       isActive: row.IsActive
     });
   }

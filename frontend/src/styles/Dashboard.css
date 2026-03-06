@@ -1,0 +1,124 @@
+/* Dashboard Specific Styles */
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #101036;
+  margin: 2rem 0 1.5rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+/* Accounting Summary Section */
+.accounting-summary-section {
+  margin-bottom: 2rem;
+}
+
+.accounting-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.accounting-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.accounting-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.accounting-card .card-icon {
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.accounting-card.card-primary .card-icon {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.accounting-card.card-success .card-icon {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.accounting-card.card-warning .card-icon {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.accounting-card.card-danger .card-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.accounting-card.card-info .card-icon {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.accounting-card.card-profit .card-icon {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.accounting-card .card-content {
+  flex: 1;
+}
+
+.accounting-card .card-content h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.accounting-card .card-value {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #101036;
+  line-height: 1.2;
+}
+
+.accounting-card .card-subtitle {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .accounting-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .section-title {
+    font-size: 1.25rem;
+    margin: 1.5rem 0 1rem 0;
+  }
+  
+  .accounting-card .card-value {
+    font-size: 1.5rem;
+  }
+}

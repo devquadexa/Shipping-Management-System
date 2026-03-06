@@ -22,6 +22,7 @@ function Billing() {
   const [message, setMessage] = useState('');
   const [showPayItemsRow, setShowPayItemsRow] = useState(false);
   const [payItems, setPayItems] = useState([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+  const [loadingSettlement, setLoadingSettlement] = useState(false);
 
   useEffect(() => {
     fetchBills();
@@ -59,6 +60,7 @@ function Billing() {
   const handleJobSelect = async (jobId) => {
     if (!jobId) {
       setSelectedJob(null);
+      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
       return;
     }
     
@@ -71,14 +73,135 @@ function Billing() {
       
       console.log('handleJobSelect - found job:', job);
       console.log('handleJobSelect - job payItems:', job?.payItems);
+      console.log('handleJobSelect - job shipmentCategory:', job?.shipmentCategory);
+      console.log('handleJobSelect - job pettyCashStatus:', job?.pettyCashStatus);
       
       setSelectedJob(job);
       setShowPayItemsRow(false);
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+      
+      // Check if petty cash is settled for this job
+      if (job?.pettyCashStatus === 'Settled') {
+        console.log('Petty cash is settled, loading settlement data...');
+        setLoadingSettlement(true);
+        try {
+          const response = await fetch(`http://localhost:5000/api/petty-cash-assignments/job/${jobId}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          console.log('Settlement response status:', response.status);
+          console.log('Settlement response headers:', response.headers);
+          
+          if (response.ok) {
+            const responseText = await response.text();
+            console.log('Raw response text:', responseText);
+            
+            let assignment = null;
+            try {
+              assignment = responseText ? JSON.parse(responseText) : null;
+            } catch (parseError) {
+              console.error('JSON parse error:', parseError);
+              console.log('Failed to parse response as JSON');
+            }
+            
+            console.log('Parsed assignment:', assignment);
+            console.log('Assignment type:', typeof assignment);
+            console.log('Assignment keys:', assignment ? Object.keys(assignment) : 'null');
+            console.log('Settlement items:', assignment?.settlementItems);
+            console.log('Settlement items type:', typeof assignment?.settlementItems);
+            console.log('Settlement items length:', assignment?.settlementItems?.length);
+            
+            if (assignment && assignment.status === 'Settled' && assignment.settlementItems && Array.isArray(assignment.settlementItems) && assignment.settlementItems.length > 0) {
+              // Pre-fill actual costs from settlement
+              console.log('Processing settlement items:', assignment.settlementItems);
+              const loadedPayItems = assignment.settlementItems.map(item => {
+                console.log('Processing item:', item);
+                return {
+                  name: item.itemName,
+                  actualCost: item.actualCost ? item.actualCost.toString() : '',
+                  billingAmount: '',
+                  sameAmount: false
+                };
+              });
+              console.log('Setting pay items from settlement:', loadedPayItems);
+              setPayItems(loadedPayItems);
+              setShowPayItemsRow(true);
+              setMessage(`✅ Loaded ${loadedPayItems.length} items from petty cash settlement`);
+              setTimeout(() => setMessage(''), 5000);
+            } else {
+              console.log('Settlement check failed:', {
+                hasAssignment: !!assignment,
+                assignmentIsNull: assignment === null,
+                status: assignment?.status,
+                hasItems: !!assignment?.settlementItems,
+                itemsIsArray: Array.isArray(assignment?.settlementItems),
+                itemsLength: assignment?.settlementItems?.length
+              });
+              console.log('No valid settlement items found, loading templates...');
+              loadPayItemTemplates(job);
+            }
+          } else {
+            const errorText = await response.text();
+            console.log('Failed to fetch settlement. Status:', response.status, 'Error:', errorText);
+            loadPayItemTemplates(job);
+          }
+        } catch (error) {
+          console.error('Error loading settlement:', error);
+          console.error('Error stack:', error.stack);
+          loadPayItemTemplates(job);
+        } finally {
+          setLoadingSettlement(false);
+        }
+      } else {
+        console.log('Petty cash not settled, status:', job?.pettyCashStatus);
+        loadPayItemTemplates(job);
+      }
     } catch (error) {
       console.error('Error fetching job:', error);
       setMessage('Error loading job details');
       setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const loadPayItemTemplates = async (job) => {
+    // Auto-load pay item templates based on shipment category
+    if (job?.shipmentCategory && (!job.payItems || job.payItems.length === 0)) {
+      console.log('Loading pay item templates for category:', job.shipmentCategory);
+      try {
+        const response = await fetch(`http://localhost:5000/api/pay-item-templates/category/${encodeURIComponent(job.shipmentCategory)}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.ok) {
+          const templates = await response.json();
+          console.log('Loaded templates:', templates);
+          
+          if (templates && templates.length > 0) {
+            // Convert templates to pay items format
+            const loadedPayItems = templates.map(template => ({
+              name: template.itemName,
+              actualCost: '',
+              billingAmount: '',
+              sameAmount: false
+            }));
+            
+            setPayItems(loadedPayItems);
+            setShowPayItemsRow(true);
+            setMessage(`Loaded ${templates.length} default pay items for ${job.shipmentCategory}`);
+            setTimeout(() => setMessage(''), 3000);
+          } else {
+            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading pay item templates:', error);
+        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+      }
+    } else {
+      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
     }
   };
 
@@ -192,6 +315,13 @@ function Billing() {
     if (!selectedJob) {
       setMessage('Please select a job first');
       setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    
+    // Check if petty cash is settled
+    if (selectedJob.pettyCashStatus === 'Assigned') {
+      setMessage('Cannot generate invoice: Petty cash must be settled first');
+      setTimeout(() => setMessage(''), 5000);
       return;
     }
     
@@ -517,6 +647,7 @@ function Billing() {
               value={selectedJob?.jobId || ''} 
               onChange={(e) => handleJobSelect(e.target.value)}
               className="form-control"
+              disabled={loadingSettlement}
             >
               <option value="">-- Select a Job --</option>
               {jobs.map(job => (
@@ -525,6 +656,11 @@ function Billing() {
                 </option>
               ))}
             </select>
+            {loadingSettlement && (
+              <div style={{ marginTop: '10px', color: '#101036', fontStyle: 'italic' }}>
+                Loading petty cash settlement data...
+              </div>
+            )}
           </div>
 
           {selectedJob && (
@@ -746,6 +882,8 @@ function Billing() {
                   <th>Invoice No</th>
                   <th>Job ID</th>
                   <th>Customer</th>
+                  <th>Invoice Date</th>
+                  <th>Due Date</th>
                   <th>Actual Cost</th>
                   <th>Billing Amount</th>
                   <th>Profit</th>
@@ -756,10 +894,21 @@ function Billing() {
               </thead>
               <tbody>
                 {bills.map(bill => (
-                  <tr key={bill.billId}>
+                  <tr key={bill.billId} className={bill.isOverdue ? 'overdue-row' : ''}>
                     <td data-label="Invoice No"><strong>{bill.invoiceNumber || bill.billId}</strong></td>
                     <td data-label="Job ID">{bill.jobId}</td>
                     <td data-label="Customer">{getCustomerName(bill.customerId)}</td>
+                    <td data-label="Invoice Date">
+                      {bill.invoiceDate ? new Date(bill.invoiceDate).toLocaleDateString() : '-'}
+                    </td>
+                    <td data-label="Due Date">
+                      {bill.dueDate ? (
+                        <div className="due-date-cell">
+                          {new Date(bill.dueDate).toLocaleDateString()}
+                          {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
+                        </div>
+                      ) : '-'}
+                    </td>
                     <td data-label="Actual Cost">LKR {formatAmount(bill.actualCost)}</td>
                     <td data-label="Billing Amount">LKR {formatAmount(bill.billingAmount)}</td>
                     <td data-label="Profit">

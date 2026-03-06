@@ -7,7 +7,9 @@ class GetAllCustomers {
   }
 
   async execute(filters = {}) {
+    console.log('GetAllCustomers - Executing with filters:', filters);
     const customers = await this.customerRepository.findAll(filters);
+    console.log('GetAllCustomers - Found customers:', customers.length);
     return customers;
   }
 }

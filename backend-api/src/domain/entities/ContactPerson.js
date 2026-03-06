@@ -7,12 +7,16 @@ class ContactPerson {
     contactPersonId,
     customerId,
     name,
-    phone
+    phone,
+    email = null,
+    designation = null
   }) {
     this.contactPersonId = contactPersonId;
     this.customerId = customerId;
     this.name = name;
     this.phone = phone;
+    this.email = email;
+    this.designation = designation;
   }
 
   validate() {
@@ -24,6 +28,14 @@ class ContactPerson {
     
     if (!this.phone || this.phone.trim().length === 0) {
       errors.push('Contact person phone is required');
+    }
+    
+    // Email validation (optional but must be valid if provided)
+    if (this.email && this.email.trim().length > 0) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(this.email)) {
+        errors.push('Contact person email must be valid');
+      }
     }
     
     return {

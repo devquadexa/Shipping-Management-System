@@ -16,13 +16,18 @@ export const jobService = {
     return response.data;
   },
 
+  updateStatus: async (jobId, status) => {
+    const response = await apiClient.patch(`/jobs/${jobId}/status`, { status });
+    return response.data;
+  },
+
   delete: async (jobId) => {
     const response = await apiClient.delete(`/jobs/${jobId}`);
     return response.data;
   },
 
   assignUser: async (jobId, userId) => {
-    const response = await apiClient.post(`/jobs/${jobId}/assign`, { userId });
+    const response = await apiClient.patch(`/jobs/${jobId}/assign`, { userId });
     return response.data;
   },
 

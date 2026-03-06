@@ -14,6 +14,7 @@ class Customer {
     isSameLocation = false,
     website,
     registrationDate = new Date(),
+    creditPeriodDays = 30,
     isActive = true,
     contactPersons = [], // Array of contact person objects
     categories = [] // Array of category IDs
@@ -27,6 +28,7 @@ class Customer {
     this.isSameLocation = isSameLocation;
     this.website = website;
     this.registrationDate = registrationDate;
+    this.creditPeriodDays = creditPeriodDays;
     this.isActive = isActive;
     this.contactPersons = contactPersons;
     this.categories = categories;

@@ -27,9 +27,12 @@ class MSSQLBillRepository extends IBillRepository {
       .input('profit', this.sql.Decimal(10, 2), bill.profit)
       .input('paymentStatus', this.sql.VarChar, bill.paymentStatus)
       .input('invoiceNumber', this.sql.VarChar, bill.invoiceNumber)
+      .input('invoiceDate', this.sql.DateTime, bill.invoiceDate || new Date())
+      .input('dueDate', this.sql.DateTime, bill.dueDate)
+      .input('isOverdue', this.sql.Bit, bill.isOverdue || false)
       .query(`
-        INSERT INTO Bills (BillId, JobId, CustomerId, Amount, Tax, Total, ActualCost, BillingAmount, Profit, PaymentStatus, InvoiceNumber, CreatedDate, BillDate)
-        VALUES (@billId, @jobId, @customerId, @amount, @tax, @total, @actualCost, @billingAmount, @profit, @paymentStatus, @invoiceNumber, GETDATE(), GETDATE())
+        INSERT INTO Bills (BillId, JobId, CustomerId, Amount, Tax, Total, ActualCost, BillingAmount, Profit, PaymentStatus, InvoiceNumber, CreatedDate, BillDate, invoiceDate, dueDate, isOverdue)
+        VALUES (@billId, @jobId, @customerId, @amount, @tax, @total, @actualCost, @billingAmount, @profit, @paymentStatus, @invoiceNumber, GETDATE(), GETDATE(), @invoiceDate, @dueDate, @isOverdue)
       `);
     
     return bill;
@@ -86,20 +89,50 @@ class MSSQLBillRepository extends IBillRepository {
     return result.recordset.map(row => this.mapToEntity(row));
   }
 
+  async findUnpaid() {
+    const pool = await this.db();
+    const result = await pool.request()
+      .query("SELECT * FROM Bills WHERE PaymentStatus = 'Unpaid' ORDER BY CreatedDate DESC");
+    
+    return result.recordset.map(row => this.mapToEntity(row));
+  }
+
   async update(billId, bill) {
     const pool = await this.db();
     
-    await pool.request()
-      .input('billId', this.sql.VarChar, billId)
-      .input('amount', this.sql.Decimal(10, 2), bill.amount)
-      .input('tax', this.sql.Decimal(10, 2), bill.tax)
-      .input('total', this.sql.Decimal(10, 2), bill.total)
-      .input('paymentStatus', this.sql.VarChar, bill.paymentStatus)
-      .query(`
+    const request = pool.request()
+      .input('billId', this.sql.VarChar, billId);
+    
+    const updates = [];
+    
+    if (bill.amount !== undefined) {
+      request.input('amount', this.sql.Decimal(10, 2), bill.amount);
+      updates.push('Amount = @amount');
+    }
+    if (bill.tax !== undefined) {
+      request.input('tax', this.sql.Decimal(10, 2), bill.tax);
+      updates.push('Tax = @tax');
+    }
+    if (bill.total !== undefined) {
+      request.input('total', this.sql.Decimal(10, 2), bill.total);
+      updates.push('Total = @total');
+    }
+    if (bill.paymentStatus !== undefined) {
+      request.input('paymentStatus', this.sql.VarChar, bill.paymentStatus);
+      updates.push('PaymentStatus = @paymentStatus');
+    }
+    if (bill.isOverdue !== undefined) {
+      request.input('isOverdue', this.sql.Bit, bill.isOverdue);
+      updates.push('isOverdue = @isOverdue');
+    }
+    
+    if (updates.length > 0) {
+      await request.query(`
         UPDATE Bills 
-        SET Amount = @amount, Tax = @tax, Total = @total, PaymentStatus = @paymentStatus
+        SET ${updates.join(', ')}
         WHERE BillId = @billId
       `);
+    }
     
     return await this.findById(billId);
   }
@@ -146,7 +179,10 @@ class MSSQLBillRepository extends IBillRepository {
       createdDate: row.CreatedDate,
       billDate: row.BillDate || row.CreatedDate,
       paidDate: row.PaidDate,
-      invoiceNumber: row.InvoiceNumber
+      invoiceNumber: row.InvoiceNumber,
+      invoiceDate: row.invoiceDate,
+      dueDate: row.dueDate,
+      isOverdue: row.isOverdue || false
     });
   }
 }

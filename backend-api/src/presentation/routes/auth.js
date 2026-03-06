@@ -24,7 +24,7 @@ router.get('/me', auth, (req, res) => authController.getMe(req, res));
 
 router.get('/users', 
   auth, 
-  checkRole('Super Admin'), 
+  checkRole('Admin', 'Super Admin'), 
   (req, res) => authController.getUsers(req, res)
 );
 

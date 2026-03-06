@@ -51,7 +51,7 @@ class User {
   }
 
   isValidRole(role) {
-    const validRoles = ['Super Admin', 'Admin', 'User'];
+    const validRoles = ['Super Admin', 'Admin', 'Manager', 'User'];
     return validRoles.includes(role);
   }
 
@@ -64,6 +64,7 @@ class User {
     const permissions = {
       'Super Admin': ['*'], // All permissions
       'Admin': ['manage_customers', 'manage_jobs', 'manage_billing', 'manage_petty_cash'],
+      'Manager': ['manage_customers', 'manage_jobs', 'manage_billing', 'manage_petty_cash'],
       'User': ['view_assigned_jobs', 'manage_own_petty_cash']
     };
     
@@ -76,7 +77,7 @@ class User {
   }
 
   canManageCustomers() {
-    return this.role === 'Super Admin' || this.role === 'Admin';
+    return this.role === 'Super Admin' || this.role === 'Admin' || this.role === 'Manager';
   }
 
   // Remove sensitive data for API responses
