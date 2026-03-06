@@ -68,10 +68,21 @@ class JobController {
 
   async updateStatus(req, res) {
     try {
+      console.log('JobController.updateStatus - params:', req.params);
+      console.log('JobController.updateStatus - body:', req.body);
+      console.log('JobController.updateStatus - user:', req.user);
+      
       const { status } = req.body;
+      
+      if (!status) {
+        console.log('JobController.updateStatus - No status provided');
+        return res.status(400).json({ message: 'Status is required' });
+      }
       
       // Check access for User role
       const job = await this.getJobById.execute(req.params.id);
+      console.log('JobController.updateStatus - found job:', job);
+      
       if (req.user.role === 'User' && job.assignedTo !== req.user.userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
@@ -79,9 +90,11 @@ class JobController {
       await this.updateJobStatus.execute(req.params.id, status);
       const updatedJob = await this.getJobById.execute(req.params.id);
       
+      console.log('JobController.updateStatus - updated job:', updatedJob);
       res.json(updatedJob);
     } catch (error) {
       console.error('Update job status error:', error);
+      console.error('Error stack:', error.stack);
       res.status(400).json({ message: error.message });
     }
   }

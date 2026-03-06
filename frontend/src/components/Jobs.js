@@ -23,14 +23,17 @@ function Jobs() {
     exporter: '',
     lcNumber: '',
     containerNumber: '',
+    transporter: '',
     assignedTo: ''
   });
   const [message, setMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
 
   useEffect(() => {
     fetchJobs();
     fetchCustomers(); // All users need to see customer names
-    if (user?.role !== 'User') {
+    if (user?.role === 'Admin' || user?.role === 'Super Admin') {
       fetchUsers();
     }
   }, [user]);
@@ -74,10 +77,17 @@ function Jobs() {
 
   const fetchUsers = async () => {
     try {
+      console.log('Fetching users... Current user role:', user?.role);
       const data = await authService.getUsers();
-      setUsers(data.filter(u => u.role === 'User'));
+      console.log('Fetched users data:', data);
+      const filteredUsers = data.filter(u => u.role === 'User');
+      console.log('Filtered users (role=User):', filteredUsers);
+      setUsers(filteredUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      setMessage('Error loading users list. Please refresh the page.');
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -95,6 +105,7 @@ function Jobs() {
         exporter: '',
         lcNumber: '',
         containerNumber: '',
+        transporter: '',
         assignedTo: '' 
       });
       setShowModal(false);
@@ -111,13 +122,31 @@ function Jobs() {
 
   const updateStatus = async (jobId, status) => {
     try {
-      await jobService.update(jobId, { status });
+      console.log('updateStatus called - jobId:', jobId, 'status:', status);
+      await jobService.updateStatus(jobId, status);
       fetchJobs();
       setMessage('Job status updated!');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error updating status:', error);
+      console.error('Error response:', error.response?.data);
+      setMessage(`Error updating status: ${error.response?.data?.message || error.message}`);
+      setTimeout(() => setMessage(''), 5000);
     }
+  };
+
+  const getAvailableStatuses = (currentStatus) => {
+    const statusMap = {
+      'Open': ['In Progress', 'Canceled'],
+      'In Progress': ['Pending Payment', 'Canceled'],
+      'Pending Payment': ['Payment Collected', 'Overdue'],
+      'Payment Collected': ['Completed'],
+      'Overdue': ['Payment Collected'],
+      'Completed': ['Completed'], // Final status
+      'Canceled': ['Canceled'] // Final status
+    };
+    
+    return statusMap[currentStatus] || ['Open'];
   };
 
   const assignJob = async (jobId, userId) => {
@@ -143,6 +172,7 @@ function Jobs() {
       exporter: job.exporter || '',
       lcNumber: job.lcNumber || '',
       containerNumber: job.containerNumber || '',
+      transporter: job.transporter || '',
       assignedTo: job.assignedTo || ''
     });
     setShowModal(true);
@@ -162,6 +192,7 @@ function Jobs() {
         exporter: '',
         lcNumber: '',
         containerNumber: '',
+        transporter: '',
         assignedTo: ''
       });
       setShowModal(false);
@@ -173,6 +204,29 @@ function Jobs() {
       setMessage('Error updating job');
     }
   };
+
+  const filteredJobs = jobs.filter(job => {
+    const searchLower = searchTerm.toLowerCase();
+    const jobId = (job.jobId || '').toLowerCase();
+    const customerName = getCustomerName(job.customerId).toLowerCase();
+    const category = (job.shipmentCategory || '').toLowerCase();
+    const assignedUser = job.assignedTo ? getUserFullName(job.assignedTo).toLowerCase() : 'unassigned';
+    const status = (job.status || 'open').toLowerCase();
+    const openDate = job.openDate ? new Date(job.openDate).toLocaleDateString().toLowerCase() : '';
+    
+    // Status filter
+    const statusMatch = statusFilter === 'All' || job.status === statusFilter;
+    
+    // Search filter
+    const searchMatch = jobId.includes(searchLower) ||
+           customerName.includes(searchLower) ||
+           category.includes(searchLower) ||
+           assignedUser.includes(searchLower) ||
+           status.includes(searchLower) ||
+           openDate.includes(searchLower);
+    
+    return statusMatch && searchMatch;
+  });
 
   return (
     <div className="jobs-page">
@@ -192,12 +246,53 @@ function Jobs() {
 
       <div className="card">
         <div className="card-header">
-          <h2>All Jobs ({jobs.length})</h2>
+          <h2>All Jobs ({filteredJobs.length})</h2>
+          <div className="filters-container">
+            <div className="filter-group">
+              <label htmlFor="statusFilter">Filter by Status:</label>
+              <select
+                id="statusFilter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="status-filter-select"
+              >
+                <option value="All">All Statuses</option>
+                <option value="Open">Open</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Pending Payment">Pending Payment</option>
+                <option value="Payment Collected">Payment Collected</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Completed">Completed</option>
+                <option value="Canceled">Canceled</option>
+              </select>
+              {(statusFilter !== 'All' || searchTerm) && (
+                <button
+                  onClick={() => {
+                    setStatusFilter('All');
+                    setSearchTerm('');
+                  }}
+                  className="btn-clear-filters"
+                  title="Clear all filters"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search by Job ID, Customer, Category, Assigned User, or Date..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+            </div>
+          </div>
         </div>
-        {jobs.length === 0 ? (
+        {filteredJobs.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">📦</div>
-            <p>No jobs found</p>
+            <p>{searchTerm ? 'No jobs found matching your search' : 'No jobs found'}</p>
           </div>
         ) : (
           <div className="jobs-table-wrapper">
@@ -214,7 +309,7 @@ function Jobs() {
               </tr>
             </thead>
             <tbody>
-              {jobs.map(job => (
+              {filteredJobs.map(job => (
                 <React.Fragment key={job.jobId}>
                   <tr className={expandedRow === job.jobId ? 'expanded' : ''}>
                     <td data-label="Job ID"><span className="job-id">{job.jobId || '-'}</span></td>
@@ -241,14 +336,17 @@ function Jobs() {
                     )}
                     <td data-label="Status">
                       <select 
-                        className={`status-badge status-${(job.status || 'Open').toLowerCase().replace(' ', '-')}`}
+                        className={`status-badge status-${(job.status || 'Open').toLowerCase().replace(/\s+/g, '-')}`}
                         onChange={(e) => updateStatus(job.jobId, e.target.value)} 
                         value={job.status || 'Open'}
+                        disabled={job.status === 'Completed' || job.status === 'Canceled'}
                       >
-                        <option value="Open">Open</option>
-                        <option value="Started">Started</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Canceled">Canceled</option>
+                        <option value={job.status || 'Open'}>{job.status || 'Open'}</option>
+                        {getAvailableStatuses(job.status || 'Open').map(status => (
+                          status !== (job.status || 'Open') && (
+                            <option key={status} value={status}>{status.toUpperCase()}</option>
+                          )
+                        ))}
                       </select>
                     </td>
                     <td data-label="Actions">
@@ -349,75 +447,84 @@ function Jobs() {
               <button className="btn-close" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); }}>×</button>
             </div>
             <form onSubmit={isEditing ? handleUpdate : handleSubmit} className="job-form">
-              <div className="form-group">
-                <label>Customer *</label>
-                <select name="customerId" value={formData.customerId} onChange={handleChange} required disabled={isEditing}>
-                  <option value="">Select Customer</option>
-                  {customers.map(c => (
-                    <option key={c.customerId} value={c.customerId}>{c.customerId} - {c.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="form-row">
-                <div className="form-group">
-                  <label>BL Number</label>
-                  <input type="text" name="blNumber" value={formData.blNumber} onChange={handleChange} placeholder="Bill of Lading Number" />
-                </div>
-                <div className="form-group">
-                  <label>CUSDEC Number</label>
-                  <input type="text" name="cusdecNumber" value={formData.cusdecNumber} onChange={handleChange} placeholder="Customs Declaration Number" />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Open Date</label>
-                  <input type="date" name="openDate" value={formData.openDate} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label>Shipment Category *</label>
-                  <select name="shipmentCategory" value={formData.shipmentCategory} onChange={handleChange} required>
-                    <option value="">Select Category</option>
-                    <option value="SLPA">SLPA - Sri Lanka Port Authority</option>
-                    <option value="CICT">CICT - Colombo International Cargo Terminal</option>
-                    <option value="CWIT">CWIT - Colombo West International Terminal</option>
-                    <option value="LCL">LCL - Loose Cargo Load</option>
-                    <option value="FCL">FCL - Full Container Load</option>
-                    <option value="Air-Freight">Air-Freight</option>
-                    <option value="BOI">BOI - Board of Investment</option>
-                    <option value="TIEP">TIEP - Temporary Importation for Export Processing</option>
-                    <option value="ICL">ICL - Import Control License</option>
-                    <option value="SLSI">SLSI - Sri Lanka Standard Institution</option>
-                    <option value="CEA">CEA - Central Environmental Authority</option>
-                  </select>
+              <div className="form-section">
+                <h3 className="section-heading">Basic Information</h3>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Customer <span className="required">*</span></label>
+                    <select name="customerId" value={formData.customerId} onChange={handleChange} required disabled={isEditing}>
+                      <option value="">Select Customer</option>
+                      {customers.map(c => (
+                        <option key={c.customerId} value={c.customerId}>{c.customerId} - {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Assign To</label>
+                    <select name="assignedTo" value={formData.assignedTo} onChange={handleChange}>
+                      <option value="">Assign Later</option>
+                      {users.map(u => (
+                        <option key={u.userId} value={u.userId}>{u.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Exporter</label>
-                  <input type="text" name="exporter" value={formData.exporter} onChange={handleChange} placeholder="Exporter name" />
+              <div className="form-section">
+                <h3 className="section-heading">Shipment Details</h3>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Shipment Category <span className="required">*</span></label>
+                    <select name="shipmentCategory" value={formData.shipmentCategory} onChange={handleChange} required>
+                      <option value="">Select Category</option>
+                      <option value="LCL">LCL - Loose Cargo Load</option>
+                      <option value="FCL">FCL - Full Container Load</option>
+                      <option value="Air Freight">Air Freight</option>
+                      <option value="BOI">BOI - Board of Investment</option>
+                      <option value="Vehicle">Vehicle</option>
+                      <option value="TIEP">TIEP - Temporary Importation for Export Processing</option>
+                    </select>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Open Date <span className="required">*</span></label>
+                    <input type="date" name="openDate" value={formData.openDate} onChange={handleChange} required />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>BL Number</label>
+                    <input type="text" name="blNumber" value={formData.blNumber} onChange={handleChange} placeholder="Bill of Lading Number" />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>CUSDEC Number</label>
+                    <input type="text" name="cusdecNumber" value={formData.cusdecNumber} onChange={handleChange} placeholder="Customs Declaration Number" />
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label>LC Number</label>
-                  <input type="text" name="lcNumber" value={formData.lcNumber} onChange={handleChange} placeholder="Letter of Credit Number" />
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>LC Number</label>
+                    <input type="text" name="lcNumber" value={formData.lcNumber} onChange={handleChange} placeholder="Letter of Credit Number" />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Container Number</label>
+                    <input type="text" name="containerNumber" value={formData.containerNumber} onChange={handleChange} placeholder="Container Number" />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Exporter</label>
+                    <input type="text" name="exporter" value={formData.exporter} onChange={handleChange} placeholder="Exporter name" />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Transporter</label>
+                    <input type="text" name="transporter" value={formData.transporter} onChange={handleChange} placeholder="Transporter name" />
+                  </div>
                 </div>
-              </div>
-
-              <div className="form-group">
-                <label>Container Number</label>
-                <input type="text" name="containerNumber" value={formData.containerNumber} onChange={handleChange} placeholder="Container Number" />
-              </div>
-
-              <div className="form-group">
-                <label>Assign To (Optional)</label>
-                <select name="assignedTo" value={formData.assignedTo} onChange={handleChange}>
-                  <option value="">Assign Later</option>
-                  {users.map(u => (
-                    <option key={u.userId} value={u.userId}>{u.fullName}</option>
-                  ))}
-                </select>
               </div>
 
               <div className="action-buttons">

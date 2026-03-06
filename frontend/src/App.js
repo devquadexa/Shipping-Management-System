@@ -9,6 +9,8 @@ import Billing from './components/Billing';
 import PettyCash from './components/PettyCash';
 import Dashboard from './components/Dashboard';
 import UserManagement from './components/UserManagement';
+import Settings from './components/Settings';
+import Accounting from './components/Accounting';
 import Navbar from './components/Navbar';
 
 function PrivateRoute({ children }) {
@@ -36,7 +38,9 @@ function AppContent() {
           <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
           <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
           <Route path="/petty-cash" element={<PrivateRoute><PettyCash /></PrivateRoute>} />
+          <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
+          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
         </Routes>
       </div>
     </Router>

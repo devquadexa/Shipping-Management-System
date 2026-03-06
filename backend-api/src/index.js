@@ -10,7 +10,12 @@ const customerRoutes = require('./presentation/routes/customers');
 const jobRoutes = require('./presentation/routes/jobs');
 const billingRoutes = require('./presentation/routes/billing');
 const pettyCashRoutes = require('./presentation/routes/pettycash');
+const payItemTemplateRoutes = require('./presentation/routes/payItemTemplateRoutes');
+const pettyCashAssignmentRoutes = require('./presentation/routes/pettyCashAssignmentRoutes');
+const accountingRoutes = require('./presentation/routes/accounting');
 const { getConnection } = require('./config/database');
+const container = require('./infrastructure/di/container');
+const { startOverdueChecker } = require('./infrastructure/scheduler/overdueChecker');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,6 +28,9 @@ getConnection()
   .then(() => {
     console.log('✅ Database connected successfully');
     console.log('🏗️  Clean Architecture initialized');
+    
+    // Start the overdue invoice checker
+    startOverdueChecker(container);
   })
   .catch((err) => {
     console.error('❌ Failed to connect to database:', err);
@@ -34,6 +42,9 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/petty-cash', pettyCashRoutes);
+app.use('/api/pay-item-templates', payItemTemplateRoutes(container));
+app.use('/api/petty-cash-assignments', pettyCashAssignmentRoutes(container));
+app.use('/api/accounting', accountingRoutes);
 
 app.get('/', (req, res) => {
   res.json({ 

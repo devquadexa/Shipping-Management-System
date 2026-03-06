@@ -12,6 +12,8 @@ const MSSQLBillRepository = require('../repositories/MSSQLBillRepository');
 const MSSQLPettyCashRepository = require('../repositories/MSSQLPettyCashRepository');
 const MSSQLContactPersonRepository = require('../repositories/MSSQLContactPersonRepository');
 const MSSQLCategoryRepository = require('../repositories/MSSQLCategoryRepository');
+const MSSQLPayItemTemplateRepository = require('../repositories/MSSQLPayItemTemplateRepository');
+const MSSQLPettyCashAssignmentRepository = require('../repositories/MSSQLPettyCashAssignmentRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -32,11 +34,29 @@ const CreateBill = require('../../application/use-cases/billing/CreateBill');
 const GetAllBills = require('../../application/use-cases/billing/GetAllBills');
 const GetBillById = require('../../application/use-cases/billing/GetBillById');
 const MarkBillAsPaid = require('../../application/use-cases/billing/MarkBillAsPaid');
+const CheckOverdueInvoices = require('../../application/use-cases/billing/CheckOverdueInvoices');
+
+// Accounting Use Cases
+const GetAccountingDashboard = require('../../application/use-cases/accounting/GetAccountingDashboard');
 
 // Petty Cash Use Cases
 const CreatePettyCashEntry = require('../../application/use-cases/pettycash/CreatePettyCashEntry');
 const GetAllPettyCashEntries = require('../../application/use-cases/pettycash/GetAllPettyCashEntries');
 const GetPettyCashBalance = require('../../application/use-cases/pettycash/GetPettyCashBalance');
+
+// Pay Item Template Use Cases
+const GetAllPayItemTemplates = require('../../application/use-cases/payitemtemplate/GetAllPayItemTemplates');
+const GetPayItemTemplatesByCategory = require('../../application/use-cases/payitemtemplate/GetPayItemTemplatesByCategory');
+const CreatePayItemTemplate = require('../../application/use-cases/payitemtemplate/CreatePayItemTemplate');
+const UpdatePayItemTemplate = require('../../application/use-cases/payitemtemplate/UpdatePayItemTemplate');
+const DeletePayItemTemplate = require('../../application/use-cases/payitemtemplate/DeletePayItemTemplate');
+
+// Petty Cash Assignment Use Cases
+const CreatePettyCashAssignment = require('../../application/use-cases/pettycashassignment/CreatePettyCashAssignment');
+const GetAllPettyCashAssignments = require('../../application/use-cases/pettycashassignment/GetAllPettyCashAssignments');
+const GetUserPettyCashAssignments = require('../../application/use-cases/pettycashassignment/GetUserPettyCashAssignments');
+const GetPettyCashAssignmentByJob = require('../../application/use-cases/pettycashassignment/GetPettyCashAssignmentByJob');
+const SettlePettyCashAssignment = require('../../application/use-cases/pettycashassignment/SettlePettyCashAssignment');
 
 // Auth Use Cases
 const AuthenticateUser = require('../../application/use-cases/auth/AuthenticateUser');
@@ -62,10 +82,12 @@ class Container {
     this.dependencies.userRepository = new MSSQLUserRepository(getConnection, sql);
     this.dependencies.billRepository = new MSSQLBillRepository(getConnection, sql);
     this.dependencies.pettyCashRepository = new MSSQLPettyCashRepository(getConnection, sql);
+    this.dependencies.payItemTemplateRepository = new MSSQLPayItemTemplateRepository(getConnection, sql);
+    this.dependencies.pettyCashAssignmentRepository = new MSSQLPettyCashAssignmentRepository(getConnection, sql);
   }
 
   setupUseCases() {
-    const { customerRepository, jobRepository, userRepository, billRepository, pettyCashRepository } = this.dependencies;
+    const { customerRepository, jobRepository, userRepository, billRepository, pettyCashRepository, payItemTemplateRepository, pettyCashAssignmentRepository } = this.dependencies;
     
     // Customer use cases
     this.dependencies.createCustomer = new CreateCustomer(customerRepository);
@@ -82,15 +104,38 @@ class Container {
     this.dependencies.addPayItem = new AddPayItem(jobRepository);
     
     // Billing use cases
-    this.dependencies.createBill = new CreateBill(billRepository, jobRepository);
+    this.dependencies.createBill = new CreateBill(billRepository, jobRepository, customerRepository);
     this.dependencies.getAllBills = new GetAllBills(billRepository);
     this.dependencies.getBillById = new GetBillById(billRepository);
     this.dependencies.markBillAsPaid = new MarkBillAsPaid(billRepository);
+    this.dependencies.checkOverdueInvoices = new CheckOverdueInvoices(billRepository, jobRepository);
     
     // Petty Cash use cases
     this.dependencies.createPettyCashEntry = new CreatePettyCashEntry(pettyCashRepository);
     this.dependencies.getAllPettyCashEntries = new GetAllPettyCashEntries(pettyCashRepository);
     this.dependencies.getPettyCashBalance = new GetPettyCashBalance(pettyCashRepository);
+    
+    // Pay Item Template use cases
+    this.dependencies.getAllPayItemTemplates = new GetAllPayItemTemplates(payItemTemplateRepository);
+    this.dependencies.getPayItemTemplatesByCategory = new GetPayItemTemplatesByCategory(payItemTemplateRepository);
+    this.dependencies.createPayItemTemplate = new CreatePayItemTemplate(payItemTemplateRepository);
+    this.dependencies.updatePayItemTemplate = new UpdatePayItemTemplate(payItemTemplateRepository);
+    this.dependencies.deletePayItemTemplate = new DeletePayItemTemplate(payItemTemplateRepository);
+    
+    // Petty Cash Assignment use cases
+    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository);
+    this.dependencies.getAllPettyCashAssignments = new GetAllPettyCashAssignments(pettyCashAssignmentRepository);
+    this.dependencies.getUserPettyCashAssignments = new GetUserPettyCashAssignments(pettyCashAssignmentRepository);
+    this.dependencies.getPettyCashAssignmentByJob = new GetPettyCashAssignmentByJob(pettyCashAssignmentRepository);
+    this.dependencies.settlePettyCashAssignment = new SettlePettyCashAssignment(pettyCashAssignmentRepository);
+    
+    // Accounting use cases
+    this.dependencies.getAccountingDashboard = new GetAccountingDashboard(
+      jobRepository, 
+      billRepository, 
+      pettyCashAssignmentRepository, 
+      customerRepository
+    );
     
     // Auth use cases
     const jwtSecret = process.env.JWT_SECRET || 'default_secret';
@@ -102,6 +147,10 @@ class Container {
       throw new Error(`Dependency '${name}' not found`);
     }
     return this.dependencies[name];
+  }
+
+  resolve(name) {
+    return this.get(name);
   }
 }
 

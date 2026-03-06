@@ -219,6 +219,7 @@ class MSSQLJobRepository extends IJobRepository {
       assignedTo: row.AssignedTo,
       createdDate: row.CreatedDate,
       completedDate: row.CompletedDate,
+      pettyCashStatus: row.pettyCashStatus,
       payItems: payItems || []
     };
     

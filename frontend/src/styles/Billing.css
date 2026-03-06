@@ -80,30 +80,37 @@
 }
 
 .job-info-card {
-  background: #f8f9fa;
-  padding: 1.5rem;
+  background: #ffffff;
+  padding: 2rem;
   border-radius: 8px;
   margin-bottom: 1.5rem;
-  border: 1px solid #e0e0e0;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .job-info-card h3 {
-  margin: 0 0 1rem 0;
+  margin: 0 0 1.5rem 0;
   color: #101036;
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 0.75rem;
+  border-bottom: 3px solid #101036;
 }
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem 2rem;
 }
 
 .info-row {
   display: flex;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #e0e0e0;
+  flex-direction: column;
+  padding: 0;
+  border-bottom: none;
+  gap: 0.4rem;
 }
 
 .info-row:last-child {
@@ -112,14 +119,18 @@
 
 .info-label {
   font-weight: 600;
-  color: #666;
-  min-width: 150px;
-  font-size: 0.9rem;
+  color: #6b7280;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: auto;
 }
 
 .info-value {
-  color: #333;
-  font-size: 0.9rem;
+  color: #101036;
+  font-size: 1rem;
+  font-weight: 500;
+  word-break: break-word;
 }
 
 .pay-items-card {
@@ -322,14 +333,35 @@
   color: #1976d2;
 }
 
-.status-started {
+.status-in-progress {
   background: #fff3e0;
   color: #f57c00;
+}
+
+.status-pending-payment {
+  background: #ffe0b2;
+  color: #e65100;
+}
+
+.status-payment-collected {
+  background: #c8e6c9;
+  color: #2e7d32;
+}
+
+.status-overdue {
+  background: #ffcdd2;
+  color: #c62828;
 }
 
 .status-completed {
   background: #e8f5e9;
   color: #388e3c;
+}
+
+/* Legacy status support */
+.status-started {
+  background: #fff3e0;
+  color: #f57c00;
 }
 
 .status-canceled {
@@ -499,6 +531,11 @@
 
   .info-grid {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .job-info-card {
+    padding: 1.5rem;
   }
 
   .card-header-inline {
@@ -579,4 +616,49 @@
   .action-buttons .btn {
     width: 100%;
   }
+}
+
+/* Overdue Invoice Styles */
+.overdue-row {
+  background-color: #fff5f5 !important;
+}
+
+.overdue-row:hover {
+  background-color: #ffe5e5 !important;
+}
+
+.due-date-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.overdue-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background-color: #dc3545;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.help-text {
+  display: block;
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.25rem;
+  font-style: italic;
 }

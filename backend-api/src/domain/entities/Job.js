@@ -18,6 +18,7 @@ class Job {
     createdDate = new Date(),
     completedDate = null,
     payItems = [],
+    pettyCashStatus = null,
     metadata = {}
   }) {
     this.jobId = jobId;
@@ -34,6 +35,7 @@ class Job {
     this.createdDate = createdDate;
     this.completedDate = completedDate;
     this.payItems = payItems;
+    this.pettyCashStatus = pettyCashStatus;
     this.metadata = metadata;
   }
 
@@ -51,7 +53,7 @@ class Job {
   }
 
   canBeAssigned() {
-    return this.status === 'Open' || this.status === 'Started';
+    return this.status === 'Open' || this.status === 'In Progress';
   }
 
   assignTo(userId) {
@@ -62,7 +64,7 @@ class Job {
   }
 
   updateStatus(newStatus) {
-    const validStatuses = ['Open', 'Started', 'Completed', 'Canceled'];
+    const validStatuses = ['Open', 'In Progress', 'Pending Payment', 'Payment Collected', 'Overdue', 'Completed', 'Canceled'];
     if (!validStatuses.includes(newStatus)) {
       throw new Error(`Invalid status: ${newStatus}`);
     }
@@ -103,6 +105,7 @@ class Job {
       createdDate: this.createdDate,
       completedDate: this.completedDate,
       payItems: this.payItems,
+      pettyCashStatus: this.pettyCashStatus,
       metadata: this.metadata
     };
   }

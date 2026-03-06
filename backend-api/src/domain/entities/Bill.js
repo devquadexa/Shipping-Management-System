@@ -18,6 +18,9 @@ class Bill {
     billDate = new Date(),
     paidDate = null,
     invoiceNumber = null,
+    invoiceDate = null,
+    dueDate = null,
+    isOverdue = false,
     items = [],
     metadata = {}
   }) {
@@ -35,6 +38,9 @@ class Bill {
     this.billDate = billDate;
     this.paidDate = paidDate;
     this.invoiceNumber = invoiceNumber;
+    this.invoiceDate = invoiceDate;
+    this.dueDate = dueDate;
+    this.isOverdue = isOverdue;
     this.items = items;
     this.metadata = metadata;
   }
