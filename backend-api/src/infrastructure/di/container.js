@@ -43,6 +43,7 @@ const GetAccountingDashboard = require('../../application/use-cases/accounting/G
 const CreatePettyCashEntry = require('../../application/use-cases/pettycash/CreatePettyCashEntry');
 const GetAllPettyCashEntries = require('../../application/use-cases/pettycash/GetAllPettyCashEntries');
 const GetPettyCashBalance = require('../../application/use-cases/pettycash/GetPettyCashBalance');
+const GetAvailablePettyCashBalance = require('../../application/use-cases/pettycash/GetAvailablePettyCashBalance');
 
 // Pay Item Template Use Cases
 const GetAllPayItemTemplates = require('../../application/use-cases/payitemtemplate/GetAllPayItemTemplates');
@@ -57,6 +58,7 @@ const GetAllPettyCashAssignments = require('../../application/use-cases/pettycas
 const GetUserPettyCashAssignments = require('../../application/use-cases/pettycashassignment/GetUserPettyCashAssignments');
 const GetPettyCashAssignmentByJob = require('../../application/use-cases/pettycashassignment/GetPettyCashAssignmentByJob');
 const SettlePettyCashAssignment = require('../../application/use-cases/pettycashassignment/SettlePettyCashAssignment');
+const GetUserBalancesSummary = require('../../application/use-cases/pettycashassignment/GetUserBalancesSummary');
 
 // Auth Use Cases
 const AuthenticateUser = require('../../application/use-cases/auth/AuthenticateUser');
@@ -114,6 +116,7 @@ class Container {
     this.dependencies.createPettyCashEntry = new CreatePettyCashEntry(pettyCashRepository);
     this.dependencies.getAllPettyCashEntries = new GetAllPettyCashEntries(pettyCashRepository);
     this.dependencies.getPettyCashBalance = new GetPettyCashBalance(pettyCashRepository);
+    this.dependencies.getAvailablePettyCashBalance = new GetAvailablePettyCashBalance(pettyCashRepository, pettyCashAssignmentRepository);
     
     // Pay Item Template use cases
     this.dependencies.getAllPayItemTemplates = new GetAllPayItemTemplates(payItemTemplateRepository);
@@ -128,6 +131,7 @@ class Container {
     this.dependencies.getUserPettyCashAssignments = new GetUserPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getPettyCashAssignmentByJob = new GetPettyCashAssignmentByJob(pettyCashAssignmentRepository);
     this.dependencies.settlePettyCashAssignment = new SettlePettyCashAssignment(pettyCashAssignmentRepository);
+    this.dependencies.getUserBalancesSummary = new GetUserBalancesSummary(pettyCashAssignmentRepository);
     
     // Accounting use cases
     this.dependencies.getAccountingDashboard = new GetAccountingDashboard(

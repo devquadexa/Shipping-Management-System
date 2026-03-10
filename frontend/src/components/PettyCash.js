@@ -12,6 +12,8 @@ function PettyCash() {
   const [users, setUsers] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [message, setMessage] = useState('');
+  const [overallBalance, setOverallBalance] = useState(0);
+  const [userBalances, setUserBalances] = useState({});
   
   // Assignment Modal
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -33,6 +35,7 @@ function PettyCash() {
     fetchCustomers();
     if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') {
       fetchUsers();
+      fetchOverallBalance();
     }
   }, [user]);
 
@@ -60,6 +63,11 @@ function PettyCash() {
       // Ensure data is an array
       if (Array.isArray(data)) {
         setAssignments(data);
+        
+        // For admin/super admin, fetch user balances from dedicated endpoint
+        if (user?.role === 'Admin' || user?.role === 'Super Admin') {
+          fetchUserBalances();
+        }
       } else {
         console.error('Assignments data is not an array:', data);
         setAssignments([]);
@@ -67,6 +75,47 @@ function PettyCash() {
     } catch (error) {
       console.error('Error fetching assignments:', error);
       setAssignments([]);
+    }
+  };
+
+  const fetchUserBalances = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/petty-cash-assignments/user-balances', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched user balances:', data);
+        
+        // Convert array to object keyed by userId
+        const balancesMap = {};
+        data.forEach(balance => {
+          balancesMap[balance.userId] = balance;
+        });
+        setUserBalances(balancesMap);
+      }
+    } catch (error) {
+      console.error('Error fetching user balances:', error);
+    }
+  };
+
+  const fetchOverallBalance = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/petty-cash/balance', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setOverallBalance(data.balance || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching overall balance:', error);
     }
   };
 
@@ -144,7 +193,7 @@ function PettyCash() {
       } else {
         const error = await response.json();
         setMessage(error.message || 'Error assigning petty cash');
-        setTimeout(() => setMessage(''), 3000);
+        setTimeout(() => setMessage(''), 5000);
       }
     } catch (error) {
       console.error('Error assigning petty cash:', error);
@@ -311,6 +360,118 @@ function PettyCash() {
           </button>
         )}
       </div>
+
+      {/* Overall Balance Card for Admin/Super Admin */}
+      {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+        <div className="balance-cards">
+          <div className="balance-card overall-balance">
+            <div className="balance-card-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                <line x1="1" y1="10" x2="23" y2="10"></line>
+              </svg>
+            </div>
+            <div className="balance-card-content">
+              <h3>Overall Petty Cash Balance</h3>
+              <p className="balance-amount">LKR {formatAmount(overallBalance)}</p>
+              <p className="balance-description">Total available petty cash in system</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Balances Summary for Admin/Super Admin */}
+      {(user?.role === 'Admin' || user?.role === 'Super Admin') && Object.keys(userBalances).length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h2>User Petty Cash Summary</h2>
+          </div>
+          <div className="user-balances-grid">
+            {Object.entries(userBalances).map(([userId, balance]) => {
+              return (
+                <div key={userId} className="user-balance-card">
+                  <div className="user-balance-header">
+                    <div className="user-avatar">
+                      {balance.userName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="user-info">
+                      <h4>{balance.userName}</h4>
+                      <p className="user-id">{userId}</p>
+                    </div>
+                  </div>
+                  <div className="user-balance-stats">
+                    <div className="stat-row">
+                      <span className="stat-label">Total Assigned:</span>
+                      <span className="stat-value">LKR {formatAmount(balance.totalAssigned)}</span>
+                    </div>
+                    <div className="stat-row">
+                      <span className="stat-label">Total Spent:</span>
+                      <span className="stat-value">LKR {formatAmount(balance.totalSpent)}</span>
+                    </div>
+                    {balance.totalBalance > 0 && (
+                      <div className="stat-row">
+                        <span className="stat-label">Balance to Return:</span>
+                        <span className="stat-value balance-positive">LKR {formatAmount(balance.totalBalance)}</span>
+                      </div>
+                    )}
+                    {balance.totalOver > 0 && (
+                      <div className="stat-row">
+                        <span className="stat-label">Over Amount:</span>
+                        <span className="stat-value balance-negative">LKR {formatAmount(balance.totalOver)}</span>
+                      </div>
+                    )}
+                    <div className="stat-row stat-row-divider">
+                      <span className="stat-label">Active Assignments:</span>
+                      <span className="stat-value stat-badge">{balance.activeAssignments}</span>
+                    </div>
+                    <div className="stat-row">
+                      <span className="stat-label">Settled Assignments:</span>
+                      <span className="stat-value stat-badge">{balance.settledAssignments}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* User's Own Balance Summary */}
+      {user?.role === 'User' && assignments.length > 0 && (
+        <div className="balance-cards">
+          <div className="balance-card user-balance">
+            <div className="balance-card-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </div>
+            <div className="balance-card-content">
+              <h3>Your Petty Cash Summary</h3>
+              <div className="user-balance-details">
+                <div className="balance-detail-row">
+                  <span>Total Assigned:</span>
+                  <span className="balance-value">
+                    LKR {formatAmount(assignments.reduce((sum, a) => sum + parseFloat(a.assignedAmount || 0), 0))}
+                  </span>
+                </div>
+                <div className="balance-detail-row">
+                  <span>Active Assignments:</span>
+                  <span className="balance-value">
+                    {assignments.filter(a => a.status === 'Assigned').length}
+                  </span>
+                </div>
+                <div className="balance-detail-row">
+                  <span>Settled Assignments:</span>
+                  <span className="balance-value">
+                    {assignments.filter(a => a.status === 'Settled').length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className={`alert ${message.includes('Error') ? 'alert-error' : 'alert-success'}`}>

@@ -15,7 +15,8 @@ function Dashboard() {
     openJobs: 0,
     totalBills: 0,
     unpaidBills: 0,
-    pettyCashBalance: 0
+    pettyCashBalance: 0,
+    userPettyCash: 0
   });
   const [accountingData, setAccountingData] = useState(null);
 
@@ -28,11 +29,21 @@ function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const [customers, jobs, bills, pettyCash] = await Promise.all([
+      let pettyCashData = { balance: 0 };
+
+      // Fetch petty cash based on role
+      if (user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Manager') {
+        // For admin/super admin/manager, get overall balance
+        pettyCashData = await pettyCashService.getBalance();
+      } else if (user?.role === 'User') {
+        // For regular users, get their assigned petty cash
+        pettyCashData = await pettyCashService.getUserAssignedBalance();
+      }
+
+      const [customers, jobs, bills] = await Promise.all([
         (user?.role !== 'User') ? customerService.getAll() : Promise.resolve([]),
         jobService.getAll(),
-        (user?.role !== 'User') ? billingService.getBills() : Promise.resolve([]),
-        pettyCashService.getBalance()
+        (user?.role !== 'User') ? billingService.getBills() : Promise.resolve([])
       ]);
 
       setStats({
@@ -41,7 +52,8 @@ function Dashboard() {
         openJobs: jobs.filter(j => j.status === 'Open').length,
         totalBills: bills.length,
         unpaidBills: bills.filter(b => b.paymentStatus === 'Unpaid').length,
-        pettyCashBalance: pettyCash.balance
+        pettyCashBalance: pettyCashData.balance,
+        userPettyCash: pettyCashData.balance
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -173,8 +185,12 @@ function Dashboard() {
         )}
         <div className="stat-card">
           <h3>Petty Cash</h3>
-          <div className="value">LKR {stats.pettyCashBalance.toFixed(2)}</div>
-          <div className="label">Current Balance</div>
+          <div className="value">
+            LKR {(user?.role === 'User' ? stats.userPettyCash : stats.pettyCashBalance).toFixed(2)}
+          </div>
+          <div className="label">
+            {user?.role === 'User' ? 'Assigned to you' : 'Current Balance'}
+          </div>
         </div>
       </div>
     </div>
