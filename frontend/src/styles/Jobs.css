@@ -231,7 +231,16 @@
   appearance: none;
   background-position: right 8px center;
   background-repeat: no-repeat;
-  padding-right: 28px;
+}
+
+.status-badge:not(:disabled) {
+  padding-right: 32px;
+}
+
+.status-badge:disabled {
+  cursor: not-allowed;
+  opacity: 0.9;
+  padding-right: 14px;
 }
 
 .status-open {
@@ -961,4 +970,80 @@
 
 .action-buttons .btn {
   min-width: 150px;
+}
+
+/* Status Select Wrapper with Dropdown Arrow */
+.status-select-wrapper {
+  position: relative;
+  display: inline-block;
+  min-width: 140px;
+}
+
+.status-select-wrapper select.status-badge {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  width: 100%;
+  padding: 6px 14px;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.status-select-wrapper select.status-badge:not(:disabled) {
+  padding-right: 32px;
+}
+
+.status-select-wrapper select.status-badge:disabled {
+  cursor: not-allowed;
+  opacity: 0.9;
+  padding-right: 14px;
+}
+
+.status-select-wrapper .dropdown-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.status-select-wrapper:hover .dropdown-arrow {
+  opacity: 1;
+}
+
+/* Adjust arrow color based on status */
+.status-open .dropdown-arrow {
+  color: #1e40af;
+}
+
+.status-in-progress .dropdown-arrow {
+  color: #92400e;
+}
+
+.status-pending-payment .dropdown-arrow {
+  color: #9a3412;
+}
+
+.status-payment-collected .dropdown-arrow {
+  color: #166534;
+}
+
+.status-overdue .dropdown-arrow {
+  color: #991b1b;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .status-select-wrapper {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .status-select-wrapper select.status-badge {
+    width: 100%;
+  }
 }

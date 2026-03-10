@@ -12,7 +12,8 @@ const router = express.Router();
 const pettyCashController = new PettyCashController(
   container.get('createPettyCashEntry'),
   container.get('getAllPettyCashEntries'),
-  container.get('getPettyCashBalance')
+  container.get('getPettyCashBalance'),
+  container.get('getAvailablePettyCashBalance')
 );
 
 // Routes
@@ -26,6 +27,10 @@ router.get('/', auth, (req, res) =>
 
 router.get('/balance', auth, (req, res) => 
   pettyCashController.getBalance(req, res)
+);
+
+router.get('/available-balance', auth, (req, res) => 
+  pettyCashController.getAvailableBalance(req, res)
 );
 
 module.exports = router;

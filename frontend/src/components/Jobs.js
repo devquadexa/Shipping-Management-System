@@ -335,19 +335,26 @@ function Jobs() {
                       </td>
                     )}
                     <td data-label="Status">
-                      <select 
-                        className={`status-badge status-${(job.status || 'Open').toLowerCase().replace(/\s+/g, '-')}`}
-                        onChange={(e) => updateStatus(job.jobId, e.target.value)} 
-                        value={job.status || 'Open'}
-                        disabled={job.status === 'Completed' || job.status === 'Canceled'}
-                      >
-                        <option value={job.status || 'Open'}>{job.status || 'Open'}</option>
-                        {getAvailableStatuses(job.status || 'Open').map(status => (
-                          status !== (job.status || 'Open') && (
-                            <option key={status} value={status}>{status.toUpperCase()}</option>
-                          )
-                        ))}
-                      </select>
+                      <div className="status-select-wrapper">
+                        <select 
+                          className={`status-badge status-${(job.status || 'Open').toLowerCase().replace(/\s+/g, '-')}`}
+                          onChange={(e) => updateStatus(job.jobId, e.target.value)} 
+                          value={job.status || 'Open'}
+                          disabled={job.status === 'Completed' || job.status === 'Canceled'}
+                        >
+                          <option value={job.status || 'Open'}>{job.status || 'Open'}</option>
+                          {getAvailableStatuses(job.status || 'Open').map(status => (
+                            status !== (job.status || 'Open') && (
+                              <option key={status} value={status}>{status.toUpperCase()}</option>
+                            )
+                          ))}
+                        </select>
+                        {job.status !== 'Completed' && job.status !== 'Canceled' && (
+                          <svg className="dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
                     </td>
                     <td data-label="Actions">
                       <div style={{ display: 'flex', gap: '0.5rem' }}>

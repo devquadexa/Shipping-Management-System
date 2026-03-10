@@ -76,6 +76,17 @@ class PettyCashAssignmentController {
       res.status(500).json({ message: error.message || 'Error settling petty cash' });
     }
   }
+
+  async getUserBalancesSummary(req, res) {
+    try {
+      const getUserBalancesSummary = this.container.resolve('getUserBalancesSummary');
+      const balances = await getUserBalancesSummary.execute();
+      res.json(balances);
+    } catch (error) {
+      console.error('Error in getUserBalancesSummary:', error);
+      res.status(500).json({ message: 'Error fetching user balances summary' });
+    }
+  }
 }
 
 module.exports = PettyCashAssignmentController;

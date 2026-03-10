@@ -20,6 +20,13 @@ module.exports = (container) => {
     (req, res) => controller.getAll(req, res)
   );
 
+  // Get user balances summary (Admin/Super Admin only)
+  router.get('/user-balances', 
+    auth, 
+    checkRole('Admin', 'Super Admin'), 
+    (req, res) => controller.getUserBalancesSummary(req, res)
+  );
+
   // Get user's own assignments (All authenticated users)
   router.get('/my', 
     auth, 
