@@ -180,21 +180,42 @@ PRINT 'Step 2.2: Migrating existing job assignments...';
 -- Check if there are jobs with assignedTo that aren't in JobAssignments yet
 IF EXISTS (SELECT * FROM sys.tables WHERE name = 'JobAssignments')
 BEGIN
-    INSERT INTO JobAssignments (jobId, userId, assignedDate, assignedBy)
-    SELECT 
-        j.jobId,
-        j.assignedTo,
-        GETDATE(), -- Use current date since Jobs table doesn't have assignedDate
-        'admin' -- Default to admin since Jobs table doesn't have createdBy
-    FROM Jobs j
-    WHERE j.assignedTo IS NOT NULL
-    AND NOT EXISTS (
-        SELECT 1 FROM JobAssignments ja 
-        WHERE ja.jobId = j.jobId AND ja.userId = j.assignedTo
-    );
+    -- Get a valid admin user ID (Super Admin or Admin)
+    DECLARE @AdminUserId VARCHAR(50);
+    SELECT TOP 1 @AdminUserId = userId 
+    FROM Users 
+    WHERE role IN ('Super Admin', 'Admin') 
+    ORDER BY CASE WHEN role = 'Super Admin' THEN 1 ELSE 2 END;
     
-    DECLARE @MigratedCount INT = @@ROWCOUNT;
-    PRINT '✓ Migrated ' + CAST(@MigratedCount AS VARCHAR) + ' existing job assignment(s)';
+    -- If no admin found, use the first user
+    IF @AdminUserId IS NULL
+    BEGIN
+        SELECT TOP 1 @AdminUserId = userId FROM Users;
+    END
+    
+    -- Only migrate if we have a valid admin user
+    IF @AdminUserId IS NOT NULL
+    BEGIN
+        INSERT INTO JobAssignments (jobId, userId, assignedDate, assignedBy)
+        SELECT 
+            j.jobId,
+            j.assignedTo,
+            GETDATE(), -- Use current date since Jobs table doesn't have assignedDate
+            @AdminUserId -- Use actual admin user ID
+        FROM Jobs j
+        WHERE j.assignedTo IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM JobAssignments ja 
+            WHERE ja.jobId = j.jobId AND ja.userId = j.assignedTo
+        );
+        
+        DECLARE @MigratedCount INT = @@ROWCOUNT;
+        PRINT '✓ Migrated ' + CAST(@MigratedCount AS VARCHAR) + ' existing job assignment(s)';
+    END
+    ELSE
+    BEGIN
+        PRINT '⚠ No admin user found, skipping migration of existing assignments';
+    END
 END
 PRINT '';
 GO
@@ -485,8 +506,9 @@ PRINT '';
 
 -- Verify Waff Clerk role
 PRINT 'Waff Clerk Role:';
-SELECT @UpdatedUsers = COUNT(*) FROM Users WHERE role = 'Waff Clerk';
-PRINT '  ✓ ' + CAST(@UpdatedUsers AS VARCHAR) + ' Waff Clerk user(s) in system';
+DECLARE @WaffClerkCount INT;
+SELECT @WaffClerkCount = COUNT(*) FROM Users WHERE role = 'Waff Clerk';
+PRINT '  ✓ ' + CAST(@WaffClerkCount AS VARCHAR) + ' Waff Clerk user(s) in system';
 
 IF EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK_Users_Role')
     PRINT '  ✓ Role constraint updated'
