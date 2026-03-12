@@ -184,8 +184,8 @@ BEGIN
     SELECT 
         j.jobId,
         j.assignedTo,
-        j.assignedDate,
-        COALESCE(j.createdBy, 'admin')
+        GETDATE(), -- Use current date since Jobs table doesn't have assignedDate
+        'admin' -- Default to admin since Jobs table doesn't have createdBy
     FROM Jobs j
     WHERE j.assignedTo IS NOT NULL
     AND NOT EXISTS (
@@ -286,14 +286,14 @@ SELECT
     j.customerId,
     j.shipmentCategory,
     j.status,
-    j.assignedDate,
+    j.openDate,
     COUNT(ja.userId) as assignedUserCount,
     STRING_AGG(u.fullName, ', ') as assignedUserNames,
     STRING_AGG(ja.userId, ',') as assignedUserIds
 FROM Jobs j
 LEFT JOIN JobAssignments ja ON j.jobId = ja.jobId
 LEFT JOIN Users u ON ja.userId = u.userId
-GROUP BY j.jobId, j.customerId, j.shipmentCategory, j.status, j.assignedDate;
+GROUP BY j.jobId, j.customerId, j.shipmentCategory, j.status, j.openDate;
 GO
 
 PRINT '✓ Created vw_JobAssignmentSummary';
