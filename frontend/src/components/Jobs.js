@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
 import { authService } from '../api/services/authService';
+import apiClient from '../api/client';
 import '../styles/Jobs.css';
 
 function Jobs() {
@@ -26,6 +27,8 @@ function Jobs() {
     transporter: '',
     assignedTo: ''
   });
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -33,10 +36,24 @@ function Jobs() {
   useEffect(() => {
     fetchJobs();
     fetchCustomers(); // All users need to see customer names
-    if (user?.role === 'Admin' || user?.role === 'Super Admin') {
+    if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') {
       fetchUsers();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Close dropdown when clicking outside
+    const handleClickOutside = (event) => {
+      if (showUserDropdown && !event.target.closest('.multi-select-dropdown')) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserDropdown]);
 
   const fetchJobs = async () => {
     try {
@@ -46,7 +63,9 @@ function Jobs() {
       // Ensure all jobs have a status
       const jobsWithStatus = data.map(job => ({
         ...job,
-        status: job.status || 'Open'
+        status: job.status || 'Open',
+        // Map assignedUsers to assignments for consistency
+        assignments: job.assignedUsers || []
       }));
       console.log('Jobs with status:', jobsWithStatus);
       console.log('First job after mapping:', JSON.stringify(jobsWithStatus[0], null, 2));
@@ -62,6 +81,7 @@ function Jobs() {
   };
 
   const getUserFullName = (userId) => {
+    if (!userId) return 'Unknown';
     const user = users.find(u => u.userId === userId);
     return user ? user.fullName : userId;
   };
@@ -80,8 +100,8 @@ function Jobs() {
       console.log('Fetching users... Current user role:', user?.role);
       const data = await authService.getUsers();
       console.log('Fetched users data:', data);
-      const filteredUsers = data.filter(u => u.role === 'User');
-      console.log('Filtered users (role=User):', filteredUsers);
+      const filteredUsers = data.filter(u => u.role === 'Waff Clerk');
+      console.log('Filtered users (role=Waff Clerk):', filteredUsers);
       setUsers(filteredUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -94,8 +114,34 @@ function Jobs() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await jobService.create(formData);
-      setMessage('Job created successfully!');
+      // Create the job first
+      const jobResponse = await jobService.create(formData);
+      const jobId = jobResponse.jobId;
+      
+      let assignmentMessage = '';
+      
+      // If users are selected, assign them to the job
+      if (selectedUsers.length > 0) {
+        try {
+          const response = await apiClient.post(`/job-assignments/jobs/${jobId}/assign-users`, {
+            userIds: selectedUsers,
+            notes: 'Initial assignment from job creation'
+          });
+          
+          if (response.data.success) {
+            assignmentMessage = ` and assigned to ${selectedUsers.length} user${selectedUsers.length > 1 ? 's' : ''}`;
+          } else {
+            console.error('Assignment failed:', response.data);
+            assignmentMessage = ' (Note: Job created but user assignment failed)';
+          }
+        } catch (assignmentError) {
+          console.error('Failed to assign users to job:', assignmentError);
+          console.error('Error response:', assignmentError.response?.data);
+          assignmentMessage = ' (Note: Job created but user assignment failed)';
+        }
+      }
+      
+      setMessage(`Job created successfully${assignmentMessage}!`);
       setFormData({ 
         customerId: '', 
         blNumber: '', 
@@ -108,12 +154,36 @@ function Jobs() {
         transporter: '',
         assignedTo: '' 
       });
+      setSelectedUsers([]);
       setShowModal(false);
       fetchJobs();
-      setTimeout(() => setMessage(''), 3000);
+      setTimeout(() => setMessage(''), 5000);
     } catch (error) {
+      console.error('Job creation error:', error);
       setMessage('Error creating job');
+      setTimeout(() => setMessage(''), 3000);
     }
+  };
+
+  const handleUserSelection = (userId, isChecked) => {
+    if (isChecked) {
+      setSelectedUsers(prev => [...prev, userId]);
+    } else {
+      setSelectedUsers(prev => prev.filter(id => id !== userId));
+    }
+  };
+
+  const toggleUserDropdown = () => {
+    setShowUserDropdown(!showUserDropdown);
+  };
+
+  const getSelectedUserNames = () => {
+    if (selectedUsers.length === 0) return 'Select Users';
+    if (selectedUsers.length === 1) {
+      const user = users.find(u => u.userId === selectedUsers[0]);
+      return user ? user.fullName : 'Select Users';
+    }
+    return `${selectedUsers.length} users selected`;
   };
 
   const handleChange = (e) => {
@@ -175,6 +245,14 @@ function Jobs() {
       transporter: job.transporter || '',
       assignedTo: job.assignedTo || ''
     });
+    // For editing, load existing assignments
+    if (job.assignments && job.assignments.length > 0) {
+      setSelectedUsers(job.assignments.map(a => a.userId));
+    } else if (job.assignedTo) {
+      setSelectedUsers([job.assignedTo]);
+    } else {
+      setSelectedUsers([]);
+    }
     setShowModal(true);
   };
 
@@ -182,6 +260,23 @@ function Jobs() {
     e.preventDefault();
     try {
       await jobService.update(selectedJob.jobId, formData);
+      
+      // Update user assignments if changed
+      if (selectedUsers.length > 0) {
+        try {
+          const response = await apiClient.post(`/job-assignments/jobs/${selectedJob.jobId}/assign-users`, {
+            userIds: selectedUsers,
+            notes: 'Updated assignment from job edit'
+          });
+          
+          if (!response.data.success) {
+            console.error('Failed to update user assignments');
+          }
+        } catch (assignmentError) {
+          console.error('Failed to update user assignments:', assignmentError);
+        }
+      }
+      
       setMessage('Job updated successfully!');
       setFormData({
         customerId: '',
@@ -195,6 +290,8 @@ function Jobs() {
         transporter: '',
         assignedTo: ''
       });
+      setSelectedUsers([]);
+      setShowUserDropdown(false);
       setShowModal(false);
       setIsEditing(false);
       setSelectedJob(null);
@@ -233,9 +330,9 @@ function Jobs() {
       <div className="page-header">
         <div>
           <h1>Job Management</h1>
-          <p>{user?.role === 'User' ? 'Your assigned jobs' : 'Manage all cargo jobs'}</p>
+          <p>{user?.role === 'Waff Clerk' ? 'Your assigned jobs' : 'Manage all cargo jobs'}</p>
         </div>
-        {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+        {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
           <button onClick={() => setShowModal(true)} className="btn btn-primary">
             + New Job
           </button>
@@ -303,7 +400,7 @@ function Jobs() {
                 <th>Customer</th>
                 <th>Category</th>
                 <th>Open Date</th>
-                {user?.role !== 'User' && <th>Assigned To</th>}
+                {user?.role !== 'Waff Clerk' && <th>Assigned To</th>}
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -320,9 +417,9 @@ function Jobs() {
                       ) : '-'}
                     </td>
                     <td data-label="Open Date">{job.openDate ? new Date(job.openDate).toLocaleDateString() : '-'}</td>
-                    {user?.role !== 'User' && (
+                    {user?.role !== 'Waff Clerk' && (
                       <td data-label="Assigned To">
-                        {(user?.role === 'Admin' || user?.role === 'Super Admin') && !job.assignedTo ? (
+                        {(user?.role === 'Admin' || user?.role === 'Super Admin') && !job.assignedTo && (!job.assignments || job.assignments.length === 0) ? (
                           <select onChange={(e) => assignJob(job.jobId, e.target.value)} defaultValue="">
                             <option value="">Assign User</option>
                             {users.map(u => (
@@ -330,7 +427,26 @@ function Jobs() {
                             ))}
                           </select>
                         ) : (
-                          <span>{job.assignedTo ? getUserFullName(job.assignedTo) : 'Unassigned'}</span>
+                          <div className="assigned-users">
+                            {job.assignments && job.assignments.length > 0 ? (
+                              <div className="multi-user-assignments">
+                                {job.assignments.slice(0, 2).map((assignment, index) => (
+                                  <span key={assignment.userId || index} className="assigned-user-badge">
+                                    {assignment.userName || getUserFullName(assignment.userId)}
+                                  </span>
+                                ))}
+                                {job.assignments.length > 2 && (
+                                  <span className="more-users-badge">
+                                    +{job.assignments.length - 2} more
+                                  </span>
+                                )}
+                              </div>
+                            ) : job.assignedTo ? (
+                              <span className="assigned-user-badge">{getUserFullName(job.assignedTo)}</span>
+                            ) : (
+                              <span className="unassigned-text">Unassigned</span>
+                            )}
+                          </div>
                         )}
                       </td>
                     )}
@@ -358,7 +474,7 @@ function Jobs() {
                     </td>
                     <td data-label="Actions">
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+                        {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
                           <button
                             className="btn-action btn-edit"
                             onClick={() => openEditModal(job)}
@@ -379,7 +495,7 @@ function Jobs() {
                   </tr>
                   {expandedRow === job.jobId && (
                     <tr className="expanded-details">
-                      <td colSpan={user?.role !== 'User' ? 7 : 6}>
+                      <td colSpan={user?.role !== 'Waff Clerk' ? 7 : 6}>
                         <div className="details-grid">
                           <div className="detail-section">
                             <h4 className="section-title">Basic Information</h4>
@@ -431,7 +547,21 @@ function Jobs() {
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">Assigned To:</span>
-                              <span className="detail-value">{job.assignedTo ? getUserFullName(job.assignedTo) : 'Unassigned'}</span>
+                              <span className="detail-value">
+                                {job.assignments && job.assignments.length > 0 ? (
+                                  <div className="assigned-users-detail">
+                                    {job.assignments.map((assignment, index) => (
+                                      <span key={assignment.userId || index} className="assigned-user-badge">
+                                        {assignment.userName || getUserFullName(assignment.userId)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : job.assignedTo ? (
+                                  <span className="assigned-user-badge">{getUserFullName(job.assignedTo)}</span>
+                                ) : (
+                                  <span className="unassigned-text">Unassigned</span>
+                                )}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -447,11 +577,11 @@ function Jobs() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); }}>
+        <div className="modal-overlay" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{isEditing ? 'Edit Job' : 'Create New Job'}</h2>
-              <button className="btn-close" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); }}>×</button>
+              <button className="btn-close" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }}>×</button>
             </div>
             <form onSubmit={isEditing ? handleUpdate : handleSubmit} className="job-form">
               <div className="form-section">
@@ -468,13 +598,61 @@ function Jobs() {
                   </div>
                   
                   <div className="form-group">
-                    <label>Assign To</label>
-                    <select name="assignedTo" value={formData.assignedTo} onChange={handleChange}>
-                      <option value="">Assign Later</option>
-                      {users.map(u => (
-                        <option key={u.userId} value={u.userId}>{u.fullName}</option>
-                      ))}
-                    </select>
+                    <label>Assign To Users</label>
+                    <div className="multi-select-dropdown">
+                      <div 
+                        className="multi-select-trigger" 
+                        onClick={toggleUserDropdown}
+                      >
+                        <span className="selected-text">{getSelectedUserNames()}</span>
+                        <svg 
+                          className={`dropdown-arrow ${showUserDropdown ? 'open' : ''}`} 
+                          width="12" 
+                          height="12" 
+                          viewBox="0 0 12 12" 
+                          fill="none"
+                        >
+                          <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      {showUserDropdown && (
+                        <div className="multi-select-options">
+                          {users.length === 0 ? (
+                            <div className="no-users-message">No users available</div>
+                          ) : (
+                            users.map(user => (
+                              <label key={user.userId} className="multi-select-option">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedUsers.includes(user.userId)}
+                                  onChange={(e) => handleUserSelection(user.userId, e.target.checked)}
+                                />
+                                <span className="option-label">{user.fullName}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {selectedUsers.length > 0 && (
+                      <div className="selected-users-tags">
+                        {selectedUsers.map(userId => {
+                          const user = users.find(u => u.userId === userId);
+                          return user ? (
+                            <span key={userId} className="user-tag">
+                              {user.fullName}
+                              <button
+                                type="button"
+                                className="remove-tag"
+                                onClick={() => handleUserSelection(userId, false)}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -536,7 +714,7 @@ function Jobs() {
 
               <div className="action-buttons">
                 <button type="submit" className="btn btn-primary">{isEditing ? 'Update Job' : 'Create Job'}</button>
-                <button type="button" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); }} className="btn btn-secondary">Cancel</button>
+                <button type="button" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }} className="btn btn-secondary">Cancel</button>
               </div>
             </form>
           </div>

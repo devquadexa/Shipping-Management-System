@@ -65,11 +65,33 @@ class PettyCashAssignmentController {
     }
   }
 
+  async getSettlementItems(req, res) {
+    try {
+      const { id } = req.params;
+      const pettyCashAssignmentRepository = this.container.resolve('pettyCashAssignmentRepository');
+      const items = await pettyCashAssignmentRepository.getSettlementItems(parseInt(id));
+      res.json(items);
+    } catch (error) {
+      console.error('Error in getSettlementItems:', error);
+      res.status(500).json({ message: 'Error fetching settlement items' });
+    }
+  }
+
   async settle(req, res) {
     try {
       const { id } = req.params;
       const settlePettyCashAssignment = this.container.resolve('settlePettyCashAssignment');
-      const assignment = await settlePettyCashAssignment.execute(parseInt(id), req.body);
+      
+      // Add paidBy to each item if not provided
+      const settlementData = {
+        ...req.body,
+        items: req.body.items.map(item => ({
+          ...item,
+          paidBy: item.paidBy || req.user.userId
+        }))
+      };
+      
+      const assignment = await settlePettyCashAssignment.execute(parseInt(id), settlementData);
       res.json(assignment);
     } catch (error) {
       console.error('Error in settle:', error);

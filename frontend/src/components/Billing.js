@@ -113,22 +113,50 @@ function Billing() {
             console.log('Settlement items length:', assignment?.settlementItems?.length);
             
             if (assignment && assignment.status === 'Settled' && assignment.settlementItems && Array.isArray(assignment.settlementItems) && assignment.settlementItems.length > 0) {
-              // Pre-fill actual costs from settlement
+              // Pre-fill actual costs from settlement and auto-save to job
               console.log('Processing settlement items:', assignment.settlementItems);
-              const loadedPayItems = assignment.settlementItems.map(item => {
-                console.log('Processing item:', item);
-                return {
-                  name: item.itemName,
-                  actualCost: item.actualCost ? item.actualCost.toString() : '',
-                  billingAmount: '',
-                  sameAmount: false
-                };
-              });
-              console.log('Setting pay items from settlement:', loadedPayItems);
-              setPayItems(loadedPayItems);
-              setShowPayItemsRow(true);
-              setMessage(`✅ Loaded ${loadedPayItems.length} items from petty cash settlement`);
-              setTimeout(() => setMessage(''), 5000);
+              
+              // Check if job already has pay items from this settlement
+              const hasPayItems = job.payItems && job.payItems.length > 0;
+              
+              if (!hasPayItems) {
+                // Auto-save settlement items as pay items
+                console.log('Auto-saving settlement items as pay items...');
+                try {
+                  for (const item of assignment.settlementItems) {
+                    await jobService.addPayItem(jobId, {
+                      description: item.itemName,
+                      amount: parseFloat(item.actualCost),
+                      billingAmount: 0 // Will be filled by user
+                    });
+                  }
+                  
+                  // Refresh job data
+                  const refreshedJobs = await jobService.getAll();
+                  const refreshedJob = refreshedJobs.find(j => j.jobId === jobId);
+                  setSelectedJob(refreshedJob);
+                  
+                  setMessage(`✅ Loaded ${assignment.settlementItems.length} items from petty cash settlement. Please fill in billing amounts.`);
+                  setTimeout(() => setMessage(''), 5000);
+                } catch (saveError) {
+                  console.error('Error auto-saving settlement items:', saveError);
+                  // Fall back to manual entry
+                  const loadedPayItems = assignment.settlementItems.map(item => ({
+                    name: item.itemName,
+                    actualCost: item.actualCost ? item.actualCost.toString() : '',
+                    billingAmount: '',
+                    sameAmount: false
+                  }));
+                  setPayItems(loadedPayItems);
+                  setShowPayItemsRow(true);
+                  setMessage(`⚠ Loaded ${loadedPayItems.length} items from settlement. Please save them manually.`);
+                  setTimeout(() => setMessage(''), 5000);
+                }
+              } else {
+                console.log('Job already has pay items, skipping auto-save');
+                setMessage(`✅ Settlement items already loaded for this job`);
+                setTimeout(() => setMessage(''), 3000);
+              }
             } else {
               console.log('Settlement check failed:', {
                 hasAssignment: !!assignment,
@@ -619,7 +647,7 @@ function Billing() {
     `;
   };
 
-  if (user?.role === 'User') {
+  if (user?.role === 'Waff Clerk') {
     return (
       <div className="billing-page">
         <div className="alert alert-error">Access Denied: Admin or Super Admin only</div>

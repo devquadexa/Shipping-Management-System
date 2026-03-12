@@ -35,7 +35,7 @@ END
 
 -- Add new constraint
 ALTER TABLE Users ADD CONSTRAINT CK_Users_Role 
-CHECK (Role IN ('Super Admin', 'Admin', 'Manager', 'User'));
+CHECK (Role IN ('Super Admin', 'Admin', 'Manager', 'Waff Clerk'));
 PRINT '✓ Added new constraint with Manager role';
 PRINT '';
 GO

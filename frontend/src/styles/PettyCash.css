@@ -789,3 +789,82 @@
 .form-group input.error {
   border-color: #dc2626;
 }
+/* No users message */
+.no-users-message {
+  color: #6b7280;
+  font-style: italic;
+  text-align: center;
+  padding: 0.5rem;
+  margin: 0.5rem 0 0 0;
+  font-size: 0.875rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+/* Helper text for form fields */
+.helper-text {
+  margin: 0.5rem 0 0 0;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.helper-text.warning {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+}
+
+.helper-text.info {
+  color: #1e40af;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+}
+
+
+/* Paid By Badge */
+.paid-by-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid #bfdbfe;
+}
+
+/* Settlement Items Table - Paid By Column */
+.settlement-items-table th:last-child,
+.settlement-items-table td:last-child {
+  text-align: center;
+}
+
+
+/* Paid Item Row Styling */
+.settlement-item-row.paid-item-row {
+  background: #f0f9ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.paid-input {
+  background: #f0f9ff !important;
+  color: #1e40af !important;
+  font-weight: 600 !important;
+  cursor: not-allowed !important;
+}
+
+.paid-by-indicator {
+  display: flex;
+  align-items: center;
+  margin-left: 0.5rem;
+}
+
+/* Helper text at top of form */
+.settlement-form .helper-text {
+  margin-bottom: 1rem;
+}
