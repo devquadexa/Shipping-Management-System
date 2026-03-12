@@ -188,13 +188,47 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
   async getSettlementItems(assignmentId) {
     try {
       const pool = await this.getConnection();
+      
+      // Check if paidBy column exists
+      const columnCheck = await pool.request()
+        .query(`
+          SELECT COUNT(*) as columnExists
+          FROM sys.columns 
+          WHERE object_id = OBJECT_ID('PettyCashSettlementItems') 
+          AND name = 'paidBy'
+        `);
+      
+      const hasPaidByColumn = columnCheck.recordset[0].columnExists > 0;
+      
+      let query;
+      if (hasPaidByColumn) {
+        // New query with paidBy column
+        query = `
+          SELECT 
+            si.*,
+            u.fullName as paidByName,
+            u.email as paidByEmail
+          FROM PettyCashSettlementItems si
+          LEFT JOIN Users u ON si.paidBy = u.userId
+          WHERE si.assignmentId = @assignmentId
+          ORDER BY si.settlementItemId
+        `;
+      } else {
+        // Fallback query without paidBy column
+        query = `
+          SELECT 
+            si.*,
+            NULL as paidByName,
+            NULL as paidByEmail
+          FROM PettyCashSettlementItems si
+          WHERE si.assignmentId = @assignmentId
+          ORDER BY si.settlementItemId
+        `;
+      }
+      
       const result = await pool.request()
         .input('assignmentId', this.sql.Int, assignmentId)
-        .query(`
-          SELECT * FROM PettyCashSettlementItems
-          WHERE assignmentId = @assignmentId
-          ORDER BY settlementItemId
-        `);
+        .query(query);
       
       return result.recordset;
     } catch (error) {
@@ -211,51 +245,112 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       await transaction.begin();
       
       try {
-        // Calculate totals
-        const actualSpent = settlementData.items.reduce((sum, item) => sum + parseFloat(item.actualCost), 0);
         const assignment = await this.getById(assignmentId);
-        const assignedAmount = parseFloat(assignment.assignedAmount);
-        const balanceAmount = assignedAmount > actualSpent ? assignedAmount - actualSpent : 0;
-        const overAmount = actualSpent > assignedAmount ? actualSpent - assignedAmount : 0;
         
-        // Update assignment
-        await transaction.request()
-          .input('assignmentId', this.sql.Int, assignmentId)
-          .input('status', this.sql.NVarChar, 'Settled')
-          .input('actualSpent', this.sql.Decimal(18, 2), actualSpent)
-          .input('balanceAmount', this.sql.Decimal(18, 2), balanceAmount)
-          .input('overAmount', this.sql.Decimal(18, 2), overAmount)
+        // Check if paidBy column exists
+        const columnCheck = await transaction.request()
           .query(`
-            UPDATE PettyCashAssignments
-            SET status = @status,
-                settlementDate = GETDATE(),
-                actualSpent = @actualSpent,
-                balanceAmount = @balanceAmount,
-                overAmount = @overAmount
-            WHERE assignmentId = @assignmentId
+            SELECT COUNT(*) as columnExists
+            FROM sys.columns 
+            WHERE object_id = OBJECT_ID('PettyCashSettlementItems') 
+            AND name = 'paidBy'
           `);
         
-        // Insert settlement items
+        const hasPaidByColumn = columnCheck.recordset[0].columnExists > 0;
+        
+        // Check if this is a partial settlement (incremental)
+        const isPartialSettlement = settlementData.partialSettlement === true;
+        
+        // Insert settlement items (without changing assignment status if partial)
         for (const item of settlementData.items) {
-          await transaction.request()
-            .input('assignmentId', this.sql.Int, assignmentId)
-            .input('itemName', this.sql.NVarChar, item.itemName)
-            .input('actualCost', this.sql.Decimal(18, 2), item.actualCost)
-            .input('isCustomItem', this.sql.Bit, item.isCustomItem || false)
-            .query(`
-              INSERT INTO PettyCashSettlementItems (assignmentId, itemName, actualCost, isCustomItem)
-              VALUES (@assignmentId, @itemName, @actualCost, @isCustomItem)
-            `);
+          if (hasPaidByColumn) {
+            // New version with paidBy column
+            await transaction.request()
+              .input('assignmentId', this.sql.Int, assignmentId)
+              .input('itemName', this.sql.NVarChar, item.itemName)
+              .input('actualCost', this.sql.Decimal(18, 2), item.actualCost)
+              .input('isCustomItem', this.sql.Bit, item.isCustomItem || false)
+              .input('paidBy', this.sql.VarChar, item.paidBy || assignment.assignedTo)
+              .query(`
+                INSERT INTO PettyCashSettlementItems (assignmentId, itemName, actualCost, isCustomItem, paidBy)
+                VALUES (@assignmentId, @itemName, @actualCost, @isCustomItem, @paidBy)
+              `);
+          } else {
+            // Fallback version without paidBy column
+            await transaction.request()
+              .input('assignmentId', this.sql.Int, assignmentId)
+              .input('itemName', this.sql.NVarChar, item.itemName)
+              .input('actualCost', this.sql.Decimal(18, 2), item.actualCost)
+              .input('isCustomItem', this.sql.Bit, item.isCustomItem || false)
+              .query(`
+                INSERT INTO PettyCashSettlementItems (assignmentId, itemName, actualCost, isCustomItem)
+                VALUES (@assignmentId, @itemName, @actualCost, @isCustomItem)
+              `);
+          }
         }
         
-        // Update job status
-        await transaction.request()
-          .input('jobId', this.sql.VarChar, assignment.jobId)
-          .query(`
-            UPDATE Jobs 
-            SET pettyCashStatus = 'Settled'
-            WHERE jobId = @jobId
-          `);
+        // If NOT partial settlement, mark as settled and update totals
+        if (!isPartialSettlement) {
+          // Calculate totals from ALL settlement items
+          const allItemsResult = await transaction.request()
+            .input('assignmentId', this.sql.Int, assignmentId)
+            .query(`
+              SELECT SUM(actualCost) as totalSpent
+              FROM PettyCashSettlementItems
+              WHERE assignmentId = @assignmentId
+            `);
+          
+          const actualSpent = allItemsResult.recordset[0].totalSpent || 0;
+          const assignedAmount = parseFloat(assignment.assignedAmount);
+          const balanceAmount = assignedAmount > actualSpent ? assignedAmount - actualSpent : 0;
+          const overAmount = actualSpent > assignedAmount ? actualSpent - assignedAmount : 0;
+          
+          // Update assignment status to Settled
+          await transaction.request()
+            .input('assignmentId', this.sql.Int, assignmentId)
+            .input('status', this.sql.NVarChar, 'Settled')
+            .input('actualSpent', this.sql.Decimal(18, 2), actualSpent)
+            .input('balanceAmount', this.sql.Decimal(18, 2), balanceAmount)
+            .input('overAmount', this.sql.Decimal(18, 2), overAmount)
+            .query(`
+              UPDATE PettyCashAssignments
+              SET status = @status,
+                  settlementDate = GETDATE(),
+                  actualSpent = @actualSpent,
+                  balanceAmount = @balanceAmount,
+                  overAmount = @overAmount
+              WHERE assignmentId = @assignmentId
+            `);
+          
+          // Update job status
+          await transaction.request()
+            .input('jobId', this.sql.VarChar, assignment.jobId)
+            .query(`
+              UPDATE Jobs 
+              SET pettyCashStatus = 'Settled'
+              WHERE jobId = @jobId
+            `);
+        } else {
+          // For partial settlement, just update the actualSpent without changing status
+          const allItemsResult = await transaction.request()
+            .input('assignmentId', this.sql.Int, assignmentId)
+            .query(`
+              SELECT SUM(actualCost) as totalSpent
+              FROM PettyCashSettlementItems
+              WHERE assignmentId = @assignmentId
+            `);
+          
+          const actualSpent = allItemsResult.recordset[0].totalSpent || 0;
+          
+          await transaction.request()
+            .input('assignmentId', this.sql.Int, assignmentId)
+            .input('actualSpent', this.sql.Decimal(18, 2), actualSpent)
+            .query(`
+              UPDATE PettyCashAssignments
+              SET actualSpent = @actualSpent
+              WHERE assignmentId = @assignmentId
+            `);
+        }
         
         await transaction.commit();
         

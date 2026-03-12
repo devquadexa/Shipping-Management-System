@@ -179,10 +179,17 @@
   border: 1px solid #a7f3d0;
 }
 
+.role-waff-clerk {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+/* Legacy support for old 'user' role class */
 .role-user {
-  background: #e0e7ff;
-  color: #3730a3;
-  border: 1px solid #c7d2fe;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
 }
 
 /* Empty State */
