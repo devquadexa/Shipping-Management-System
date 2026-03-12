@@ -35,8 +35,8 @@ class JobController {
     try {
       const filters = {};
       
-      // Filter by user role
-      if (req.user.role === 'User') {
+      // Filter by user role - Waff Clerk only sees their assigned jobs
+      if (req.user.role === 'Waff Clerk') {
         filters.assignedTo = req.user.userId;
       }
       
@@ -54,8 +54,8 @@ class JobController {
     try {
       const job = await this.getJobById.execute(req.params.id);
       
-      // Check access for User role
-      if (req.user.role === 'User' && job.assignedTo !== req.user.userId) {
+      // Check access for Waff Clerk role
+      if (req.user.role === 'Waff Clerk' && job.assignedTo !== req.user.userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
       
@@ -83,7 +83,7 @@ class JobController {
       const job = await this.getJobById.execute(req.params.id);
       console.log('JobController.updateStatus - found job:', job);
       
-      if (req.user.role === 'User' && job.assignedTo !== req.user.userId) {
+      if (req.user.role === 'Waff Clerk' && job.assignedTo !== req.user.userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
       

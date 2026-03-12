@@ -9,21 +9,21 @@ module.exports = (container) => {
   // Create assignment (Admin/Super Admin only)
   router.post('/', 
     auth, 
-    checkRole('Admin', 'Super Admin'), 
+    checkRole('Admin', 'Super Admin', 'Manager'), 
     (req, res) => controller.create(req, res)
   );
 
   // Get all assignments (Admin/Super Admin only)
   router.get('/', 
     auth, 
-    checkRole('Admin', 'Super Admin'), 
+    checkRole('Admin', 'Super Admin', 'Manager'), 
     (req, res) => controller.getAll(req, res)
   );
 
   // Get user balances summary (Admin/Super Admin only)
   router.get('/user-balances', 
     auth, 
-    checkRole('Admin', 'Super Admin'), 
+    checkRole('Admin', 'Super Admin', 'Manager'), 
     (req, res) => controller.getUserBalancesSummary(req, res)
   );
 
@@ -37,6 +37,12 @@ module.exports = (container) => {
   router.get('/job/:jobId', 
     auth, 
     (req, res) => controller.getByJob(req, res)
+  );
+
+  // Get settlement items for an assignment
+  router.get('/:id/settlement-items', 
+    auth, 
+    (req, res) => controller.getSettlementItems(req, res)
   );
 
   // Settle assignment (User who was assigned)

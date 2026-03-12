@@ -127,7 +127,7 @@ function Settings() {
     }
   };
 
-  if (user?.role === 'User') {
+  if (user?.role === 'Waff Clerk') {
     return (
       <div className="container">
         <div className="alert alert-error">Access Denied: Admin or Super Admin only</div>

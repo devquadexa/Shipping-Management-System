@@ -51,7 +51,7 @@ class User {
   }
 
   isValidRole(role) {
-    const validRoles = ['Super Admin', 'Admin', 'Manager', 'User'];
+    const validRoles = ['Super Admin', 'Admin', 'Manager', 'Waff Clerk'];
     return validRoles.includes(role);
   }
 

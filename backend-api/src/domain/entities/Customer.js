@@ -9,9 +9,21 @@ class Customer {
     name,
     mainPhone,
     email,
-    address,
-    officeLocation,
-    isSameLocation = false,
+    // Residential Address (Standard Sri Lankan Format)
+    addressNumber,
+    addressStreet1,
+    addressStreet2,
+    addressDistrict, // District (left side)
+    addressCity, // City (right side)
+    addressCountry = 'Sri Lanka', // Country with default
+    // Office Address (Same structure)
+    officeAddressNumber,
+    officeAddressStreet1,
+    officeAddressStreet2,
+    officeAddressDistrict, // District (left side)
+    officeAddressCity, // City (right side)
+    officeAddressCountry = 'Sri Lanka', // Country with default
+    isOfficeAddressSame = false,
     website,
     registrationDate = new Date(),
     creditPeriodDays = 30,
@@ -23,9 +35,21 @@ class Customer {
     this.name = name;
     this.mainPhone = mainPhone;
     this.email = email;
-    this.address = address;
-    this.officeLocation = officeLocation;
-    this.isSameLocation = isSameLocation;
+    // Residential Address
+    this.addressNumber = addressNumber;
+    this.addressStreet1 = addressStreet1;
+    this.addressStreet2 = addressStreet2;
+    this.addressDistrict = addressDistrict; // District (left side)
+    this.addressCity = addressCity; // City (right side)
+    this.addressCountry = addressCountry; // Country
+    // Office Address
+    this.officeAddressNumber = officeAddressNumber;
+    this.officeAddressStreet1 = officeAddressStreet1;
+    this.officeAddressStreet2 = officeAddressStreet2;
+    this.officeAddressDistrict = officeAddressDistrict; // District (left side)
+    this.officeAddressCity = officeAddressCity; // City (right side)
+    this.officeAddressCountry = officeAddressCountry; // Country
+    this.isOfficeAddressSame = isOfficeAddressSame;
     this.website = website;
     this.registrationDate = registrationDate;
     this.creditPeriodDays = creditPeriodDays;
@@ -50,8 +74,48 @@ class Customer {
       errors.push('Valid email is required');
     }
 
-    if (!this.address || this.address.trim().length === 0) {
-      errors.push('Address is required');
+    // Residential address validation
+    if (!this.addressNumber || this.addressNumber.trim().length === 0) {
+      errors.push('Address number is required');
+    }
+    
+    if (!this.addressStreet1 || this.addressStreet1.trim().length === 0) {
+      errors.push('Street name is required');
+    }
+    
+    if (!this.addressDistrict || this.addressDistrict.trim().length === 0) {
+      errors.push('District is required');
+    }
+    
+    if (!this.addressCity || this.addressCity.trim().length === 0) {
+      errors.push('City is required');
+    }
+
+    if (!this.addressCountry || this.addressCountry.trim().length === 0) {
+      errors.push('Country is required');
+    }
+
+    // Office address validation (if not same as residential)
+    if (!this.isOfficeAddressSame) {
+      if (!this.officeAddressNumber || this.officeAddressNumber.trim().length === 0) {
+        errors.push('Office address number is required');
+      }
+      
+      if (!this.officeAddressStreet1 || this.officeAddressStreet1.trim().length === 0) {
+        errors.push('Office street name is required');
+      }
+      
+      if (!this.officeAddressDistrict || this.officeAddressDistrict.trim().length === 0) {
+        errors.push('Office district is required');
+      }
+      
+      if (!this.officeAddressCity || this.officeAddressCity.trim().length === 0) {
+        errors.push('Office city is required');
+      }
+
+      if (!this.officeAddressCountry || this.officeAddressCountry.trim().length === 0) {
+        errors.push('Office country is required');
+      }
     }
 
     // Validate contact persons (max 3)
@@ -75,6 +139,34 @@ class Customer {
       isValid: errors.length === 0,
       errors
     };
+  }
+
+  // Get formatted residential address string
+  getFormattedResidentialAddress() {
+    let address = '';
+    if (this.addressNumber) address += this.addressNumber;
+    if (this.addressStreet1) address += (address ? ', ' : '') + this.addressStreet1;
+    if (this.addressStreet2) address += (address ? ', ' : '') + this.addressStreet2;
+    if (this.addressDistrict) address += (address ? ', ' : '') + this.addressDistrict;
+    if (this.addressCity) address += (address ? ', ' : '') + this.addressCity;
+    if (this.addressCountry) address += (address ? ', ' : '') + this.addressCountry;
+    return address;
+  }
+
+  // Get formatted office address string
+  getFormattedOfficeAddress() {
+    if (this.isOfficeAddressSame) {
+      return this.getFormattedResidentialAddress();
+    }
+    
+    let address = '';
+    if (this.officeAddressNumber) address += this.officeAddressNumber;
+    if (this.officeAddressStreet1) address += (address ? ', ' : '') + this.officeAddressStreet1;
+    if (this.officeAddressStreet2) address += (address ? ', ' : '') + this.officeAddressStreet2;
+    if (this.officeAddressDistrict) address += (address ? ', ' : '') + this.officeAddressDistrict;
+    if (this.officeAddressCity) address += (address ? ', ' : '') + this.officeAddressCity;
+    if (this.officeAddressCountry) address += (address ? ', ' : '') + this.officeAddressCountry;
+    return address;
   }
 
   isValidEmail(email) {

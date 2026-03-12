@@ -8,11 +8,13 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const authRoutes = require('./presentation/routes/auth');
 const customerRoutes = require('./presentation/routes/customers');
 const jobRoutes = require('./presentation/routes/jobs');
+const jobAssignmentRoutes = require('./presentation/routes/jobAssignments');
 const billingRoutes = require('./presentation/routes/billing');
 const pettyCashRoutes = require('./presentation/routes/pettycash');
 const payItemTemplateRoutes = require('./presentation/routes/payItemTemplateRoutes');
 const pettyCashAssignmentRoutes = require('./presentation/routes/pettyCashAssignmentRoutes');
 const accountingRoutes = require('./presentation/routes/accounting');
+const locationRoutes = require('./presentation/routes/locations');
 const { getConnection } = require('./config/database');
 const container = require('./infrastructure/di/container');
 const { startOverdueChecker } = require('./infrastructure/scheduler/overdueChecker');
@@ -40,11 +42,13 @@ getConnection()
 app.use('/api/auth', authRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/job-assignments', jobAssignmentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/petty-cash', pettyCashRoutes);
 app.use('/api/pay-item-templates', payItemTemplateRoutes(container));
 app.use('/api/petty-cash-assignments', pettyCashAssignmentRoutes(container));
 app.use('/api/accounting', accountingRoutes);
+app.use('/api/locations', locationRoutes);
 
 app.get('/', (req, res) => {
   res.json({ 

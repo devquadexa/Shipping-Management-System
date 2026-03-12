@@ -95,7 +95,7 @@ BEGIN
         password VARCHAR(255) NOT NULL,
         fullName NVARCHAR(100) NOT NULL,
         email VARCHAR(100) NOT NULL,
-        role NVARCHAR(20) NOT NULL CHECK (Role IN ('Super Admin', 'Admin', 'Manager', 'User')),
+        role NVARCHAR(20) NOT NULL CHECK (Role IN ('Super Admin', 'Admin', 'Manager', 'Waff Clerk')),
         createdDate DATETIME DEFAULT GETDATE(),
         isActive BIT DEFAULT 1
     );
@@ -112,7 +112,7 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK_Users_Role')
     BEGIN
         ALTER TABLE Users ADD CONSTRAINT CK_Users_Role 
-        CHECK (Role IN ('Super Admin', 'Admin', 'Manager', 'User'));
+        CHECK (Role IN ('Super Admin', 'Admin', 'Manager', 'Waff Clerk'));
         PRINT '✓ Updated Users table constraint to include Manager role';
     END
     PRINT '✓ Table already exists: Users';

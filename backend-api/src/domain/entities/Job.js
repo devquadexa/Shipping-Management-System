@@ -14,7 +14,8 @@ class Job {
     lcNumber = null,
     containerNumber = null,
     status = 'Open',
-    assignedTo = null,
+    assignedTo = null, // Legacy single assignment (for backward compatibility)
+    assignedUsers = [], // New: Array of assigned users
     createdDate = new Date(),
     completedDate = null,
     payItems = [],
@@ -31,7 +32,8 @@ class Job {
     this.lcNumber = lcNumber;
     this.containerNumber = containerNumber;
     this.status = status;
-    this.assignedTo = assignedTo;
+    this.assignedTo = assignedTo; // Legacy field
+    this.assignedUsers = assignedUsers; // New field for multiple users
     this.createdDate = createdDate;
     this.completedDate = completedDate;
     this.payItems = payItems;
@@ -60,7 +62,32 @@ class Job {
     if (!this.canBeAssigned()) {
       throw new Error(`Cannot assign job with status: ${this.status}`);
     }
-    this.assignedTo = userId;
+    this.assignedTo = userId; // Legacy field for backward compatibility
+  }
+
+  // New method for multiple user assignment
+  assignToUsers(userIds) {
+    if (!this.canBeAssigned()) {
+      throw new Error(`Cannot assign job with status: ${this.status}`);
+    }
+    this.assignedUsers = Array.isArray(userIds) ? userIds : [userIds];
+    // Update legacy field with first user for backward compatibility
+    this.assignedTo = this.assignedUsers.length > 0 ? this.assignedUsers[0] : null;
+  }
+
+  // Check if user is assigned to this job
+  isAssignedToUser(userId) {
+    return this.assignedUsers.includes(userId) || this.assignedTo === userId;
+  }
+
+  // Get all assigned user IDs
+  getAssignedUserIds() {
+    return this.assignedUsers.length > 0 ? this.assignedUsers : (this.assignedTo ? [this.assignedTo] : []);
+  }
+
+  // Get assignment count
+  getAssignedUserCount() {
+    return this.getAssignedUserIds().length;
   }
 
   updateStatus(newStatus) {
@@ -101,7 +128,9 @@ class Job {
       lcNumber: this.lcNumber,
       containerNumber: this.containerNumber,
       status: this.status,
-      assignedTo: this.assignedTo,
+      assignedTo: this.assignedTo, // Legacy field
+      assignedUsers: this.assignedUsers, // New field
+      assignedUserCount: this.getAssignedUserCount(),
       createdDate: this.createdDate,
       completedDate: this.completedDate,
       payItems: this.payItems,

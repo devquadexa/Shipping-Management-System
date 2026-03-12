@@ -52,6 +52,11 @@ class MSSQLJobRepository extends IJobRepository {
   async findAll(filters = {}) {
     const pool = await this.db();
     
+    // If filtering by assignedTo (user role), use the findByAssignedUser method
+    if (filters.assignedTo) {
+      return await this.findByAssignedUser(filters.assignedTo);
+    }
+    
     let query = 'SELECT * FROM Jobs WHERE 1=1';
     
     if (filters.status) {
@@ -60,10 +65,6 @@ class MSSQLJobRepository extends IJobRepository {
     
     if (filters.customerId) {
       query += ` AND CustomerId = '${filters.customerId}'`;
-    }
-    
-    if (filters.assignedTo) {
-      query += ` AND AssignedTo = '${filters.assignedTo}'`;
     }
     
     query += ' ORDER BY JobId ASC';
@@ -77,11 +78,29 @@ class MSSQLJobRepository extends IJobRepository {
   async findByAssignedUser(userId) {
     const pool = await this.db();
     
-    const result = await pool.request()
+    // First, get jobs from JobAssignments table (new multi-user system)
+    const assignmentResult = await pool.request()
+      .input('userId', this.sql.VarChar, userId)
+      .query(`
+        SELECT DISTINCT j.* 
+        FROM Jobs j
+        INNER JOIN JobAssignments ja ON j.JobId = ja.JobId
+        WHERE ja.UserId = @userId AND ja.IsActive = 1
+        ORDER BY j.CreatedDate DESC
+      `);
+    
+    // Also get jobs from legacy AssignedTo field
+    const legacyResult = await pool.request()
       .input('userId', this.sql.VarChar, userId)
       .query('SELECT * FROM Jobs WHERE AssignedTo = @userId ORDER BY CreatedDate DESC');
     
-    return await Promise.all(result.recordset.map(row => this.mapToEntity(row)));
+    // Combine both results and remove duplicates
+    const allJobs = [...assignmentResult.recordset, ...legacyResult.recordset];
+    const uniqueJobs = allJobs.filter((job, index, self) => 
+      index === self.findIndex(j => j.JobId === job.JobId)
+    );
+    
+    return await Promise.all(uniqueJobs.map(row => this.mapToEntity(row)));
   }
 
   async findByCustomer(customerId) {
@@ -204,8 +223,31 @@ class MSSQLJobRepository extends IJobRepository {
     const payItems = await this.getPayItems(row.JobId);
     console.log('Pay items:', payItems);
     
-    // Return plain object directly for API responses
-    const result = {
+    // Get assigned users for this job (new feature)
+    let assignedUsers = [];
+    try {
+      const pool = await this.db();
+      
+      // Try to get from JobAssignments table directly
+      const assignmentResult = await pool.request()
+        .input('jobId', this.sql.VarChar, row.JobId)
+        .query(`
+          SELECT ja.UserId as userId, u.FullName as userName 
+          FROM JobAssignments ja
+          INNER JOIN Users u ON ja.UserId = u.UserId
+          WHERE ja.JobId = @jobId AND ja.IsActive = 1
+        `);
+      
+      assignedUsers = assignmentResult.recordset.map(a => ({
+        userId: a.userId,
+        userName: a.userName
+      }));
+    } catch (error) {
+      console.log('Could not fetch assigned users:', error.message);
+    }
+    
+    // Create and return Job entity instance
+    const job = new Job({
       jobId: row.JobId,
       customerId: row.CustomerId,
       blNumber: row.BLNumber,
@@ -216,15 +258,16 @@ class MSSQLJobRepository extends IJobRepository {
       lcNumber: row.LCNumber,
       containerNumber: row.ContainerNumber,
       status: row.Status || 'Open',
-      assignedTo: row.AssignedTo,
+      assignedTo: row.AssignedTo, // Legacy field
+      assignedUsers: assignedUsers, // New field with user details
       createdDate: row.CreatedDate,
       completedDate: row.CompletedDate,
       pettyCashStatus: row.pettyCashStatus,
       payItems: payItems || []
-    };
+    });
     
-    console.log('mapToEntity result:', result);
-    return result;
+    console.log('mapToEntity result:', job.toJSON());
+    return job;
   }
 }
 

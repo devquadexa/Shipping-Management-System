@@ -63,7 +63,7 @@ class AuthController {
         password, // Plain text (matches current authenticate method)
         fullName,
         email,
-        role: role || 'User',
+        role: role || 'Waff Clerk',
         createdDate: new Date(),
         isActive: true
       });

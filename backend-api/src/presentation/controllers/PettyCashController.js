@@ -32,7 +32,7 @@ class PettyCashController {
       const filters = {};
       
       // Filter by user role
-      if (req.user.role === 'User') {
+      if (req.user.role === 'Waff Clerk') {
         filters.createdBy = req.user.userId;
       }
       

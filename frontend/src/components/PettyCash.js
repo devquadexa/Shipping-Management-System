@@ -14,6 +14,7 @@ function PettyCash() {
   const [message, setMessage] = useState('');
   const [overallBalance, setOverallBalance] = useState(0);
   const [userBalances, setUserBalances] = useState({});
+  const [jobAssignments, setJobAssignments] = useState({}); // Store job assignments
   
   // Assignment Modal
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -41,7 +42,7 @@ function PettyCash() {
 
   const fetchAssignments = async () => {
     try {
-      const endpoint = user?.role === 'User' 
+      const endpoint = user?.role === 'Waff Clerk' 
         ? 'http://localhost:5000/api/petty-cash-assignments/my'
         : 'http://localhost:5000/api/petty-cash-assignments';
       
@@ -125,9 +126,24 @@ function PettyCash() {
       console.log('Fetched jobs:', data);
       console.log('Jobs with pettyCashStatus:', data.map(j => ({ 
         jobId: j.jobId, 
-        pettyCashStatus: j.pettyCashStatus 
+        pettyCashStatus: j.pettyCashStatus,
+        assignedUsers: j.assignedUsers
       })));
       setJobs(data);
+      
+      // Build job assignments map from the assignedUsers in each job
+      if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') {
+        const assignmentsMap = {};
+        data.forEach(job => {
+          if (job.assignedUsers && job.assignedUsers.length > 0) {
+            assignmentsMap[job.jobId] = job.assignedUsers;
+          } else {
+            assignmentsMap[job.jobId] = [];
+          }
+        });
+        console.log('Job assignments map:', assignmentsMap);
+        setJobAssignments(assignmentsMap);
+      }
     } catch (error) {
       console.error('Error fetching jobs:', error);
     }
@@ -136,7 +152,7 @@ function PettyCash() {
   const fetchUsers = async () => {
     try {
       const data = await authService.getUsers();
-      setUsers(data.filter(u => u.role === 'User'));
+      setUsers(data.filter(u => u.role === 'Waff Clerk'));
     } catch (error) {
       console.error('Error fetching users:', error);
     }
@@ -159,6 +175,62 @@ function PettyCash() {
   const getUserName = (userId) => {
     const foundUser = users.find(u => u.userId === userId);
     return foundUser ? foundUser.fullName : userId;
+  };
+
+  // Get jobs that have users who haven't received petty cash yet
+  const getAvailableJobs = () => {
+    return jobs.filter(job => {
+      // If job has no assignments, skip it
+      if (!jobAssignments[job.jobId] || jobAssignments[job.jobId].length === 0) {
+        return false;
+      }
+      
+      // Get all users assigned to this job
+      const assignedUserIds = jobAssignments[job.jobId].map(a => a.userId);
+      
+      // Get users who already have petty cash for this job
+      const usersWithPettyCash = assignments
+        .filter(a => a.jobId === job.jobId && a.status !== 'Returned')
+        .map(a => a.assignedTo);
+      
+      // Check if there are any assigned users without petty cash
+      const hasUsersWithoutPettyCash = assignedUserIds.some(
+        userId => !usersWithPettyCash.includes(userId)
+      );
+      
+      return hasUsersWithoutPettyCash;
+    });
+  };
+
+  const getAvailableUsersForJob = (jobId) => {
+    console.log('getAvailableUsersForJob called with jobId:', jobId);
+    console.log('jobAssignments:', jobAssignments);
+    console.log('users:', users);
+    console.log('assignments:', assignments);
+    
+    if (!jobId || !jobAssignments[jobId]) {
+      console.log('No job selected or no assignments found');
+      return [];
+    }
+    
+    // Get all users assigned to this job
+    const assignedUserIds = jobAssignments[jobId].map(assignment => assignment.userId);
+    console.log('Assigned user IDs for job:', assignedUserIds);
+    
+    // Get users who already have petty cash for this job (excluding Returned status)
+    const usersWithPettyCash = assignments
+      .filter(a => a.jobId === jobId && a.status !== 'Returned')
+      .map(a => a.assignedTo);
+    console.log('Users with petty cash for this job:', usersWithPettyCash);
+    
+    // Filter to show only assigned users who don't have petty cash yet
+    const availableUsers = users.filter(user => 
+      assignedUserIds.includes(user.userId) && 
+      !usersWithPettyCash.includes(user.userId)
+    );
+    console.log('Available users (assigned but no petty cash):', availableUsers);
+    
+    return availableUsers;
   };
 
   const handleAssignSubmit = async (e) => {
@@ -206,6 +278,26 @@ function PettyCash() {
     console.log('Opening settle modal for assignment:', assignment);
     setSelectedAssignment(assignment);
     
+    // Load existing settlement items first
+    let existingItems = [];
+    try {
+      const existingResponse = await fetch(
+        `http://localhost:5000/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      
+      if (existingResponse.ok) {
+        existingItems = await existingResponse.json();
+        console.log('Existing settlement items:', existingItems);
+      }
+    } catch (error) {
+      console.error('Error loading existing settlement items:', error);
+    }
+    
     // Load pay item templates for this job's category
     try {
       const job = jobs.find(j => j.jobId === assignment.jobId);
@@ -231,13 +323,41 @@ function PettyCash() {
           
           if (templates && templates.length > 0) {
             // Convert templates to pay items format
-            const loadedPayItems = templates.map(template => ({
-              itemName: template.itemName,
-              actualCost: '',
-              isCustomItem: false
-            }));
-            console.log('Setting settlement items:', loadedPayItems);
-            setSettlementItems(loadedPayItems);
+            // Mark items as paid if they exist in existingItems
+            const loadedPayItems = templates.map(template => {
+              const existingItem = existingItems.find(ei => ei.itemName === template.itemName);
+              if (existingItem) {
+                return {
+                  itemName: template.itemName,
+                  actualCost: existingItem.actualCost,
+                  isCustomItem: false,
+                  paidBy: existingItem.paidBy,
+                  paidByName: existingItem.paidByName,
+                  alreadyPaid: true
+                };
+              }
+              return {
+                itemName: template.itemName,
+                actualCost: '',
+                isCustomItem: false,
+                alreadyPaid: false
+              };
+            });
+            
+            // Add custom items from existing settlement
+            const customItems = existingItems
+              .filter(ei => ei.isCustomItem)
+              .map(ei => ({
+                itemName: ei.itemName,
+                actualCost: ei.actualCost,
+                isCustomItem: true,
+                paidBy: ei.paidBy,
+                paidByName: ei.paidByName,
+                alreadyPaid: true
+              }));
+            
+            console.log('Setting settlement items:', [...loadedPayItems, ...customItems]);
+            setSettlementItems([...loadedPayItems, ...customItems]);
           } else {
             console.log('No templates found, using default empty item');
             setSettlementItems([{ itemName: '', actualCost: '', isCustomItem: true }]);
@@ -283,10 +403,13 @@ function PettyCash() {
   const handleSettleSubmit = async (e) => {
     e.preventDefault();
     
-    const validItems = settlementItems.filter(item => item.itemName && item.actualCost);
+    // Only submit items that have both name and cost filled in
+    const validItems = settlementItems.filter(item => 
+      item.itemName && item.actualCost && parseFloat(item.actualCost) > 0
+    );
     
     if (validItems.length === 0) {
-      setMessage('Please add at least one item with name and cost');
+      setMessage('Please fill in at least one item with name and cost');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -305,7 +428,8 @@ function PettyCash() {
               itemName: item.itemName,
               actualCost: parseFloat(item.actualCost),
               isCustomItem: item.isCustomItem
-            }))
+            })),
+            partialSettlement: true  // Flag to indicate this is partial settlement
           })
         }
       );
@@ -352,7 +476,7 @@ function PettyCash() {
       <div className="page-header">
         <div>
           <h1>Petty Cash Management</h1>
-          <p>{user?.role === 'User' ? 'Your assigned petty cash' : 'Manage petty cash assignments'}</p>
+          <p>{user?.role === 'Waff Clerk' ? 'Your assigned petty cash' : 'Manage petty cash assignments'}</p>
         </div>
         {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
           <button onClick={() => setShowAssignModal(true)} className="btn btn-primary">
@@ -437,7 +561,7 @@ function PettyCash() {
       )}
 
       {/* User's Own Balance Summary */}
-      {user?.role === 'User' && assignments.length > 0 && (
+      {user?.role === 'Waff Clerk' && assignments.length > 0 && (
         <div className="balance-cards">
           <div className="balance-card user-balance">
             <div className="balance-card-icon">
@@ -492,7 +616,7 @@ function PettyCash() {
                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
               </svg>
             </div>
-            <p>{user?.role === 'User' ? 'No petty cash assigned to you yet' : 'No petty cash assignments yet'}</p>
+            <p>{user?.role === 'Waff Clerk' ? 'No petty cash assigned to you yet' : 'No petty cash assignments yet'}</p>
           </div>
         ) : (
           <div className="assignments-table-wrapper">
@@ -502,7 +626,7 @@ function PettyCash() {
                   <th>Assignment ID</th>
                   <th>Job ID</th>
                   <th>Customer</th>
-                  {user?.role !== 'User' && <th>Assigned To</th>}
+                  {user?.role !== 'Waff Clerk' && <th>Assigned To</th>}
                   <th>Assigned Amount</th>
                   <th>Actual Spent</th>
                   <th>Balance/Over</th>
@@ -521,7 +645,7 @@ function PettyCash() {
                       </td>
                       <td data-label="Job ID">{assignment.jobId}</td>
                       <td data-label="Customer">{job ? getCustomerName(job.customerId) : '-'}</td>
-                      {user?.role !== 'User' && (
+                      {user?.role !== 'Waff Clerk' && (
                         <td data-label="Assigned To">{assignment.assignedToName || assignment.assignedTo}</td>
                       )}
                       <td data-label="Assigned Amount">
@@ -552,7 +676,7 @@ function PettyCash() {
                         {new Date(assignment.assignedDate).toLocaleDateString()}
                       </td>
                       <td data-label="Actions">
-                        {assignment.status === 'Assigned' && user?.role === 'User' && (
+                        {assignment.status === 'Assigned' && user?.role === 'Waff Clerk' && (
                           <button
                             className="btn-action btn-settle"
                             onClick={() => openSettleModal(assignment)}
@@ -595,11 +719,15 @@ function PettyCash() {
                 <label>Select Job <span className="required">*</span></label>
                 <select
                   value={assignFormData.jobId}
-                  onChange={(e) => setAssignFormData({ ...assignFormData, jobId: e.target.value })}
+                  onChange={(e) => setAssignFormData({ 
+                    ...assignFormData, 
+                    jobId: e.target.value,
+                    assignedTo: '' // Reset user selection when job changes
+                  })}
                   required
                 >
                   <option value="">-- Select Job --</option>
-                  {jobs.filter(j => !j.pettyCashStatus || j.pettyCashStatus === 'Not Assigned').map(job => (
+                  {getAvailableJobs().map(job => (
                     <option key={job.jobId} value={job.jobId}>
                       {job.jobId} - {getCustomerName(job.customerId)} - {job.shipmentCategory}
                     </option>
@@ -615,12 +743,15 @@ function PettyCash() {
                   required
                 >
                   <option value="">-- Select User --</option>
-                  {users.map(u => (
+                  {getAvailableUsersForJob(assignFormData.jobId).map(u => (
                     <option key={u.userId} value={u.userId}>
                       {u.fullName}
                     </option>
                   ))}
                 </select>
+                {assignFormData.jobId && getAvailableUsersForJob(assignFormData.jobId).length === 0 && (
+                  <p className="helper-text warning">All assigned users for this job have already received petty cash.</p>
+                )}
               </div>
 
               <div className="form-group">
@@ -721,6 +852,7 @@ function PettyCash() {
                       <th>Item Name</th>
                       <th>Actual Cost (LKR)</th>
                       <th>Type</th>
+                      <th>Paid By</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -733,11 +865,17 @@ function PettyCash() {
                             {item.isCustomItem ? 'Custom' : 'Template'}
                           </span>
                         </td>
+                        <td>
+                          <span className="paid-by-badge">
+                            {item.paidByName || 'Unknown'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                     <tr className="total-row">
                       <td><strong>Total</strong></td>
                       <td className="amount"><strong>LKR {formatAmount(selectedAssignment.actualSpent)}</strong></td>
+                      <td></td>
                       <td></td>
                     </tr>
                   </tbody>
@@ -746,9 +884,10 @@ function PettyCash() {
             ) : (
               <form onSubmit={handleSettleSubmit} className="settlement-form">
                 <h3>Settlement Items</h3>
+                <p className="helper-text info">Fill in only the items you paid for. Items already paid by others are shown as read-only.</p>
                 <div className="settlement-items-list">
                   {settlementItems.map((item, index) => (
-                    <div key={index} className="settlement-item-row">
+                    <div key={index} className={`settlement-item-row ${item.alreadyPaid ? 'paid-item-row' : ''}`}>
                       <div className="item-number">{index + 1}</div>
                       <div className="form-group">
                         <input
@@ -756,7 +895,8 @@ function PettyCash() {
                           value={item.itemName}
                           onChange={(e) => handleSettlementItemChange(index, 'itemName', e.target.value)}
                           placeholder="Item name"
-                          required
+                          disabled={item.alreadyPaid}
+                          className={item.alreadyPaid ? 'paid-input' : ''}
                         />
                       </div>
                       <div className="form-group">
@@ -765,11 +905,19 @@ function PettyCash() {
                           step="0.01"
                           value={item.actualCost}
                           onChange={(e) => handleSettlementItemChange(index, 'actualCost', e.target.value)}
-                          placeholder="0.00"
-                          required
+                          placeholder={item.alreadyPaid ? `Paid: ${item.actualCost}` : '0.00'}
+                          disabled={item.alreadyPaid}
+                          className={item.alreadyPaid ? 'paid-input' : ''}
                         />
                       </div>
-                      {settlementItems.length > 1 && (
+                      {item.alreadyPaid && (
+                        <div className="paid-by-indicator">
+                          <span className="paid-by-badge">
+                            Paid by {item.paidByName}
+                          </span>
+                        </div>
+                      )}
+                      {!item.alreadyPaid && settlementItems.filter(i => !i.alreadyPaid).length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeSettlementItem(index)}
