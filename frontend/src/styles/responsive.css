@@ -21,7 +21,7 @@
   }
 
   .navbar-brand-text h1 {
-    font-size: 1rem;
+    font-size: 0.85rem !important;
   }
 
   .navbar-brand-text p {
@@ -29,8 +29,8 @@
   }
 
   .navbar-brand .logo {
-    width: 35px;
-    height: 35px;
+    width: 28px !important;
+    height: 28px !important;
   }
 
   .navbar-right {
@@ -138,7 +138,12 @@
 
   /* Page Header */
   .page-header h1 {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+  }
+
+  /* Prevent add buttons from going full-width in page header */
+  .page-header .btn {
+    width: auto !important;
   }
 
   .page-header p {
@@ -198,11 +203,12 @@
 /* Small mobile devices */
 @media (max-width: 480px) {
   .navbar-brand .logo {
-    font-size: 1.5rem;
+    width: 24px;
+    height: 24px;
   }
 
   .navbar-brand-text h1 {
-    font-size: 1rem;
+    font-size: 0.78rem;
   }
 
   .stat-card .value {

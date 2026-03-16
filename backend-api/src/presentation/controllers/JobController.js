@@ -13,6 +13,7 @@ class JobController {
     this.assignMultipleUsersToJob = assignMultipleUsersToJob;
     this.replacePayItemsUseCase = replacePayItems;
     this.updateJobUseCase = updateJob;
+    this.updateJob = updateJob;
   }
 
   async create(req, res) {
@@ -26,7 +27,12 @@ class JobController {
         blNumber: req.body.blNumber || null,
         cusdecNumber: req.body.cusdecNumber || null,
         openDate: req.body.openDate || null,
-        shipmentCategory: req.body.shipmentCategory
+        shipmentCategory: req.body.shipmentCategory,
+        exporter: req.body.exporter || null,
+        transporter: req.body.transporter || null,
+        lcNumber: req.body.lcNumber || null,
+        containerNumber: req.body.containerNumber || null,
+        assignedTo: req.body.assignedTo || null
       };
       
       console.log('create - jobData:', jobData);
@@ -76,6 +82,30 @@ class JobController {
       console.error('Create job error:', error);
       console.error('Error stack:', error.stack);
       console.log('=== CREATE JOB END (with error) ===');
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  async update(req, res) {
+    try {
+      const jobId = req.params.id;
+      const jobData = {
+        blNumber: req.body.blNumber || null,
+        cusdecNumber: req.body.cusdecNumber || null,
+        openDate: req.body.openDate || null,
+        shipmentCategory: req.body.shipmentCategory,
+        exporter: req.body.exporter || null,
+        transporter: req.body.transporter || null,
+        lcNumber: req.body.lcNumber || null,
+        containerNumber: req.body.containerNumber || null,
+        status: req.body.status || 'Open',
+        assignedTo: req.body.assignedTo || null
+      };
+      
+      const job = await this.updateJob.execute(jobId, jobData);
+      res.json(job);
+    } catch (error) {
+      console.error('Update job error:', error);
       res.status(400).json({ message: error.message });
     }
   }

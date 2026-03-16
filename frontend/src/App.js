@@ -11,6 +11,7 @@ import Dashboard from './components/Dashboard';
 import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
 import Accounting from './components/Accounting';
+import Transporters from './components/Transporters';
 import Navbar from './components/Navbar';
 
 function PrivateRoute({ children }) {
@@ -37,6 +38,7 @@ function AppContent() {
           <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
           <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
           <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+          <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
           <Route path="/petty-cash" element={<PrivateRoute><PettyCash /></PrivateRoute>} />
           <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />

@@ -65,6 +65,9 @@ function Navbar() {
           <ul className="desktop-menu">
             <li><Link to="/" className={isActive('/')}>Dashboard</Link></li>
             <li><Link to="/customers" className={isActive('/customers')}>Customers</Link></li>
+            {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+              <li><Link to="/transporters" className={isActive('/transporters')}>Transporters</Link></li>
+            )}
             <li><Link to="/jobs" className={isActive('/jobs')}>Jobs</Link></li>
             {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
               <li><Link to="/billing" className={isActive('/billing')}>Invoicing</Link></li>
@@ -173,6 +176,19 @@ function Navbar() {
               </svg>
             </span> Customers
           </Link></li>
+          {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+            <li><Link to="/transporters" className={isActive('/transporters')} onClick={closeMobileMenu}>
+              <span className="menu-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 17h4"></path>
+                  <path d="M7 17h.01"></path>
+                  <path d="M17 17h.01"></path>
+                  <path d="M3 8l2-3h14l2 3"></path>
+                  <path d="M5 8h14v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8Z"></path>
+                </svg>
+              </span> Transporters
+            </Link></li>
+          )}
           <li><Link to="/jobs" className={isActive('/jobs')} onClick={closeMobileMenu}>
             <span className="menu-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
