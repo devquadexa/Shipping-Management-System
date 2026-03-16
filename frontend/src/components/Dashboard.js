@@ -32,8 +32,8 @@ function Dashboard() {
       let pettyCashData = { balance: 0 };
 
       // Fetch petty cash based on role
-      if (user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Manager') {
-        // For admin/super admin/manager, get overall balance
+      if (user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') {
+        // For admin/super admin/manager/office executive, get overall balance
         pettyCashData = await pettyCashService.getBalance();
       } else if (user?.role === 'Waff Clerk') {
         // For regular users, get their assigned petty cash

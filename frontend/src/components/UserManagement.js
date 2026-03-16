@@ -226,6 +226,7 @@ function UserManagement() {
                     <label>Role *</label>
                     <select name="role" value={formData.role} onChange={handleChange} required>
                       <option value="Waff Clerk">Waff Clerk</option>
+                      <option value="Office Executive">Office Executive</option>
                       <option value="Manager">Manager</option>
                       <option value="Admin">Admin</option>
                       <option value="Super Admin">Super Admin</option>

@@ -4,6 +4,7 @@ import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
 import { authService } from '../api/services/authService';
 import apiClient from '../api/client';
+import OfficePayItems from './OfficePayItems';
 import '../styles/Jobs.css';
 
 function Jobs() {
@@ -36,7 +37,7 @@ function Jobs() {
   useEffect(() => {
     fetchJobs();
     fetchCustomers(); // All users need to see customer names
-    if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') {
+    if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') {
       fetchUsers();
     }
   }, [user]);
@@ -332,7 +333,7 @@ function Jobs() {
           <h1>Job Management</h1>
           <p>{user?.role === 'Waff Clerk' ? 'Your assigned jobs' : 'Manage all cargo jobs'}</p>
         </div>
-        {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
+        {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') && (
           <button onClick={() => setShowModal(true)} className="btn btn-primary">
             + New Job
           </button>
@@ -474,7 +475,7 @@ function Jobs() {
                     </td>
                     <td data-label="Actions">
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
+                        {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') && (
                           <button
                             className="btn-action btn-edit"
                             onClick={() => openEditModal(job)}
@@ -565,6 +566,12 @@ function Jobs() {
                             </div>
                           </div>
                         </div>
+                        
+                        {/* Office Pay Items Section */}
+                        <OfficePayItems 
+                          jobId={job.jobId} 
+                          onUpdate={fetchJobs}
+                        />
                       </td>
                     </tr>
                   )}

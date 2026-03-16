@@ -39,6 +39,13 @@ module.exports = (container) => {
     (req, res) => controller.getByJob(req, res)
   );
 
+  // Get ALL assignments for a job (for Invoicing)
+  router.get('/job/:jobId/all', 
+    auth, 
+    checkRole('Admin', 'Super Admin', 'Manager'), 
+    (req, res) => controller.getAllByJob(req, res)
+  );
+
   // Get settlement items for an assignment
   router.get('/:id/settlement-items', 
     auth, 

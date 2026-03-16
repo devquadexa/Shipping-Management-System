@@ -34,13 +34,13 @@ router.get('/:id',
 
 router.put('/:id', 
   auth, 
-  checkRole('Admin', 'Super Admin', 'Manager'), 
+  checkRole('Admin', 'Super Admin', 'Manager', 'Office Executive'), 
   (req, res) => customerController.update(req, res)
 );
 
 router.delete('/:id', 
   auth, 
-  checkRole('Admin', 'Super Admin', 'Manager'), 
+  checkRole('Admin', 'Super Admin', 'Manager', 'Office Executive'), 
   (req, res) => customerController.delete(req, res)
 );
 

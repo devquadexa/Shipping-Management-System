@@ -44,8 +44,14 @@ class PettyCashAssignmentController {
     try {
       const { jobId } = req.params;
       console.log('getByJob controller - jobId:', jobId);
+      console.log('getByJob controller - userId:', req.user.userId);
+      console.log('getByJob controller - userRole:', req.user.role);
+      
       const getPettyCashAssignmentByJob = this.container.resolve('getPettyCashAssignmentByJob');
-      const assignment = await getPettyCashAssignmentByJob.execute(jobId);
+      
+      // For Waff Clerk, get only their assignment for this job
+      // For Manager/Admin/Super Admin, get all assignments for this job
+      const assignment = await getPettyCashAssignmentByJob.execute(jobId, req.user.userId, req.user.role);
       console.log('getByJob controller - assignment:', assignment);
       console.log('getByJob controller - assignment type:', typeof assignment);
       console.log('getByJob controller - assignment keys:', assignment ? Object.keys(assignment) : 'null');
@@ -65,6 +71,25 @@ class PettyCashAssignmentController {
     }
   }
 
+  async getAllByJob(req, res) {
+    try {
+      const { jobId } = req.params;
+      console.log('getAllByJob controller - jobId:', jobId);
+      
+      const pettyCashAssignmentRepository = this.container.resolve('pettyCashAssignmentRepository');
+      
+      // Get ALL assignments for this job (for Invoicing)
+      const assignments = await pettyCashAssignmentRepository.getAllByJob(jobId);
+      console.log('getAllByJob controller - assignments count:', assignments.length);
+      
+      res.json(assignments);
+    } catch (error) {
+      console.error('Error in getAllByJob:', error);
+      console.error('Error stack:', error.stack);
+      res.status(500).json({ message: 'Error fetching assignments' });
+    }
+  }
+
   async getSettlementItems(req, res) {
     try {
       const { id } = req.params;
@@ -79,7 +104,12 @@ class PettyCashAssignmentController {
 
   async settle(req, res) {
     try {
+      console.log('=== CONTROLLER SETTLE START ===');
       const { id } = req.params;
+      console.log('controller settle - id:', id);
+      console.log('controller settle - req.user:', req.user);
+      console.log('controller settle - req.body:', req.body);
+      
       const settlePettyCashAssignment = this.container.resolve('settlePettyCashAssignment');
       
       // Add paidBy to each item if not provided
@@ -91,7 +121,11 @@ class PettyCashAssignmentController {
         }))
       };
       
+      console.log('controller settle - settlementData:', settlementData);
+      
       const assignment = await settlePettyCashAssignment.execute(parseInt(id), settlementData);
+      console.log('controller settle - returned assignment:', assignment);
+      console.log('=== CONTROLLER SETTLE END ===');
       res.json(assignment);
     } catch (error) {
       console.error('Error in settle:', error);
