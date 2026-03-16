@@ -25,6 +25,7 @@ function Billing() {
   const [loadingSettlement, setLoadingSettlement] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
+  const [expandedBillId, setExpandedBillId] = useState(null);
 
   useEffect(() => {
     fetchBills();
@@ -262,30 +263,38 @@ function Billing() {
   };
 
   const savePayItems = async () => {
-    // Validate pay items
-    const validPayItems = payItems.filter(item => item.name && item.actualCost && item.billingAmount);
+    // Validate pay items - must have name, actualCost, and billingAmount
+    const validPayItems = payItems.filter(item => {
+      return item.name && 
+             (item.actualCost || item.actualCost === 0) && 
+             (item.billingAmount || item.billingAmount === 0);
+    });
     
     if (validPayItems.length === 0) {
-      setMessage('Please add at least one valid pay item');
-      setTimeout(() => setMessage(''), 3000);
+      setMessage('Please fill in all required fields (Description, Actual Cost, Billing Amount) for at least one pay item');
+      setTimeout(() => setMessage(''), 5000);
       return;
     }
 
     try {
-      // Separate office pay items from regular pay items
+      console.log('=== SAVE PAY ITEMS START ===');
+      console.log('New pay items to save:', validPayItems);
+      console.log('Existing job pay items:', selectedJob.payItems);
+      
+      // Separate office pay items, petty cash items, and custom pay items
       const officePayItems = validPayItems.filter(item => item.isOfficePayItem);
-      const regularPayItems = validPayItems.filter(item => !item.isOfficePayItem && !item.isPettyCashItem);
       const pettyCashItems = validPayItems.filter(item => item.isPettyCashItem);
+      const customPayItems = validPayItems.filter(item => !item.isOfficePayItem && !item.isPettyCashItem);
       
       console.log('Office pay items to update:', officePayItems);
-      console.log('Regular pay items to save:', regularPayItems);
-      console.log('Petty cash items (read-only):', pettyCashItems);
+      console.log('Petty cash items to update:', pettyCashItems);
+      console.log('Custom pay items to add:', customPayItems);
       
-      // Update billing amounts for office pay items
+      // 1. Update billing amounts for office pay items
       for (const item of officePayItems) {
         if (item.officePayItemId) {
           try {
-            await fetch(`http://localhost:5000/api/office-pay-items/${item.officePayItemId}`, {
+            const response = await fetch(`http://localhost:5000/api/office-pay-items/${item.officePayItemId}`, {
               method: 'PUT',
               headers: {
                 'Content-Type': 'application/json',
@@ -295,45 +304,79 @@ function Billing() {
                 billingAmount: parseFloat(item.billingAmount)
               })
             });
-            console.log(`Updated billing amount for office pay item ${item.officePayItemId}`);
+            
+            if (!response.ok) {
+              throw new Error(`Failed to update office pay item: ${response.statusText}`);
+            }
+            
+            console.log(`✓ Updated billing amount for office pay item ${item.officePayItemId}`);
           } catch (error) {
-            console.error(`Error updating office pay item ${item.officePayItemId}:`, error);
+            console.error(`✗ Error updating office pay item ${item.officePayItemId}:`, error);
+            throw error;
           }
         }
       }
       
-      // Save regular pay items (if any) using the existing method
-      if (regularPayItems.length > 0) {
-        const payItemsData = regularPayItems.map(item => ({
-          description: item.name,
-          amount: parseFloat(item.actualCost),
-          billingAmount: parseFloat(item.billingAmount)
-        }));
-        
-        console.log('Saving regular pay items:', payItemsData);
-        await jobService.replacePayItems(selectedJob.jobId, payItemsData);
+      // 2. Update billing amounts for petty cash items (if needed)
+      for (const item of pettyCashItems) {
+        console.log(`Petty cash item: ${item.name} - Actual: ${item.actualCost}, Billing: ${item.billingAmount}`);
+        // Petty cash items are typically read-only in the billing section
+        // but we log them for reference
       }
-
-      setMessage('Pay items saved successfully!');
-      setShowPayItemsRow(false);
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
       
-      // Refresh jobs and selected job
+      // 3. APPEND new pay items to existing ones instead of replacing
+      // Get existing pay items from the job
+      const existingPayItems = selectedJob.payItems || [];
+      console.log('Existing pay items count:', existingPayItems.length);
+      
+      // Convert new pay items to the format expected by the job
+      const newPayItemsData = validPayItems.map(item => ({
+        description: item.name,
+        amount: parseFloat(item.actualCost),
+        actualCost: parseFloat(item.actualCost),
+        billingAmount: parseFloat(item.billingAmount),
+        paidBy: item.paidByName || item.paidBy || 'Office',
+        source: item.isOfficePayItem ? 'Office Payment' : item.isPettyCashItem ? 'Petty Cash' : 'Custom'
+      }));
+      
+      // Combine existing and new pay items
+      const allPayItemsData = [...existingPayItems, ...newPayItemsData];
+      
+      console.log('New pay items to add:', newPayItemsData);
+      console.log('Combined pay items (existing + new):', allPayItemsData);
+      
+      // Save combined pay items to the job
+      await jobService.replacePayItems(selectedJob.jobId, allPayItemsData);
+      console.log('✓ All pay items saved successfully');
+
+      const isAddingToExisting = existingPayItems.length > 0;
+      const addedCount = newPayItemsData.length;
+      const totalCount = allPayItemsData.length;
+      
+      if (isAddingToExisting) {
+        setMessage(`✓ Added ${addedCount} new pay item(s) successfully! Total: ${totalCount} items. Review below and generate invoice.`);
+      } else {
+        setMessage(`✓ ${addedCount} pay item(s) saved successfully! Review the details below and generate invoice.`);
+      }
+      
+      setShowPayItemsRow(false);
+      
+      // Refresh jobs and selected job to show the saved pay items
       console.log('Refreshing jobs after save...');
       const updatedJobs = await jobService.getAll();
-      console.log('Updated jobs:', updatedJobs);
-      
       const updatedJob = updatedJobs.find(j => j.jobId === selectedJob.jobId);
-      console.log('Updated selected job:', updatedJob);
+      
+      console.log('Updated selected job with pay items:', updatedJob);
       
       setSelectedJob(updatedJob);
-      await fetchJobs(); // Update the jobs list
+      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
       
-      setTimeout(() => setMessage(''), 3000);
+      setTimeout(() => setMessage(''), 5000);
+      console.log('=== SAVE PAY ITEMS END ===');
     } catch (error) {
       console.error('Error saving pay items:', error);
-      setMessage('Error saving pay items');
-      setTimeout(() => setMessage(''), 3000);
+      setMessage(`Error saving pay items: ${error.message}`);
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -360,6 +403,11 @@ function Billing() {
     const profit = billingAmount - actualCost;
     
     console.log('calculateTotals - result:', { actualCost, billingAmount, profit });
+    console.log('calculateTotals - formatted result:', { 
+      actualCost: formatAmount(actualCost), 
+      billingAmount: formatAmount(billingAmount), 
+      profit: formatAmount(profit) 
+    });
     
     return { actualCost, billingAmount, profit };
   };
@@ -822,7 +870,15 @@ function Billing() {
               <div className="pay-items-card">
                 <div className="card-header-inline">
                   <h3>Pay Items</h3>
-                  {!showPayItemsRow && (
+                  {!showPayItemsRow && selectedJob.payItems && selectedJob.payItems.length > 0 && (
+                    <button 
+                      onClick={() => setShowPayItemsRow(true)} 
+                      className="btn btn-primary btn-small"
+                    >
+                      + Add More Items
+                    </button>
+                  )}
+                  {!showPayItemsRow && (!selectedJob.payItems || selectedJob.payItems.length === 0) && (
                     <button 
                       onClick={() => setShowPayItemsRow(true)} 
                       className="btn btn-primary btn-small"
@@ -834,6 +890,15 @@ function Billing() {
 
                 {showPayItemsRow && (
                   <div className="pay-items-form">
+                    {selectedJob.payItems && selectedJob.payItems.length > 0 && (
+                      <div className="add-more-items-notice">
+                        <div className="notice-icon">ℹ️</div>
+                        <div className="notice-text">
+                          <strong>Adding Additional Items</strong>
+                          <p>You are adding new pay items to the existing {selectedJob.payItems.length} item(s). All items will be combined in the review table.</p>
+                        </div>
+                      </div>
+                    )}
                     <table className="pay-items-input-table">
                       <thead>
                         <tr>
@@ -876,6 +941,13 @@ function Billing() {
                                 className="form-control-small"
                                 disabled={item.paidByName}
                               />
+                            </td>
+                            <td data-label="Paid By">
+                              {item.paidByName ? (
+                                <span className="paid-by-name">{item.paidByName}</span>
+                              ) : (
+                                <span className="paid-by-empty">-</span>
+                              )}
                             </td>
                             <td data-label="Billing Amount (LKR)">
                               <input
@@ -934,40 +1006,43 @@ function Billing() {
 
                 {selectedJob.payItems && selectedJob.payItems.length > 0 && (
                   <div className="saved-pay-items">
-                    <table className="pay-items-display-table">
-                      <thead>
-                        <tr>
-                          <th>Description</th>
-                          <th style={{textAlign: 'right'}}>Actual Cost (LKR)</th>
-                          <th style={{textAlign: 'right'}}>Billing Amount (LKR)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                    <div className="pay-items-review-header">
+                      <h4>📋 Pay Items Review</h4>
+                      <p className="review-subtitle">Review all pay items before generating invoice</p>
+                    </div>
+                    <div className="pay-items-review-table">
+                      <div className="table-header">
+                        <div className="header-cell description-header">Description</div>
+                        <div className="header-cell amount-header">Actual Cost (LKR)</div>
+                        <div className="header-cell amount-header">Billing Amount (LKR)</div>
+                      </div>
+                      <div className="table-body">
                         {selectedJob.payItems.map((item, idx) => (
-                          <tr key={idx}>
-                            <td data-label="Description">{item.description}</td>
-                            <td data-label="Actual Cost" className="amount">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</td>
-                            <td data-label="Billing Amount" className="amount">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</td>
-                          </tr>
+                          <div key={idx} className="table-row">
+                            <div className="table-cell description-cell">{item.description}</div>
+                            <div className="table-cell amount-cell">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</div>
+                            <div className="table-cell amount-cell">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</div>
+                          </div>
                         ))}
-                        <tr className="total-row">
-                          <td><strong>Total</strong></td>
-                          <td data-label="Actual" className="amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></td>
-                          <td data-label="Billing" className="amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></td>
-                        </tr>
-                        <tr className="profit-row">
-                          <td colSpan="2"><strong>Profit</strong></td>
-                          <td data-label="Net" className="amount">
+                        <div className="table-row total-row">
+                          <div className="table-cell description-cell total-label"><strong>Total</strong></div>
+                          <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></div>
+                          <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></div>
+                        </div>
+                        <div className="table-row profit-row">
+                          <div className="table-cell description-cell profit-label"><strong>Profit Margin</strong></div>
+                          <div className="table-cell amount-cell"></div>
+                          <div className="table-cell amount-cell profit-amount">
                             <strong className={calculateTotals().profit >= 0 ? 'profit-positive' : 'profit-negative'}>
                               {formatAmount(calculateTotals().profit)}
                             </strong>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                     <div className="generate-bill-section">
                       <button onClick={generateBill} className="btn btn-success btn-large">
-                        Generate Invoice
+                        ✓ Generate Invoice
                       </button>
                       
                       {/* Validation Modal */}
@@ -1021,64 +1096,94 @@ function Billing() {
                   <th>Customer</th>
                   <th>Invoice Date</th>
                   <th>Due Date</th>
-                  <th>Actual Cost</th>
-                  <th>Billing Amount</th>
-                  <th>Profit</th>
-                  <th>Total Due</th>
                   <th>Status</th>
+                  <th className="expand-header"></th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {bills.map(bill => (
-                  <tr key={bill.billId} className={bill.isOverdue ? 'overdue-row' : ''}>
-                    <td data-label="Invoice No"><strong>{bill.invoiceNumber || bill.billId}</strong></td>
-                    <td data-label="Job ID">{bill.jobId}</td>
-                    <td data-label="Customer">{getCustomerName(bill.customerId)}</td>
-                    <td data-label="Invoice Date">
-                      {bill.invoiceDate ? new Date(bill.invoiceDate).toLocaleDateString() : '-'}
-                    </td>
-                    <td data-label="Due Date">
-                      {bill.dueDate ? (
-                        <div className="due-date-cell">
-                          {new Date(bill.dueDate).toLocaleDateString()}
-                          {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
-                        </div>
-                      ) : '-'}
-                    </td>
-                    <td data-label="Actual Cost">LKR {formatAmount(bill.actualCost)}</td>
-                    <td data-label="Billing Amount">LKR {formatAmount(bill.billingAmount)}</td>
-                    <td data-label="Profit">
-                      <span className={bill.profit >= 0 ? 'profit-positive' : 'profit-negative'}>
-                        LKR {formatAmount(bill.profit)}
-                      </span>
-                    </td>
-                    <td data-label="Total"><strong>LKR {formatAmount(bill.total)}</strong></td>
-                    <td data-label="Status">
-                      <span className={`status-badge status-${bill.paymentStatus.toLowerCase()}`}>
-                        {bill.paymentStatus}
-                      </span>
-                    </td>
-                    <td data-label="Actions">
-                      <div className="action-buttons">
-                        <button 
-                          onClick={() => printBill(bill)} 
-                          className="btn btn-primary btn-small"
-                          title="Print Invoice"
+                  <React.Fragment key={bill.billId}>
+                    <tr className={bill.isOverdue ? 'overdue-row' : ''}>
+                      <td data-label="Invoice No"><strong>{bill.invoiceNumber || bill.billId}</strong></td>
+                      <td data-label="Job ID">{bill.jobId}</td>
+                      <td data-label="Customer">{getCustomerName(bill.customerId)}</td>
+                      <td data-label="Invoice Date">
+                        {bill.invoiceDate ? new Date(bill.invoiceDate).toLocaleDateString() : '-'}
+                      </td>
+                      <td data-label="Due Date">
+                        {bill.dueDate ? (
+                          <div className="due-date-cell">
+                            {new Date(bill.dueDate).toLocaleDateString()}
+                            {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td data-label="Status">
+                        <span className={`status-badge status-${bill.paymentStatus.toLowerCase()}`}>
+                          {bill.paymentStatus}
+                        </span>
+                      </td>
+                      <td className="expand-column">
+                        <button
+                          className="expand-btn-middle"
+                          onClick={() => setExpandedBillId(expandedBillId === bill.billId ? null : bill.billId)}
+                          title={expandedBillId === bill.billId ? "Hide details" : "View details"}
                         >
-                          Print
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points={expandedBillId === bill.billId ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+                          </svg>
                         </button>
-                        {bill.paymentStatus === 'Unpaid' && (
+                      </td>
+                      <td data-label="Actions">
+                        <div className="action-buttons">
                           <button 
-                            onClick={() => markAsPaid(bill.billId)} 
-                            className="btn btn-success btn-small"
+                            onClick={() => printBill(bill)} 
+                            className="btn btn-primary btn-small"
+                            title="Print Invoice"
                           >
-                            Mark Paid
+                            Print
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                          {bill.paymentStatus === 'Unpaid' && (
+                            <button 
+                              onClick={() => markAsPaid(bill.billId)} 
+                              className="btn btn-success btn-small"
+                            >
+                              Mark Paid
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedBillId === bill.billId && (
+                      <tr className="details-row">
+                        <td colSpan="8">
+                          <div className="bill-details-expanded">
+                            <div className="details-grid">
+                              <div className="detail-card">
+                                <div className="detail-label">Actual Cost</div>
+                                <div className="detail-value">LKR {formatAmount(bill.actualCost)}</div>
+                              </div>
+                              <div className="detail-card">
+                                <div className="detail-label">Billing Amount</div>
+                                <div className="detail-value">LKR {formatAmount(bill.billingAmount)}</div>
+                              </div>
+                              <div className="detail-card">
+                                <div className="detail-label">Profit</div>
+                                <div className={`detail-value ${bill.profit >= 0 ? 'profit-positive' : 'profit-negative'}`}>
+                                  LKR {formatAmount(bill.profit)}
+                                </div>
+                              </div>
+                              <div className="detail-card">
+                                <div className="detail-label">Total Due</div>
+                                <div className="detail-value total-due"><strong>LKR {formatAmount(bill.total)}</strong></div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

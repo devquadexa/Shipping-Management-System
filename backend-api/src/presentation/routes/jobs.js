@@ -57,7 +57,7 @@ router.post('/:id/pay-items', auth, checkRole('Admin', 'Super Admin', 'Manager')
   jobController.addPayItem(req, res)
 );
 
-router.put('/:id/pay-items', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
+router.put('/:id/pay-items', auth, checkRole('Admin', 'Super Admin', 'Manager', 'Office Executive'), (req, res) => 
   jobController.replacePayItems(req, res)
 );
 
