@@ -278,7 +278,7 @@ function PettyCash() {
     console.log('Opening settle modal for assignment:', assignment);
     setSelectedAssignment(assignment);
     
-    // Load existing settlement items first
+    // Load existing settlement items for THIS assignment
     let existingItems = [];
     try {
       const existingResponse = await fetch(
@@ -292,10 +292,39 @@ function PettyCash() {
       
       if (existingResponse.ok) {
         existingItems = await existingResponse.json();
-        console.log('Existing settlement items:', existingItems);
+        console.log('Existing settlement items for this assignment:', existingItems);
       }
     } catch (error) {
       console.error('Error loading existing settlement items:', error);
+    }
+    
+    // Get read-only predefined items from the backend response
+    let readOnlyPredefinedItems = [];
+    try {
+      const job = jobs.find(j => j.jobId === assignment.jobId);
+      if (job) {
+        const assignmentResponse = await fetch(
+          `http://localhost:5000/api/petty-cash-assignments/job/${assignment.jobId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+        
+        if (assignmentResponse.ok) {
+          const jobAssignment = await assignmentResponse.json();
+          console.log('Job assignment:', jobAssignment);
+          console.log('Read-only predefined items:', jobAssignment.readOnlyPredefinedItems);
+          
+          // Get read-only items from backend
+          if (jobAssignment && jobAssignment.readOnlyPredefinedItems) {
+            readOnlyPredefinedItems = jobAssignment.readOnlyPredefinedItems;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading job assignment:', error);
     }
     
     // Load pay item templates for this job's category
@@ -323,10 +352,13 @@ function PettyCash() {
           
           if (templates && templates.length > 0) {
             // Convert templates to pay items format
-            // Mark items as paid if they exist in existingItems
+            // Mark items as paid if they exist in readOnlyPredefinedItems
             const loadedPayItems = templates.map(template => {
               const existingItem = existingItems.find(ei => ei.itemName === template.itemName);
+              const paidByOther = readOnlyPredefinedItems.find(si => si.itemName === template.itemName);
+              
               if (existingItem) {
+                // This Waff Clerk already paid for this item
                 return {
                   itemName: template.itemName,
                   actualCost: existingItem.actualCost,
@@ -334,6 +366,17 @@ function PettyCash() {
                   paidBy: existingItem.paidBy,
                   paidByName: existingItem.paidByName,
                   alreadyPaid: true
+                };
+              } else if (paidByOther) {
+                // Another Waff Clerk already paid for this item (read-only)
+                return {
+                  itemName: template.itemName,
+                  actualCost: paidByOther.actualCost,
+                  isCustomItem: false,
+                  paidBy: paidByOther.paidBy,
+                  paidByName: paidByOther.paidByName,
+                  alreadyPaid: true,
+                  paidByOther: true
                 };
               }
               return {
@@ -356,25 +399,20 @@ function PettyCash() {
                 alreadyPaid: true
               }));
             
-            console.log('Setting settlement items:', [...loadedPayItems, ...customItems]);
-            setSettlementItems([...loadedPayItems, ...customItems]);
-          } else {
-            console.log('No templates found, using default empty item');
-            setSettlementItems([{ itemName: '', actualCost: '', isCustomItem: true }]);
+            const finalPayItems = [...loadedPayItems, ...customItems];
+            console.log('Final pay items:', finalPayItems);
+            setSettlementItems(finalPayItems);
+            setShowSettleModal(true);
+            return;
           }
-        } else {
-          console.error('Failed to fetch templates:', response.status);
-          setSettlementItems([{ itemName: '', actualCost: '', isCustomItem: true }]);
         }
-      } else {
-        console.log('No job or shipment category found, using default empty item');
-        setSettlementItems([{ itemName: '', actualCost: '', isCustomItem: true }]);
       }
     } catch (error) {
       console.error('Error loading templates:', error);
-      setSettlementItems([{ itemName: '', actualCost: '', isCustomItem: true }]);
     }
     
+    // Fallback: just show existing items
+    setSettlementItems(existingItems);
     setShowSettleModal(true);
   };
 
@@ -395,7 +433,11 @@ function PettyCash() {
   };
 
   const calculateTotalSpent = () => {
+    // Only count items that are NOT already paid (exclude read-only items from other clerks)
     return settlementItems.reduce((sum, item) => {
+      if (item.alreadyPaid) {
+        return sum; // Skip items already paid by this or other clerks
+      }
       return sum + (parseFloat(item.actualCost) || 0);
     }, 0);
   };
@@ -405,7 +447,7 @@ function PettyCash() {
     
     // Only submit items that have both name and cost filled in
     const validItems = settlementItems.filter(item => 
-      item.itemName && item.actualCost && parseFloat(item.actualCost) > 0
+      item.itemName && item.actualCost && parseFloat(item.actualCost) > 0 && !item.alreadyPaid
     );
     
     if (validItems.length === 0) {
@@ -428,8 +470,8 @@ function PettyCash() {
               itemName: item.itemName,
               actualCost: parseFloat(item.actualCost),
               isCustomItem: item.isCustomItem
-            })),
-            partialSettlement: true  // Flag to indicate this is partial settlement
+            }))
+            // Removed partialSettlement flag - each assignment should be fully settled
           })
         }
       );
@@ -687,9 +729,34 @@ function PettyCash() {
                         {assignment.status === 'Settled' && (
                           <button
                             className="btn-action btn-view"
-                            onClick={() => {
+                            onClick={async () => {
+                              console.log('Loading settlement details for assignment:', assignment.assignmentId);
                               setSelectedAssignment(assignment);
-                              setSettlementItems(assignment.settlementItems || []);
+                              
+                              // Load settlement items from API
+                              try {
+                                const response = await fetch(
+                                  `http://localhost:5000/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
+                                  {
+                                    headers: {
+                                      'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                    }
+                                  }
+                                );
+                                
+                                if (response.ok) {
+                                  const items = await response.json();
+                                  console.log('Loaded settlement items:', items);
+                                  setSettlementItems(items);
+                                } else {
+                                  console.error('Failed to load settlement items:', response.status);
+                                  setSettlementItems(assignment.settlementItems || []);
+                                }
+                              } catch (error) {
+                                console.error('Error loading settlement items:', error);
+                                setSettlementItems(assignment.settlementItems || []);
+                              }
+                              
                               setShowSettleModal(true);
                             }}
                           >

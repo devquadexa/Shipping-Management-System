@@ -55,19 +55,14 @@ class MSSQLJobAssignmentRepository extends IJobAssignmentRepository {
     const pool = await this.db();
     
     let query = `
-      SELECT ja.*, u.name as userName, u.email as userEmail, u.role as userRole,
-             ab.name as assignedByName
+      SELECT ja.*, u.fullName as userName, u.email as userEmail, u.role as userRole,
+             ab.fullName as assignedByName
       FROM JobAssignments ja
       INNER JOIN Users u ON ja.userId = u.userId
       LEFT JOIN Users ab ON ja.assignedBy = ab.userId
       WHERE ja.jobId = @jobId
+      ORDER BY ja.assignedDate DESC
     `;
-    
-    if (activeOnly) {
-      query += ' AND ja.isActive = 1';
-    }
-    
-    query += ' ORDER BY ja.assignedDate DESC';
     
     const result = await pool.request()
       .input('jobId', this.sql.VarChar, jobId)
@@ -80,19 +75,14 @@ class MSSQLJobAssignmentRepository extends IJobAssignmentRepository {
     const pool = await this.db();
     
     let query = `
-      SELECT ja.*, u.name as userName, u.email as userEmail, u.role as userRole,
-             ab.name as assignedByName
+      SELECT ja.*, u.fullName as userName, u.email as userEmail, u.role as userRole,
+             ab.fullName as assignedByName
       FROM JobAssignments ja
       INNER JOIN Users u ON ja.userId = u.userId
       LEFT JOIN Users ab ON ja.assignedBy = ab.userId
       WHERE ja.userId = @userId
+      ORDER BY ja.assignedDate DESC
     `;
-    
-    if (activeOnly) {
-      query += ' AND ja.isActive = 1';
-    }
-    
-    query += ' ORDER BY ja.assignedDate DESC';
     
     const result = await pool.request()
       .input('userId', this.sql.VarChar, userId)
@@ -104,14 +94,19 @@ class MSSQLJobAssignmentRepository extends IJobAssignmentRepository {
   async assignUsersToJob(jobId, userIds, assignedBy, notes = null) {
     const pool = await this.db();
     
-    const result = await pool.request()
-      .input('jobId', this.sql.VarChar, jobId)
-      .input('userIds', this.sql.VarChar, userIds.join(','))
-      .input('assignedBy', this.sql.VarChar, assignedBy)
-      .input('notes', this.sql.NVarChar, notes)
-      .execute('sp_AssignUsersToJob');
-    
-    return result.recordset[0].AssignedCount;
+    try {
+      const result = await pool.request()
+        .input('jobId', this.sql.VarChar, jobId)
+        .input('userIds', this.sql.VarChar, userIds.join(','))
+        .input('assignedBy', this.sql.VarChar, assignedBy)
+        .execute('sp_AssignUsersToJob');
+      
+      // Return the number of users assigned (userIds length since SP doesn't return count)
+      return userIds.length;
+    } catch (error) {
+      console.error('Error in assignUsersToJob:', error);
+      throw error;
+    }
   }
 
   async removeUserFromJob(jobId, userId) {
@@ -130,7 +125,7 @@ class MSSQLJobAssignmentRepository extends IJobAssignmentRepository {
     
     await pool.request()
       .input('jobId', this.sql.VarChar, jobId)
-      .query('UPDATE JobAssignments SET isActive = 0 WHERE jobId = @jobId');
+      .query('DELETE FROM JobAssignments WHERE jobId = @jobId');
     
     return true;
   }

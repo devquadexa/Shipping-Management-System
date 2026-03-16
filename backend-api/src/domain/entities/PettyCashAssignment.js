@@ -13,6 +13,7 @@ class PettyCashAssignment {
     overAmount,
     notes,
     settlementItems,
+    readOnlyPredefinedItems,
     shipmentCategory,
     customerId,
     assignedToName,
@@ -31,6 +32,7 @@ class PettyCashAssignment {
     this.overAmount = overAmount;
     this.notes = notes;
     this.settlementItems = settlementItems || [];
+    this.readOnlyPredefinedItems = readOnlyPredefinedItems || [];
     this.shipmentCategory = shipmentCategory;
     this.customerId = customerId;
     this.assignedToName = assignedToName;
@@ -52,6 +54,7 @@ class PettyCashAssignment {
       overAmount: this.overAmount,
       notes: this.notes,
       settlementItems: this.settlementItems,
+      readOnlyPredefinedItems: this.readOnlyPredefinedItems,
       shipmentCategory: this.shipmentCategory,
       customerId: this.customerId,
       assignedToName: this.assignedToName,

@@ -13,6 +13,7 @@ const billingRoutes = require('./presentation/routes/billing');
 const pettyCashRoutes = require('./presentation/routes/pettycash');
 const payItemTemplateRoutes = require('./presentation/routes/payItemTemplateRoutes');
 const pettyCashAssignmentRoutes = require('./presentation/routes/pettyCashAssignmentRoutes');
+const officePayItemRoutes = require('./presentation/routes/officePayItems');
 const accountingRoutes = require('./presentation/routes/accounting');
 const locationRoutes = require('./presentation/routes/locations');
 const { getConnection } = require('./config/database');
@@ -47,6 +48,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/petty-cash', pettyCashRoutes);
 app.use('/api/pay-item-templates', payItemTemplateRoutes(container));
 app.use('/api/petty-cash-assignments', pettyCashAssignmentRoutes(container));
+app.use('/api/office-pay-items', officePayItemRoutes);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/locations', locationRoutes);
 

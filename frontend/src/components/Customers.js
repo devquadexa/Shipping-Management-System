@@ -44,9 +44,9 @@ function Customers() {
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Check if user is Admin, Super Admin, or Manager
+  // Check if user is Admin, Super Admin, Manager, or Office Executive
   const isAdminOrSuperAdmin = () => {
-    return user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager');
+    return user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive');
   };
 
   useEffect(() => {
@@ -315,7 +315,7 @@ function Customers() {
 
   const handleEdit = (customer) => {
     if (!isAdminOrSuperAdmin()) {
-      setMessage('Only Admin, Super Admin, or Manager can edit customers');
+      setMessage('Only Admin, Super Admin, Manager, or Office Executive can edit customers');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -366,7 +366,7 @@ function Customers() {
 
   const handleDeactivate = async (customerId) => {
     if (!isAdminOrSuperAdmin()) {
-      setMessage('Only Admin, Super Admin, or Manager can deactivate customers');
+      setMessage('Only Admin, Super Admin, Manager, or Office Executive can deactivate customers');
       setTimeout(() => setMessage(''), 3000);
       return;
     }

@@ -15,6 +15,7 @@ const MSSQLContactPersonRepository = require('../repositories/MSSQLContactPerson
 const MSSQLCategoryRepository = require('../repositories/MSSQLCategoryRepository');
 const MSSQLPayItemTemplateRepository = require('../repositories/MSSQLPayItemTemplateRepository');
 const MSSQLPettyCashAssignmentRepository = require('../repositories/MSSQLPettyCashAssignmentRepository');
+const MSSQLOfficePayItemRepository = require('../repositories/MSSQLOfficePayItemRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -33,6 +34,8 @@ const RemoveUserFromJob = require('../../application/use-cases/job/RemoveUserFro
 const GetJobAssignments = require('../../application/use-cases/job/GetJobAssignments');
 const GetUserJobs = require('../../application/use-cases/job/GetUserJobs');
 const AddPayItem = require('../../application/use-cases/job/AddPayItem');
+const ReplacePayItems = require('../../application/use-cases/job/ReplacePayItems');
+const UpdateJob = require('../../application/use-cases/job/UpdateJob');
 
 // Billing Use Cases
 const CreateBill = require('../../application/use-cases/billing/CreateBill');
@@ -65,6 +68,12 @@ const GetPettyCashAssignmentByJob = require('../../application/use-cases/pettyca
 const SettlePettyCashAssignment = require('../../application/use-cases/pettycashassignment/SettlePettyCashAssignment');
 const GetUserBalancesSummary = require('../../application/use-cases/pettycashassignment/GetUserBalancesSummary');
 
+// Office Pay Item Use Cases
+const CreateOfficePayItem = require('../../application/use-cases/officepayitem/CreateOfficePayItem');
+const GetOfficePayItemsByJob = require('../../application/use-cases/officepayitem/GetOfficePayItemsByJob');
+const UpdateOfficePayItem = require('../../application/use-cases/officepayitem/UpdateOfficePayItem');
+const DeleteOfficePayItem = require('../../application/use-cases/officepayitem/DeleteOfficePayItem');
+
 // Auth Use Cases
 const AuthenticateUser = require('../../application/use-cases/auth/AuthenticateUser');
 
@@ -92,10 +101,11 @@ class Container {
     this.dependencies.pettyCashRepository = new MSSQLPettyCashRepository(getConnection, sql);
     this.dependencies.payItemTemplateRepository = new MSSQLPayItemTemplateRepository(getConnection, sql);
     this.dependencies.pettyCashAssignmentRepository = new MSSQLPettyCashAssignmentRepository(getConnection, sql);
+    this.dependencies.officePayItemRepository = new MSSQLOfficePayItemRepository(getConnection, sql);
   }
 
   setupUseCases() {
-    const { customerRepository, jobRepository, jobAssignmentRepository, userRepository, billRepository, pettyCashRepository, payItemTemplateRepository, pettyCashAssignmentRepository } = this.dependencies;
+    const { customerRepository, jobRepository, jobAssignmentRepository, userRepository, billRepository, pettyCashRepository, payItemTemplateRepository, pettyCashAssignmentRepository, officePayItemRepository } = this.dependencies;
     
     // Customer use cases
     this.dependencies.createCustomer = new CreateCustomer(customerRepository);
@@ -114,6 +124,8 @@ class Container {
     this.dependencies.getJobAssignments = new GetJobAssignments(jobRepository, jobAssignmentRepository);
     this.dependencies.getUserJobs = new GetUserJobs(userRepository, jobAssignmentRepository);
     this.dependencies.addPayItem = new AddPayItem(jobRepository);
+    this.dependencies.replacePayItems = new ReplacePayItems(jobRepository);
+    this.dependencies.updateJob = new UpdateJob(jobRepository);
     
     // Billing use cases
     this.dependencies.createBill = new CreateBill(billRepository, jobRepository, customerRepository);
@@ -142,6 +154,12 @@ class Container {
     this.dependencies.getPettyCashAssignmentByJob = new GetPettyCashAssignmentByJob(pettyCashAssignmentRepository);
     this.dependencies.settlePettyCashAssignment = new SettlePettyCashAssignment(pettyCashAssignmentRepository);
     this.dependencies.getUserBalancesSummary = new GetUserBalancesSummary(pettyCashAssignmentRepository);
+    
+    // Office Pay Item use cases
+    this.dependencies.createOfficePayItem = new CreateOfficePayItem(officePayItemRepository, jobRepository);
+    this.dependencies.getOfficePayItemsByJob = new GetOfficePayItemsByJob(officePayItemRepository);
+    this.dependencies.updateOfficePayItem = new UpdateOfficePayItem(officePayItemRepository);
+    this.dependencies.deleteOfficePayItem = new DeleteOfficePayItem(officePayItemRepository);
     
     // Accounting use cases
     this.dependencies.getAccountingDashboard = new GetAccountingDashboard(

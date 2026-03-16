@@ -35,4 +35,9 @@ export const jobService = {
     const response = await apiClient.post(`/jobs/${jobId}/pay-items`, payItemData);
     return response.data;
   },
+
+  replacePayItems: async (jobId, payItems) => {
+    const response = await apiClient.put(`/jobs/${jobId}/pay-items`, { payItems });
+    return response.data;
+  },
 };

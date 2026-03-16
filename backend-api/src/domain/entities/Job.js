@@ -13,12 +13,14 @@ class Job {
     exporter = null,
     lcNumber = null,
     containerNumber = null,
+    transporter = null,
     status = 'Open',
     assignedTo = null, // Legacy single assignment (for backward compatibility)
     assignedUsers = [], // New: Array of assigned users
     createdDate = new Date(),
     completedDate = null,
     payItems = [],
+    officePayItems = [], // New: Office pay items
     pettyCashStatus = null,
     metadata = {}
   }) {
@@ -31,12 +33,14 @@ class Job {
     this.exporter = exporter;
     this.lcNumber = lcNumber;
     this.containerNumber = containerNumber;
+    this.transporter = transporter;
     this.status = status;
     this.assignedTo = assignedTo; // Legacy field
     this.assignedUsers = assignedUsers; // New field for multiple users
     this.createdDate = createdDate;
     this.completedDate = completedDate;
     this.payItems = payItems;
+    this.officePayItems = officePayItems; // New field for office pay items
     this.pettyCashStatus = pettyCashStatus;
     this.metadata = metadata;
   }
@@ -112,7 +116,8 @@ class Job {
 
   getTotalCost() {
     const payItemsTotal = this.payItems.reduce((sum, item) => sum + item.amount, 0);
-    return payItemsTotal;
+    const officePayItemsTotal = this.officePayItems.reduce((sum, item) => sum + (item.actualCost || 0), 0);
+    return payItemsTotal + officePayItemsTotal;
   }
 
   // Serialize to JSON for API responses
@@ -127,6 +132,7 @@ class Job {
       exporter: this.exporter,
       lcNumber: this.lcNumber,
       containerNumber: this.containerNumber,
+      transporter: this.transporter,
       status: this.status,
       assignedTo: this.assignedTo, // Legacy field
       assignedUsers: this.assignedUsers, // New field
@@ -134,6 +140,7 @@ class Job {
       createdDate: this.createdDate,
       completedDate: this.completedDate,
       payItems: this.payItems,
+      officePayItems: this.officePayItems, // New field for office pay items
       pettyCashStatus: this.pettyCashStatus,
       metadata: this.metadata
     };

@@ -868,3 +868,15 @@
 .settlement-form .helper-text {
   margin-bottom: 1rem;
 }
+
+/* Remove number input spinners (up/down arrows) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
