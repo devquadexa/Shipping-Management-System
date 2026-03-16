@@ -1,5 +1,6 @@
-/* User Management Page Styles - Matching Customer Page Design */
+/* User Management Page Styles */
 
+/* --- Page Layout ---------------------------------------- */
 .users-page {
   max-width: 1600px;
   margin: 0 auto;
@@ -8,11 +9,10 @@
 
 .page-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   margin-bottom: 2.5rem;
-  flex-wrap: wrap;
-  gap: 1.5rem;
+  gap: 1rem;
   padding-bottom: 1.5rem;
   border-bottom: 2px solid #e5e7eb;
 }
@@ -20,7 +20,7 @@
 .page-header h1 {
   margin: 0;
   color: #101036;
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.5px;
 }
@@ -32,8 +32,8 @@
 }
 
 .btn-large {
-  padding: 14px 28px;
-  font-size: 1rem;
+  padding: 10px 20px;
+  font-size: 0.875rem;
   font-weight: 600;
   letter-spacing: 0.3px;
   box-shadow: 0 2px 4px rgba(16, 16, 54, 0.15);
@@ -45,7 +45,7 @@
   box-shadow: 0 4px 8px rgba(16, 16, 54, 0.25);
 }
 
-/* Card Styles */
+/* --- Card ----------------------------------------------- */
 .card {
   background: white;
   border-radius: 12px;
@@ -62,7 +62,7 @@
   border-bottom: 1px solid #e5e7eb;
   background: #f9fafb;
   flex-wrap: wrap;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .card-header h2 {
@@ -70,13 +70,13 @@
   color: #101036;
   font-size: 1.5rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
-/* Search Box */
+/* --- Search Box ----------------------------------------- */
 .search-box {
-  flex: 1;
+  flex: 1 1 200px;
   max-width: 450px;
-  min-width: 280px;
 }
 
 .search-input {
@@ -87,6 +87,7 @@
   font-size: 0.95rem;
   transition: all 0.3s ease;
   background: white;
+  box-sizing: border-box;
 }
 
 .search-input:focus {
@@ -95,7 +96,7 @@
   box-shadow: 0 0 0 3px rgba(16, 16, 54, 0.08);
 }
 
-/* Table Styles */
+/* --- Table ---------------------------------------------- */
 .users-table-wrapper {
   overflow-x: auto;
 }
@@ -150,7 +151,7 @@
   font-size: 0.9rem;
 }
 
-/* Role Badges */
+/* --- Role Badges ---------------------------------------- */
 .role-badge {
   display: inline-block;
   padding: 5px 12px;
@@ -192,7 +193,7 @@
   border: 1px solid #fde68a;
 }
 
-/* Empty State */
+/* --- Empty State ---------------------------------------- */
 .empty-state {
   padding: 5rem 2rem;
   text-align: center;
@@ -211,7 +212,7 @@
   font-weight: 500;
 }
 
-/* Modal Styles */
+/* --- Modal ---------------------------------------------- */
 .modal-large {
   max-width: 800px;
   width: 95%;
@@ -260,7 +261,7 @@
   color: #333;
 }
 
-/* Form Styles */
+/* --- Form ----------------------------------------------- */
 .user-form {
   padding: 2rem;
 }
@@ -327,21 +328,19 @@
   cursor: pointer;
 }
 
-/* Form Actions */
 .form-actions {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-  padding-top: 1.5rem;
-  border-top: 2px solid #e5e7eb;
   position: sticky;
   bottom: 0;
   background: white;
   margin: 0 -2rem -2rem;
   padding: 1.5rem 2rem;
+  border-top: 2px solid #e5e7eb;
 }
 
-/* Password Input with Toggle */
+/* --- Password Toggle ------------------------------------ */
 .password-input-wrapper {
   position: relative;
   display: flex;
@@ -377,7 +376,7 @@
   display: block;
 }
 
-/* Alert Styles */
+/* --- Alerts --------------------------------------------- */
 .alert {
   padding: 1rem 1.5rem;
   border-radius: 8px;
@@ -397,8 +396,12 @@
   border: 1px solid #fca5a5;
 }
 
-/* Responsive Design */
+/* --- Responsive (single block) -------------------------- */
 @media (max-width: 768px) {
+  .users-page {
+    padding: 1rem;
+  }
+
   .page-header {
     flex-direction: column;
     align-items: flex-start;
@@ -406,43 +409,30 @@
 
   .card-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    padding: 1.25rem 1rem;
   }
 
+  .card-header h2 {
+    font-size: 1.25rem;
+  }
+
+  /* Fix search box stretching full width */
   .search-box {
+    flex: none;
+    width: 100%;
     max-width: 100%;
+    min-width: 0;
   }
 
-  .users-table th,
-  .users-table td {
-    padding: 0.75rem 0.5rem;
-    font-size: 0.85rem;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .modal-large {
+  .search-input {
     width: 100%;
-    max-height: 100vh;
-    border-radius: 0;
+    box-sizing: border-box;
   }
 
-  .form-actions {
-    flex-direction: column;
-  }
-
-  .form-actions button {
-    width: 100%;
-  }
-}
-
-
-/* Mobile Card View */
-@media (max-width: 768px) {
+  /* Table -> card layout */
   .users-table-wrapper {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .users-table thead {
@@ -460,7 +450,7 @@
     background: white;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
-    padding: 1.5rem;
+    padding: 1.25rem;
     margin-bottom: 1rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
@@ -469,15 +459,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 0;
+    padding: 0.6rem 0;
     border-bottom: 1px solid #f3f4f6;
+    font-size: 0.9rem;
     text-align: right;
   }
 
   .users-table td:last-child {
     border-bottom: none;
-    padding-top: 1rem;
-    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    margin-top: 0.25rem;
     border-top: 2px solid #e5e7eb;
   }
 
@@ -489,14 +480,34 @@
     font-size: 0.75rem;
     letter-spacing: 0.5px;
     text-align: left;
+    flex-shrink: 0;
+    margin-right: 0.5rem;
   }
 
   .user-id {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
 
   .role-badge {
     font-size: 0.75rem;
     padding: 4px 10px;
+  }
+
+  .modal-large {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions button {
+    width: 100%;
   }
 }

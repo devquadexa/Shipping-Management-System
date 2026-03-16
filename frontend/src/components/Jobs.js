@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
 import { authService } from '../api/services/authService';
+import { transporterService } from '../api/services/transporterService';
 import apiClient from '../api/client';
 import OfficePayItems from './OfficePayItems';
 import '../styles/Jobs.css';
@@ -12,6 +13,7 @@ function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
+  const [transporters, setTransporters] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
@@ -37,6 +39,7 @@ function Jobs() {
   useEffect(() => {
     fetchJobs();
     fetchCustomers(); // All users need to see customer names
+    fetchTransporters();
     if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') {
       fetchUsers();
     }
@@ -55,6 +58,17 @@ function Jobs() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showUserDropdown]);
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (showModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showModal]);
 
   const fetchJobs = async () => {
     try {
@@ -112,6 +126,16 @@ function Jobs() {
     }
   };
 
+  const fetchTransporters = async () => {
+    try {
+      const data = await transporterService.getAll();
+      // Allow assigning only active transporters in new/edit job flow
+      setTransporters(data.filter((transporter) => transporter.isActive));
+    } catch (error) {
+      console.error('Error fetching transporters:', error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -161,8 +185,9 @@ function Jobs() {
       setTimeout(() => setMessage(''), 5000);
     } catch (error) {
       console.error('Job creation error:', error);
-      setMessage('Error creating job');
-      setTimeout(() => setMessage(''), 3000);
+      const errorMessage = error.response?.data?.message || error.message || 'Error creating job';
+      setMessage(`Error creating job: ${errorMessage}`);
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -299,7 +324,10 @@ function Jobs() {
       fetchJobs();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      setMessage('Error updating job');
+      console.error('Job update error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Error updating job';
+      setMessage(`Error updating job: ${errorMessage}`);
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -547,6 +575,10 @@ function Jobs() {
                               <span className="detail-value">{job.openDate ? new Date(job.openDate).toLocaleDateString() : '-'}</span>
                             </div>
                             <div className="detail-item">
+                              <span className="detail-label">Transporter:</span>
+                              <span className="detail-value">{job.transporter || '-'}</span>
+                            </div>
+                            <div className="detail-item">
                               <span className="detail-label">Assigned To:</span>
                               <span className="detail-value">
                                 {job.assignments && job.assignments.length > 0 ? (
@@ -714,7 +746,17 @@ function Jobs() {
                   
                   <div className="form-group">
                     <label>Transporter</label>
-                    <input type="text" name="transporter" value={formData.transporter} onChange={handleChange} placeholder="Transporter name" />
+                    <select name="transporter" value={formData.transporter} onChange={handleChange}>
+                      <option value="">Select Transporter</option>
+                      {transporters.map((transporter) => (
+                        <option key={transporter.transporterId} value={transporter.name}>
+                          {transporter.name}
+                        </option>
+                      ))}
+                      {formData.transporter && !transporters.some((transporter) => transporter.name === formData.transporter) && (
+                        <option value={formData.transporter}>{formData.transporter}</option>
+                      )}
+                    </select>
                   </div>
                 </div>
               </div>
