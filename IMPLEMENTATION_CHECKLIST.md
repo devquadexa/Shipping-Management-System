@@ -1,271 +1,106 @@
-# Implementation Checklist - Settlement Flow Fixes
+# Office Executive Registration Fix - Implementation Checklist
 
-## Status: ✅ COMPLETE
+## Pre-Implementation
+- [ ] Backup database (recommended)
+- [ ] Verify SQL Server connection
+- [ ] Confirm database name: `SuperShineCargoDb`
+- [ ] Confirm server: `SASMIKA\SQLEXPRESS`
 
-All fixes have been implemented and the backend is running successfully.
+## Implementation Steps
 
----
+### Step 1: Execute Migration Script
+- [ ] Open SQL Server Management Studio (SSMS)
+- [ ] Connect to `SASMIKA\SQLEXPRESS`
+- [ ] Select database `SuperShineCargoDb`
+- [ ] Open file: `backend-api/src/config/FIX_OFFICE_EXECUTIVE_CONSTRAINT.sql`
+- [ ] Execute script (F5 or Execute button)
+- [ ] Verify output shows "✓ New constraint added successfully"
 
-## Changes Implemented
+### Step 2: Verify Constraint Update
+- [ ] Run verification query:
+  ```sql
+  SELECT definition FROM sys.check_constraints 
+  WHERE name = 'CK_Users_Role' AND parent_object_id = OBJECT_ID('Users');
+  ```
+- [ ] Confirm output contains: `'Office Executive'`
+- [ ] Confirm output contains all 5 roles:
+  - Super Admin
+  - Admin
+  - Manager
+  - Office Executive
+  - Waff Clerk
 
-### ✅ Backend Repository Changes
-- [x] Modified `getByJob()` method to collect items from ALL assignments
-- [x] Added comprehensive logging to `settle()` method
-- [x] Verified no syntax errors
-- [x] Backend compiles and runs successfully
+## Testing
 
-### ✅ Backend Controller Changes
-- [x] Added logging to `settle()` method
-- [x] Verified no syntax errors
-- [x] Backend compiles and runs successfully
+### Test 1: Create Office Executive User
+- [ ] Login to application as Super Admin
+- [ ] Navigate to User Management
+- [ ] Click "+ New User" button
+- [ ] Fill form:
+  - Username: `office_exec_test`
+  - Full Name: `Office Executive Test`
+  - Email: `office@example.com`
+  - Password: `TestPassword123`
+  - Role: Select "Office Executive"
+- [ ] Click "Create User"
+- [ ] Verify: User created successfully (no error)
+- [ ] Verify: User appears in User Management table
+- [ ] Verify: Role shows as "Office Executive"
 
-### ✅ Frontend Changes
-- [x] Verified PettyCash.js has correct logic (no changes needed)
-- [x] Verified Billing.js has correct logic (no changes needed)
-- [x] Verified no syntax errors in frontend components
+### Test 2: Login as Office Executive
+- [ ] Logout from Super Admin account
+- [ ] Login with Office Executive credentials
+- [ ] Verify: Login successful
+- [ ] Verify: Dashboard accessible
+- [ ] Verify: Can see navigation menu
 
-### ✅ Database Schema
-- [x] Verified PettyCashSettlementItems has paidBy column
-- [x] Verified PettyCashAssignments has status column
-- [x] Verified Jobs has pettyCashStatus column
-- [x] No schema changes needed
+### Test 3: Verify Office Executive Permissions
+- [ ] Dashboard: ✓ Accessible
+- [ ] Customers: ✓ Can view, add, edit, delete
+- [ ] Jobs: ✓ Can view, create, edit
+- [ ] Office Pay Items: ✓ Can add payments
+- [ ] Billing: ✗ Should NOT be accessible
+- [ ] User Management: ✗ Should NOT be accessible
 
----
+### Test 4: Create Other Roles
+- [ ] Create Super Admin user: ✓ Success
+- [ ] Create Admin user: ✓ Success
+- [ ] Create Manager user: ✓ Success
+- [ ] Create Waff Clerk user: ✓ Success
 
-## Verification Steps Completed
+## Post-Implementation
 
-### ✅ Code Quality
-- [x] No syntax errors in modified files
-- [x] No TypeScript/ESLint errors
-- [x] Code follows existing patterns
-- [x] Logging is consistent with existing code
-
-### ✅ Backend Status
-- [x] Backend starts without errors
-- [x] Database connection successful
-- [x] All services initialized
-- [x] API listening on port 5000
-
-### ✅ Documentation
-- [x] Created SETTLEMENT_FLOW_FIXES_COMPLETE.md
-- [x] Created TESTING_SETTLEMENT_GUIDE.md
-- [x] Created CODE_CHANGES_REFERENCE.md
-- [x] Created CHANGES_SUMMARY.md
-- [x] Created SETTLEMENT_FIXES_FINAL_SUMMARY.md
-- [x] Created IMPLEMENTATION_CHECKLIST.md
-
----
-
-## Files Modified
-
-| File | Status | Changes |
-|------|--------|---------|
-| backend-api/src/infrastructure/repositories/MSSQLPettyCashAssignmentRepository.js | ✅ Modified | getByJob() and settle() methods |
-| backend-api/src/presentation/controllers/PettyCashAssignmentController.js | ✅ Modified | settle() method |
-| frontend/src/components/PettyCash.js | ✅ Verified | No changes needed |
-| frontend/src/components/Billing.js | ✅ Verified | No changes needed |
-
----
-
-## Issues Fixed
-
-### ✅ Issue 1: View Details Button Not Appearing
-- **Status**: Fixed
-- **Solution**: Added logging to verify transaction commits
-- **Verification**: Backend logs will show "transaction committed" and "status: 'Settled'"
-- **Files**: MSSQLPettyCashAssignmentRepository.js, PettyCashAssignmentController.js
-
-### ✅ Issue 2: Waff Clerk 02 Can't See Items Paid by Waff Clerk 01
-- **Status**: Fixed
-- **Solution**: Modified getByJob() to collect items from all assignments
-- **Verification**: Waff Clerk 02 will see items as read-only with "Paid by" badge
-- **Files**: MSSQLPettyCashAssignmentRepository.js
-
-### ✅ Issue 3: Management Can't See Settled Items in Invoicing
-- **Status**: Fixed
-- **Solution**: Fixed getByJob() to return all settlement items
-- **Verification**: Management will see all items in Invoicing
-- **Files**: MSSQLPettyCashAssignmentRepository.js
-
----
-
-## Testing Readiness
-
-### ✅ Prerequisites Met
-- [x] Backend running on port 5000
-- [x] Database connected
-- [x] All services initialized
-- [x] No compilation errors
-
-### ✅ Test Data Available
-- [x] Test SQL scripts available (TEST_SETTLEMENT_FLOW.sql)
-- [x] Test jobs can be created
-- [x] Test users available (Waff Clerk 01, Waff Clerk 02)
-- [x] Test pay item templates available
-
-### ✅ Testing Documentation
-- [x] Step-by-step testing guide created
-- [x] Expected results documented
-- [x] Debugging tips provided
-- [x] Log message reference provided
-
----
-
-## Deployment Readiness
-
-### ✅ Code Quality
-- [x] No syntax errors
-- [x] No runtime errors
-- [x] Follows existing code patterns
-- [x] Backward compatible
-
-### ✅ Performance
-- [x] No performance degradation
-- [x] Minimal database impact
-- [x] Logging is efficient
-- [x] No memory leaks
-
-### ✅ Security
-- [x] No security vulnerabilities
-- [x] Transaction rollback on error
-- [x] Audit trail via paidBy field
-- [x] No sensitive data exposed
-
-### ✅ Documentation
-- [x] Changes documented
-- [x] Testing guide provided
-- [x] Rollback plan available
-- [x] Support documents created
-
----
-
-## Next Steps
-
-### Immediate (Testing Phase)
-1. [ ] Run TEST_SETTLEMENT_FLOW.sql to create test data
-2. [ ] Test Waff Clerk 01 settlement
-3. [ ] Monitor backend logs
-4. [ ] Verify "View Details" button appears
-5. [ ] Test Waff Clerk 02 settlement
-6. [ ] Verify multi-user visibility
-7. [ ] Test Invoicing integration
-8. [ ] Verify database updates
-
-### Short Term (Verification Phase)
-1. [ ] Run full end-to-end test
-2. [ ] Verify all three issues are fixed
-3. [ ] Check database for correct data
-4. [ ] Review backend logs
-5. [ ] Test error scenarios
-6. [ ] Test with multiple jobs
-7. [ ] Test with multiple users
-
-### Medium Term (Production Phase)
-1. [ ] Deploy to staging environment
-2. [ ] Run full regression tests
-3. [ ] Performance testing
-4. [ ] Load testing
-5. [ ] User acceptance testing
-6. [ ] Deploy to production
-7. [ ] Monitor production logs
-
-### Long Term (Optimization Phase)
-1. [ ] Reduce logging verbosity
-2. [ ] Add metrics/monitoring
-3. [ ] Optimize getByJob() if needed
-4. [ ] Add settlement history/audit trail
-5. [ ] Add retry logic for failed settlements
-6. [ ] Performance optimization
-
----
-
-## Rollback Plan
-
-If issues occur during testing:
-
-1. [ ] Stop backend: `Ctrl+C` in terminal
-2. [ ] Revert MSSQLPettyCashAssignmentRepository.js to previous version
-3. [ ] Revert PettyCashAssignmentController.js to previous version
-4. [ ] Restart backend: `npm start`
-5. [ ] Clear browser cache
-6. [ ] Test settlement flow again
-
----
-
-## Support Resources
+### Verification
+- [ ] All 5 roles can be created without errors
+- [ ] Office Executive users have correct permissions
+- [ ] No database errors in application logs
+- [ ] No constraint violations in error logs
 
 ### Documentation
-- SETTLEMENT_FLOW_FIXES_COMPLETE.md - Complete technical documentation
-- TESTING_SETTLEMENT_GUIDE.md - Step-by-step testing instructions
-- CODE_CHANGES_REFERENCE.md - Exact code changes made
-- CHANGES_SUMMARY.md - Detailed explanation of changes
-- SETTLEMENT_FIXES_FINAL_SUMMARY.md - Executive summary
+- [ ] Update team documentation
+- [ ] Notify team of fix
+- [ ] Archive migration script location
+- [ ] Document any custom configurations
 
-### Backend Logs
-- Look for "=== SETTLE START ===" and "=== SETTLE END ===" markers
-- Look for "transaction committed" to verify transaction success
-- Look for "status: 'Settled'" to verify status update
-- Look for "total settlement items:" to verify multi-user items
+## Rollback Plan (If Needed)
 
-### Database Queries
+If issues occur, run this to revert:
 ```sql
--- Check assignment status
-SELECT assignmentId, jobId, assignedTo, status, actualSpent, settlementDate
-FROM PettyCashAssignments
-WHERE jobId = 'JOB0006';
-
--- Check settlement items
-SELECT si.settlementItemId, si.assignmentId, si.itemName, si.actualCost, si.paidBy, u.fullName
-FROM PettyCashSettlementItems si
-LEFT JOIN Users u ON si.paidBy = u.userId
-WHERE si.assignmentId IN (
-  SELECT assignmentId FROM PettyCashAssignments WHERE jobId = 'JOB0006'
-);
-
--- Check job status
-SELECT jobId, pettyCashStatus FROM Jobs WHERE jobId = 'JOB0006';
+ALTER TABLE Users DROP CONSTRAINT CK_Users_Role;
+ALTER TABLE Users ADD CONSTRAINT CK_Users_Role 
+CHECK (Role IN ('Super Admin', 'Admin', 'Manager', 'Waff Clerk'));
 ```
-
----
 
 ## Sign-Off
 
-### Implementation
-- [x] All code changes completed
-- [x] All files verified
-- [x] Backend running successfully
-- [x] No errors or warnings
-
-### Documentation
-- [x] All documentation created
-- [x] Testing guide provided
-- [x] Support resources available
-- [x] Rollback plan documented
-
-### Status
-**✅ READY FOR TESTING**
-
-The settlement flow fixes are complete and ready for testing. All three issues have been addressed:
-1. View Details button will now appear for settled assignments
-2. Waff Clerk 02 will see items paid by Waff Clerk 01
-3. Management will see settled items in Invoicing
-
-Backend is running successfully with comprehensive logging enabled for debugging.
+- [ ] Implementation completed
+- [ ] All tests passed
+- [ ] No errors in logs
+- [ ] Ready for production
 
 ---
 
-## Contact & Support
-
-For questions or issues:
-1. Check the support documentation
-2. Review backend logs
-3. Run database verification queries
-4. Refer to the testing guide
-5. Check the rollback plan if needed
-
----
-
-**Last Updated**: March 12, 2026
-**Status**: ✅ Complete and Ready for Testing
-**Backend**: Running on port 5000
-**Database**: Connected and Ready
+**Date**: March 16, 2026  
+**Issue**: Office Executive Registration Error  
+**Fix**: Database Constraint Update  
+**Status**: Ready for Implementation
