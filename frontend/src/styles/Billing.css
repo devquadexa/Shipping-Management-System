@@ -587,9 +587,82 @@ input[type="number"] {
     width: 100%;
   }
 
+  .pay-items-form {
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
   .pay-items-input-table {
-    display: block;
-    overflow-x: auto;
+    display: block !important;
+    width: 100%;
+  }
+
+  .pay-items-input-table thead {
+    display: none !important;
+  }
+
+  .pay-items-input-table tbody,
+  .pay-items-input-table tbody tr {
+    display: block !important;
+    width: 100%;
+  }
+
+  .pay-items-input-table tbody tr {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  }
+
+  .pay-items-input-table td {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    gap: 0.75rem;
+  }
+
+  .pay-items-input-table td:last-child {
+    border-bottom: none;
+    justify-content: flex-end;
+  }
+
+  .pay-items-input-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .pay-items-input-table td[data-label="Action"]::before {
+    display: none;
+  }
+
+  .pay-items-input-table td input,
+  .pay-items-input-table td select,
+  .pay-items-input-table td .form-control-small {
+    width: 60% !important;
+    max-width: 60%;
+    text-align: right;
+    padding: 0.5rem 0.6rem;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
+
+  .pay-items-input-table td .btn {
+    width: auto !important;
+  }
+
+  .pay-items-input-table .form-control-small {
+    width: 60% !important;
+    min-width: 0;
+    font-size: 1rem;
+    padding: 0.5rem 0.6rem;
   }
 
   .pay-items-actions {
@@ -654,6 +727,80 @@ input[type="number"] {
 
   .action-buttons .btn {
     width: 100%;
+  }
+
+  .pay-items-display-table {
+    display: block;
+    width: 100%;
+  }
+
+  .pay-items-display-table thead {
+    display: none;
+  }
+
+  .pay-items-display-table tbody,
+  .pay-items-display-table tbody tr {
+    display: block;
+    width: 100%;
+  }
+
+  .pay-items-display-table tbody tr {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  }
+
+  .pay-items-display-table tbody tr.total-row {
+    background: #f0f4ff;
+    border-color: #c7d2fe;
+  }
+
+  .pay-items-display-table tbody tr.profit-row {
+    background: #f0fdf4;
+    border-color: #86efac;
+  }
+
+  .pay-items-display-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    text-align: right;
+  }
+
+  .pay-items-display-table td:last-child {
+    border-bottom: none;
+  }
+
+  .pay-items-display-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    text-align: left;
+  }
+
+  .pay-items-display-table .total-row td:first-child,
+  .pay-items-display-table .profit-row td:first-child {
+    display: block;
+    justify-content: flex-start;
+    font-weight: 700;
+    color: #101036;
+    border-bottom: 2px solid #d1d5db;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    text-align: left;
+  }
+
+  .pay-items-display-table .total-row td:first-child::before,
+  .pay-items-display-table .profit-row td:first-child::before {
+    content: none;
   }
 }
 

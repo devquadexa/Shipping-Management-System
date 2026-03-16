@@ -88,6 +88,38 @@ class UpdateJob {
       console.error('UpdateJob.execute - ERROR stack:', error.stack);
       throw error;
     }
+    console.log('UpdateJob.execute - jobId:', jobId, 'data:', jobData);
+    
+    const job = await this.jobRepository.findById(jobId);
+    console.log('UpdateJob.execute - found job:', job);
+    
+    if (!job) {
+      throw new Error('Job not found');
+    }
+    
+    // Update the job with new data
+    const updatedJob = {
+      jobId: job.jobId,
+      customerId: job.customerId, // Customer ID cannot be changed (already stored)
+      blNumber: jobData.blNumber !== undefined ? jobData.blNumber : job.blNumber,
+      cusdecNumber: jobData.cusdecNumber !== undefined ? jobData.cusdecNumber : job.cusdecNumber,
+      openDate: jobData.openDate !== undefined ? jobData.openDate : job.openDate,
+      shipmentCategory: jobData.shipmentCategory !== undefined ? jobData.shipmentCategory : job.shipmentCategory,
+      exporter: jobData.exporter !== undefined ? jobData.exporter : job.exporter,
+      transporter: jobData.transporter !== undefined ? jobData.transporter : job.transporter,
+      lcNumber: jobData.lcNumber !== undefined ? jobData.lcNumber : job.lcNumber,
+      containerNumber: jobData.containerNumber !== undefined ? jobData.containerNumber : job.containerNumber,
+      status: jobData.status !== undefined ? jobData.status : job.status,
+      assignedTo: jobData.assignedTo !== undefined ? jobData.assignedTo : job.assignedTo,
+      createdDate: job.createdDate
+    };
+    
+    console.log('UpdateJob.execute - Updating job with:', updatedJob);
+    const result = await this.jobRepository.update(jobId, updatedJob);
+    console.log('UpdateJob.execute - Update result:', result);
+    
+    // Return the updated job
+    return await this.jobRepository.findById(jobId);
   }
 }
 

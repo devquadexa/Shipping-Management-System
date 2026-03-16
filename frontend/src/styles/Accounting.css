@@ -8,9 +8,10 @@
 
 .page-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   margin-bottom: 2rem;
+  gap: 1rem;
   padding-bottom: 1.5rem;
   border-bottom: 2px solid #e5e7eb;
 }
@@ -18,7 +19,7 @@
 .page-header h1 {
   margin: 0;
   color: #101036;
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   font-weight: 700;
 }
 

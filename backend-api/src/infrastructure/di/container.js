@@ -16,17 +16,23 @@ const MSSQLCategoryRepository = require('../repositories/MSSQLCategoryRepository
 const MSSQLPayItemTemplateRepository = require('../repositories/MSSQLPayItemTemplateRepository');
 const MSSQLPettyCashAssignmentRepository = require('../repositories/MSSQLPettyCashAssignmentRepository');
 const MSSQLOfficePayItemRepository = require('../repositories/MSSQLOfficePayItemRepository');
+const MSSQLTransporterRepository = require('../repositories/MSSQLTransporterRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
 const GetAllCustomers = require('../../application/use-cases/customer/GetAllCustomers');
 const UpdateCustomer = require('../../application/use-cases/customer/UpdateCustomer');
 const DeleteCustomer = require('../../application/use-cases/customer/DeleteCustomer');
+const CreateTransporter = require('../../application/use-cases/transporter/CreateTransporter');
+const GetAllTransporters = require('../../application/use-cases/transporter/GetAllTransporters');
+const UpdateTransporter = require('../../application/use-cases/transporter/UpdateTransporter');
+const DeleteTransporter = require('../../application/use-cases/transporter/DeleteTransporter');
 
 // Job Use Cases
 const CreateJob = require('../../application/use-cases/job/CreateJob');
 const GetAllJobs = require('../../application/use-cases/job/GetAllJobs');
 const GetJobById = require('../../application/use-cases/job/GetJobById');
+const UpdateJob = require('../../application/use-cases/job/UpdateJob');
 const UpdateJobStatus = require('../../application/use-cases/job/UpdateJobStatus');
 const AssignJob = require('../../application/use-cases/job/AssignJob');
 const AssignMultipleUsersToJob = require('../../application/use-cases/job/AssignMultipleUsersToJob');
@@ -35,7 +41,6 @@ const GetJobAssignments = require('../../application/use-cases/job/GetJobAssignm
 const GetUserJobs = require('../../application/use-cases/job/GetUserJobs');
 const AddPayItem = require('../../application/use-cases/job/AddPayItem');
 const ReplacePayItems = require('../../application/use-cases/job/ReplacePayItems');
-const UpdateJob = require('../../application/use-cases/job/UpdateJob');
 
 // Billing Use Cases
 const CreateBill = require('../../application/use-cases/billing/CreateBill');
@@ -102,21 +107,38 @@ class Container {
     this.dependencies.payItemTemplateRepository = new MSSQLPayItemTemplateRepository(getConnection, sql);
     this.dependencies.pettyCashAssignmentRepository = new MSSQLPettyCashAssignmentRepository(getConnection, sql);
     this.dependencies.officePayItemRepository = new MSSQLOfficePayItemRepository(getConnection, sql);
+    this.dependencies.transporterRepository = new MSSQLTransporterRepository(getConnection, sql);
   }
 
   setupUseCases() {
-    const { customerRepository, jobRepository, jobAssignmentRepository, userRepository, billRepository, pettyCashRepository, payItemTemplateRepository, pettyCashAssignmentRepository, officePayItemRepository } = this.dependencies;
+    const {
+      customerRepository,
+      jobRepository,
+      jobAssignmentRepository,
+      userRepository,
+      billRepository,
+      pettyCashRepository,
+      payItemTemplateRepository,
+      pettyCashAssignmentRepository,
+      officePayItemRepository,
+      transporterRepository,
+    } = this.dependencies;
     
     // Customer use cases
     this.dependencies.createCustomer = new CreateCustomer(customerRepository);
     this.dependencies.getAllCustomers = new GetAllCustomers(customerRepository);
     this.dependencies.updateCustomer = new UpdateCustomer(customerRepository);
     this.dependencies.deleteCustomer = new DeleteCustomer(customerRepository);
+    this.dependencies.createTransporter = new CreateTransporter(transporterRepository);
+    this.dependencies.getAllTransporters = new GetAllTransporters(transporterRepository);
+    this.dependencies.updateTransporter = new UpdateTransporter(transporterRepository);
+    this.dependencies.deleteTransporter = new DeleteTransporter(transporterRepository);
     
     // Job use cases
     this.dependencies.createJob = new CreateJob(jobRepository, customerRepository);
     this.dependencies.getAllJobs = new GetAllJobs(jobRepository);
     this.dependencies.getJobById = new GetJobById(jobRepository);
+    this.dependencies.updateJob = new UpdateJob(jobRepository);
     this.dependencies.updateJobStatus = new UpdateJobStatus(jobRepository);
     this.dependencies.assignJob = new AssignJob(jobRepository, userRepository);
     this.dependencies.assignMultipleUsersToJob = new AssignMultipleUsersToJob(jobRepository, userRepository, jobAssignmentRepository);
@@ -125,7 +147,6 @@ class Container {
     this.dependencies.getUserJobs = new GetUserJobs(userRepository, jobAssignmentRepository);
     this.dependencies.addPayItem = new AddPayItem(jobRepository);
     this.dependencies.replacePayItems = new ReplacePayItems(jobRepository);
-    this.dependencies.updateJob = new UpdateJob(jobRepository);
     
     // Billing use cases
     this.dependencies.createBill = new CreateBill(billRepository, jobRepository, customerRepository);

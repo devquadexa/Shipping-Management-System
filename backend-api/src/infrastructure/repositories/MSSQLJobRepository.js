@@ -9,9 +9,47 @@ class MSSQLJobRepository extends IJobRepository {
     super();
     this.db = dbConnection;
     this.sql = sql;
+    this.schemaEnsured = false;
+  }
+
+  async ensureSchema() {
+    if (this.schemaEnsured) {
+      return;
+    }
+
+    const pool = await this.db();
+
+    await pool.request().query(`
+      IF COL_LENGTH('Jobs', 'BLNumber') IS NULL
+        ALTER TABLE Jobs ADD BLNumber NVARCHAR(100) NULL;
+
+      IF COL_LENGTH('Jobs', 'CUSDECNumber') IS NULL
+        ALTER TABLE Jobs ADD CUSDECNumber NVARCHAR(100) NULL;
+
+      IF COL_LENGTH('Jobs', 'LCNumber') IS NULL
+        ALTER TABLE Jobs ADD LCNumber NVARCHAR(100) NULL;
+
+      IF COL_LENGTH('Jobs', 'ContainerNumber') IS NULL
+        ALTER TABLE Jobs ADD ContainerNumber NVARCHAR(100) NULL;
+
+      IF COL_LENGTH('Jobs', 'Transporter') IS NULL
+        ALTER TABLE Jobs ADD Transporter NVARCHAR(200) NULL;
+
+      IF COL_LENGTH('Jobs', 'Exporter') IS NULL
+        ALTER TABLE Jobs ADD Exporter NVARCHAR(200) NULL;
+
+      IF COL_LENGTH('Jobs', 'AssignedTo') IS NULL
+        ALTER TABLE Jobs ADD AssignedTo VARCHAR(50) NULL;
+
+      IF COL_LENGTH('Jobs', 'CreatedDate') IS NULL
+        ALTER TABLE Jobs ADD CreatedDate DATETIME DEFAULT GETDATE();
+    `);
+
+    this.schemaEnsured = true;
   }
 
   async create(job) {
+    await this.ensureSchema();
     const pool = await this.db();
     
     console.log('MSSQLJobRepository.create - job:', job);
@@ -24,12 +62,15 @@ class MSSQLJobRepository extends IJobRepository {
       .input('openDate', this.sql.Date, job.openDate)
       .input('shipmentCategory', this.sql.VarChar, job.shipmentCategory)
       .input('exporter', this.sql.VarChar, job.exporter)
+      .input('transporter', this.sql.VarChar, job.transporter)
       .input('lcNumber', this.sql.VarChar, job.lcNumber)
       .input('containerNumber', this.sql.VarChar, job.containerNumber)
       .input('status', this.sql.VarChar, job.status)
+      .input('assignedTo', this.sql.VarChar, job.assignedTo)
+      .input('createdDate', this.sql.DateTime, job.createdDate)
       .query(`
-        INSERT INTO Jobs (jobId, customerId, blNumber, cusdecNumber, openDate, shipmentCategory, exporter, lcNumber, containerNumber, status)
-        VALUES (@jobId, @customerId, @blNumber, @cusdecNumber, @openDate, @shipmentCategory, @exporter, @lcNumber, @containerNumber, @status)
+        INSERT INTO Jobs (JobId, CustomerId, BLNumber, CUSDECNumber, OpenDate, ShipmentCategory, Exporter, Transporter, LCNumber, ContainerNumber, Status, AssignedTo, CreatedDate)
+        VALUES (@jobId, @customerId, @blNumber, @cusdecNumber, @openDate, @shipmentCategory, @exporter, @transporter, @lcNumber, @containerNumber, @status, @assignedTo, @createdDate)
       `);
     
     console.log('MSSQLJobRepository.create - job created successfully');
@@ -37,6 +78,7 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   async findById(jobId) {
+    await this.ensureSchema();
     const pool = await this.db();
     
     const result = await pool.request()
@@ -51,6 +93,7 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   async findAll(filters = {}) {
+    await this.ensureSchema();
     const pool = await this.db();
     
     // If filtering by assignedTo (user role), use the findByAssignedUser method
@@ -77,6 +120,7 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   async findByAssignedUser(userId) {
+    await this.ensureSchema();
     const pool = await this.db();
     
     try {
@@ -103,6 +147,7 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   async findByCustomer(customerId) {
+    await this.ensureSchema();
     const pool = await this.db();
     
     const result = await pool.request()
@@ -113,78 +158,34 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   async update(jobId, job) {
-    try {
-      console.log('MSSQLJobRepository.update - START');
-      console.log('MSSQLJobRepository.update - jobId:', jobId);
-      console.log('MSSQLJobRepository.update - job:', JSON.stringify(job, null, 2));
-      
-      // Validate inputs
-      if (!jobId) {
-        throw new Error('Job ID is required for update');
-      }
-      
-      if (!job) {
-        throw new Error('Job data is required for update');
-      }
-      
-      const pool = await this.db();
-      console.log('MSSQLJobRepository.update - got database pool');
-      
-      // Prepare the update query with proper null handling
-      const result = await pool.request()
-        .input('jobId', this.sql.VarChar, jobId)
-        .input('blNumber', this.sql.VarChar, job.blNumber || null)
-        .input('cusdecNumber', this.sql.VarChar, job.cusdecNumber || null)
-        .input('openDate', this.sql.Date, job.openDate || null)
-        .input('shipmentCategory', this.sql.VarChar, job.shipmentCategory)
-        .input('exporter', this.sql.VarChar, job.exporter || null)
-        .input('lcNumber', this.sql.VarChar, job.lcNumber || null)
-        .input('containerNumber', this.sql.VarChar, job.containerNumber || null)
-        .input('transporter', this.sql.VarChar, job.transporter || null)
-        .input('status', this.sql.VarChar, job.status)
-        .query(`
-          UPDATE Jobs 
-          SET BLNumber = @blNumber, 
-              CUSDECNumber = @cusdecNumber, 
-              OpenDate = @openDate,
-              ShipmentCategory = @shipmentCategory, 
-              Exporter = @exporter, 
-              LCNumber = @lcNumber,
-              ContainerNumber = @containerNumber, 
-              Transporter = @transporter, 
-              Status = @status
-          WHERE JobId = @jobId
-        `);
-      
-      console.log('MSSQLJobRepository.update - query result:', result);
-      console.log('MSSQLJobRepository.update - rows affected:', result.rowsAffected);
-      
-      // Check if any rows were affected
-      if (result.rowsAffected[0] === 0) {
-        throw new Error(`No job found with ID: ${jobId}`);
-      }
-      
-      console.log('MSSQLJobRepository.update - END');
-      
-      return job;
-    } catch (error) {
-      console.error('MSSQLJobRepository.update - ERROR:', error);
-      console.error('MSSQLJobRepository.update - ERROR stack:', error.stack);
-      
-      // Provide more specific error messages
-      if (error.message.includes('Invalid column name')) {
-        throw new Error('Database schema error: Invalid column in update query');
-      } else if (error.message.includes('Cannot insert the value NULL')) {
-        throw new Error('Database constraint error: Required field cannot be null');
-      } else if (error.message.includes('String or binary data would be truncated')) {
-        throw new Error('Database error: Data too long for database field');
-      }
-      
-      throw error;
-    }
+    await this.ensureSchema();
+    const pool = await this.db();
+    
+    await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .input('blNumber', this.sql.VarChar, job.blNumber)
+      .input('cusdecNumber', this.sql.VarChar, job.cusdecNumber)
+      .input('openDate', this.sql.Date, job.openDate)
+      .input('shipmentCategory', this.sql.VarChar, job.shipmentCategory)
+      .input('exporter', this.sql.VarChar, job.exporter)
+      .input('transporter', this.sql.VarChar, job.transporter)
+      .input('lcNumber', this.sql.VarChar, job.lcNumber)
+      .input('containerNumber', this.sql.VarChar, job.containerNumber)
+      .input('status', this.sql.VarChar, job.status)
+      .input('assignedTo', this.sql.VarChar, job.assignedTo)
+      .query(`
+        UPDATE Jobs 
+        SET BLNumber = @blNumber, CUSDECNumber = @cusdecNumber, OpenDate = @openDate,
+            ShipmentCategory = @shipmentCategory, Exporter = @exporter, Transporter = @transporter,
+            LCNumber = @lcNumber, ContainerNumber = @containerNumber, Status = @status, AssignedTo = @assignedTo
+        WHERE JobId = @jobId
+      `);
+    
+    return job;
   }
 
   async updateStatus(jobId, status) {
+    await this.ensureSchema();
     const pool = await this.db();
     
     await pool.request()
@@ -196,6 +197,7 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   async assignToUser(jobId, userId) {
+    await this.ensureSchema();
     const pool = await this.db();
     
     // Use JobAssignments table for user assignment
@@ -221,6 +223,7 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   async generateNextId() {
+    await this.ensureSchema();
     const pool = await this.db();
     
     const result = await pool.request()
@@ -322,6 +325,7 @@ class MSSQLJobRepository extends IJobRepository {
 
 
   async getPayItems(jobId) {
+    await this.ensureSchema();
     const pool = await this.db();
     
     try {
@@ -418,18 +422,18 @@ class MSSQLJobRepository extends IJobRepository {
     
     // Create and return Job entity instance
     const job = new Job({
-      jobId: row.jobId || row.JobId,
-      customerId: row.customerId || row.CustomerId,
-      blNumber: row.blNumber || row.BLNumber,
-      cusdecNumber: row.cusdecNumber || row.CUSDECNumber,
-      openDate: row.openDate || row.OpenDate,
-      shipmentCategory: row.shipmentCategory || row.ShipmentCategory,
-      exporter: row.exporter || row.Exporter,
-      lcNumber: row.lcNumber || row.LCNumber,
-      containerNumber: row.containerNumber || row.ContainerNumber,
-      transporter: row.transporter || row.Transporter,
-      status: row.status || row.Status || 'Open',
-      assignedTo: null, // Legacy field - no longer stored in Jobs table
+      jobId: row.JobId,
+      customerId: row.CustomerId,
+      blNumber: row.BLNumber,
+      cusdecNumber: row.CUSDECNumber,
+      openDate: row.OpenDate,
+      shipmentCategory: row.ShipmentCategory,
+      exporter: row.Exporter,
+      transporter: row.Transporter,
+      lcNumber: row.LCNumber,
+      containerNumber: row.ContainerNumber,
+      status: row.Status || 'Open',
+      assignedTo: row.AssignedTo, // Legacy field
       assignedUsers: assignedUsers, // New field with user details
       createdDate: row.createdDate || row.CreatedDate,
       completedDate: row.completedDate || row.CompletedDate,

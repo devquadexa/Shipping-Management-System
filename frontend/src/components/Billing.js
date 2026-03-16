@@ -866,7 +866,7 @@ function Billing() {
                                 )}
                               </div>
                             </td>
-                            <td>
+                            <td data-label="Actual Cost (LKR)">
                               <input
                                 type="number"
                                 step="0.01"
@@ -877,14 +877,7 @@ function Billing() {
                                 disabled={item.paidByName}
                               />
                             </td>
-                            <td>
-                              {item.paidByName ? (
-                                <span className="paid-by-name">{item.paidByName}</span>
-                              ) : (
-                                <span className="paid-by-name" style={{color: '#999'}}>-</span>
-                              )}
-                            </td>
-                            <td>
+                            <td data-label="Billing Amount (LKR)">
                               <input
                                 type="number"
                                 step="0.01"
@@ -895,7 +888,7 @@ function Billing() {
                                 disabled={item.sameAmount}
                               />
                             </td>
-                            <td className="checkbox-cell">
+                            <td data-label="Same Amount" className="checkbox-cell">
                               <input
                                 type="checkbox"
                                 checked={item.sameAmount}
@@ -952,19 +945,19 @@ function Billing() {
                       <tbody>
                         {selectedJob.payItems.map((item, idx) => (
                           <tr key={idx}>
-                            <td>{item.description}</td>
-                            <td className="amount">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</td>
-                            <td className="amount">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</td>
+                            <td data-label="Description">{item.description}</td>
+                            <td data-label="Actual Cost" className="amount">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</td>
+                            <td data-label="Billing Amount" className="amount">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</td>
                           </tr>
                         ))}
                         <tr className="total-row">
                           <td><strong>Total</strong></td>
-                          <td className="amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></td>
-                          <td className="amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></td>
+                          <td data-label="Actual" className="amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></td>
+                          <td data-label="Billing" className="amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></td>
                         </tr>
                         <tr className="profit-row">
                           <td colSpan="2"><strong>Profit</strong></td>
-                          <td className="amount">
+                          <td data-label="Net" className="amount">
                             <strong className={calculateTotals().profit >= 0 ? 'profit-positive' : 'profit-negative'}>
                               {formatAmount(calculateTotals().profit)}
                             </strong>
