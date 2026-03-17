@@ -23,6 +23,9 @@ function Billing() {
   const [showPayItemsRow, setShowPayItemsRow] = useState(false);
   const [payItems, setPayItems] = useState([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
   const [loadingSettlement, setLoadingSettlement] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
+  const [expandedBillId, setExpandedBillId] = useState(null);
 
   useEffect(() => {
     fetchBills();
@@ -60,102 +63,130 @@ function Billing() {
   const handleJobSelect = async (jobId) => {
     if (!jobId) {
       setSelectedJob(null);
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, paidBy: '', paidByName: '' }]);
+      setShowPayItemsRow(false);
       return;
     }
     
     console.log('handleJobSelect - jobId:', jobId);
     
-    // Fetch fresh job data with pay items
+    // Fetch fresh job data
     try {
       const allJobs = await jobService.getAll();
       const job = allJobs.find(j => j.jobId === jobId);
       
       console.log('handleJobSelect - found job:', job);
-      console.log('handleJobSelect - job payItems:', job?.payItems);
-      console.log('handleJobSelect - job shipmentCategory:', job?.shipmentCategory);
       console.log('handleJobSelect - job pettyCashStatus:', job?.pettyCashStatus);
       
       setSelectedJob(job);
       setShowPayItemsRow(false);
       
-      // Check if petty cash is settled for this job
+      // Collect all pay items from different sources
+      let allPayItems = [];
+      
+      // 1. Load Office Pay Items (upfront payments by office staff)
+      try {
+        const officePayItemsResponse = await fetch(`http://localhost:5000/api/office-pay-items/job/${jobId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (officePayItemsResponse.ok) {
+          const officePayItems = await officePayItemsResponse.json();
+          console.log('Office pay items:', officePayItems);
+          
+          // Add office pay items to the list
+          officePayItems.forEach(item => {
+            allPayItems.push({
+              name: item.description,
+              actualCost: item.actualCost,
+              billingAmount: item.billingAmount || '', // May already be set
+              sameAmount: false,
+              paidBy: item.paidBy,
+              paidByName: item.paidByName,
+              isOfficePayItem: true,
+              officePayItemId: item.officePayItemId
+            });
+          });
+        }
+      } catch (error) {
+        console.error('Error loading office pay items:', error);
+      }
+      
+      // 2. Load Petty Cash Settlement Items (if settled)
       if (job?.pettyCashStatus === 'Settled') {
-        console.log('Petty cash is settled, loading settlement data...');
+        console.log('Petty cash is settled, loading ALL settlement data...');
         setLoadingSettlement(true);
         try {
-          const response = await fetch(`http://localhost:5000/api/petty-cash-assignments/job/${jobId}`, {
+          // Fetch ALL assignments for this job
+          const response = await fetch(`http://localhost:5000/api/petty-cash-assignments/job/${jobId}/all`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
           });
           
           console.log('Settlement response status:', response.status);
-          console.log('Settlement response headers:', response.headers);
           
           if (response.ok) {
-            const responseText = await response.text();
-            console.log('Raw response text:', responseText);
+            const assignments = await response.json();
+            console.log('All assignments for job:', assignments);
             
-            let assignment = null;
-            try {
-              assignment = responseText ? JSON.parse(responseText) : null;
-            } catch (parseError) {
-              console.error('JSON parse error:', parseError);
-              console.log('Failed to parse response as JSON');
-            }
-            
-            console.log('Parsed assignment:', assignment);
-            console.log('Assignment type:', typeof assignment);
-            console.log('Assignment keys:', assignment ? Object.keys(assignment) : 'null');
-            console.log('Settlement items:', assignment?.settlementItems);
-            console.log('Settlement items type:', typeof assignment?.settlementItems);
-            console.log('Settlement items length:', assignment?.settlementItems?.length);
-            
-            if (assignment && assignment.status === 'Settled' && assignment.settlementItems && Array.isArray(assignment.settlementItems) && assignment.settlementItems.length > 0) {
-              // Pre-fill actual costs from settlement
-              console.log('Processing settlement items:', assignment.settlementItems);
-              const loadedPayItems = assignment.settlementItems.map(item => {
-                console.log('Processing item:', item);
-                return {
-                  name: item.itemName,
-                  actualCost: item.actualCost ? item.actualCost.toString() : '',
-                  billingAmount: '',
-                  sameAmount: false
-                };
+            // Collect ALL settlement items from ALL assignments
+            if (Array.isArray(assignments)) {
+              assignments.forEach(assignment => {
+                if (assignment.settlementItems && Array.isArray(assignment.settlementItems)) {
+                  assignment.settlementItems.forEach(item => {
+                    allPayItems.push({
+                      name: item.itemName,
+                      actualCost: item.actualCost,
+                      billingAmount: '', // Leave empty for Admin/Manager to fill
+                      sameAmount: false,
+                      paidBy: item.paidBy || assignment.assignedTo,
+                      paidByName: item.paidByName || assignment.assignedToName,
+                      isCustomItem: item.isCustomItem,
+                      isPettyCashItem: true
+                    });
+                  });
+                }
               });
-              console.log('Setting pay items from settlement:', loadedPayItems);
-              setPayItems(loadedPayItems);
-              setShowPayItemsRow(true);
-              setMessage(`✅ Loaded ${loadedPayItems.length} items from petty cash settlement`);
-              setTimeout(() => setMessage(''), 5000);
-            } else {
-              console.log('Settlement check failed:', {
-                hasAssignment: !!assignment,
-                assignmentIsNull: assignment === null,
-                status: assignment?.status,
-                hasItems: !!assignment?.settlementItems,
-                itemsIsArray: Array.isArray(assignment?.settlementItems),
-                itemsLength: assignment?.settlementItems?.length
-              });
-              console.log('No valid settlement items found, loading templates...');
-              loadPayItemTemplates(job);
             }
           } else {
             const errorText = await response.text();
-            console.log('Failed to fetch settlement. Status:', response.status, 'Error:', errorText);
-            loadPayItemTemplates(job);
+            console.log('Failed to fetch settlements. Status:', response.status, 'Error:', errorText);
           }
         } catch (error) {
           console.error('Error loading settlement:', error);
-          console.error('Error stack:', error.stack);
-          loadPayItemTemplates(job);
         } finally {
           setLoadingSettlement(false);
         }
+      }
+      
+      // 3. Set all pay items or show empty state
+      if (allPayItems.length > 0) {
+        setPayItems(allPayItems);
+        setShowPayItemsRow(true);
+        
+        const officeItemsCount = allPayItems.filter(item => item.isOfficePayItem).length;
+        const pettyCashItemsCount = allPayItems.filter(item => item.isPettyCashItem).length;
+        
+        let message = `✅ Loaded ${allPayItems.length} items: `;
+        if (officeItemsCount > 0) message += `${officeItemsCount} office payments`;
+        if (pettyCashItemsCount > 0) {
+          if (officeItemsCount > 0) message += `, `;
+          message += `${pettyCashItemsCount} petty cash items`;
+        }
+        message += '. Please review billing amounts.';
+        
+        setMessage(message);
+        setTimeout(() => setMessage(''), 5000);
       } else {
-        console.log('Petty cash not settled, status:', job?.pettyCashStatus);
-        loadPayItemTemplates(job);
+        // No items found, load templates or show empty
+        if (job?.pettyCashStatus !== 'Settled') {
+          setMessage('Petty cash must be settled before generating invoice');
+          setTimeout(() => setMessage(''), 3000);
+        }
+        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, paidBy: '', paidByName: '' }]);
       }
     } catch (error) {
       console.error('Error fetching job:', error);
@@ -232,59 +263,127 @@ function Billing() {
   };
 
   const savePayItems = async () => {
-    // Validate pay items
-    const validPayItems = payItems.filter(item => item.name && item.actualCost && item.billingAmount);
+    // Validate pay items - must have name, actualCost, and billingAmount
+    const validPayItems = payItems.filter(item => {
+      return item.name && 
+             (item.actualCost || item.actualCost === 0) && 
+             (item.billingAmount || item.billingAmount === 0);
+    });
     
     if (validPayItems.length === 0) {
-      setMessage('Please add at least one valid pay item');
-      setTimeout(() => setMessage(''), 3000);
+      setMessage('Please fill in all required fields (Description, Actual Cost, Billing Amount) for at least one pay item');
+      setTimeout(() => setMessage(''), 5000);
       return;
     }
 
     try {
-      // Save each pay item
-      for (const item of validPayItems) {
-        console.log('Saving pay item:', {
-          description: item.name,
-          amount: parseFloat(item.actualCost),
-          billingAmount: parseFloat(item.billingAmount)
-        });
-        
-        await jobService.addPayItem(selectedJob.jobId, {
-          description: item.name,
-          amount: parseFloat(item.actualCost),
-          billingAmount: parseFloat(item.billingAmount)
-        });
-      }
-
-      setMessage('Pay items saved successfully!');
-      setShowPayItemsRow(false);
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+      console.log('=== SAVE PAY ITEMS START ===');
+      console.log('New pay items to save:', validPayItems);
+      console.log('Existing job pay items:', selectedJob.payItems);
       
-      // Refresh jobs and selected job
+      // Separate office pay items, petty cash items, and custom pay items
+      const officePayItems = validPayItems.filter(item => item.isOfficePayItem);
+      const pettyCashItems = validPayItems.filter(item => item.isPettyCashItem);
+      const customPayItems = validPayItems.filter(item => !item.isOfficePayItem && !item.isPettyCashItem);
+      
+      console.log('Office pay items to update:', officePayItems);
+      console.log('Petty cash items to update:', pettyCashItems);
+      console.log('Custom pay items to add:', customPayItems);
+      
+      // 1. Update billing amounts for office pay items
+      for (const item of officePayItems) {
+        if (item.officePayItemId) {
+          try {
+            const response = await fetch(`http://localhost:5000/api/office-pay-items/${item.officePayItemId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                billingAmount: parseFloat(item.billingAmount)
+              })
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Failed to update office pay item: ${response.statusText}`);
+            }
+            
+            console.log(`✓ Updated billing amount for office pay item ${item.officePayItemId}`);
+          } catch (error) {
+            console.error(`✗ Error updating office pay item ${item.officePayItemId}:`, error);
+            throw error;
+          }
+        }
+      }
+      
+      // 2. Update billing amounts for petty cash items (if needed)
+      for (const item of pettyCashItems) {
+        console.log(`Petty cash item: ${item.name} - Actual: ${item.actualCost}, Billing: ${item.billingAmount}`);
+        // Petty cash items are typically read-only in the billing section
+        // but we log them for reference
+      }
+      
+      // 3. APPEND new pay items to existing ones instead of replacing
+      // Get existing pay items from the job
+      const existingPayItems = selectedJob.payItems || [];
+      console.log('Existing pay items count:', existingPayItems.length);
+      
+      // Convert new pay items to the format expected by the job
+      const newPayItemsData = validPayItems.map(item => ({
+        description: item.name,
+        amount: parseFloat(item.actualCost),
+        actualCost: parseFloat(item.actualCost),
+        billingAmount: parseFloat(item.billingAmount),
+        paidBy: item.paidByName || item.paidBy || 'Office',
+        source: item.isOfficePayItem ? 'Office Payment' : item.isPettyCashItem ? 'Petty Cash' : 'Custom'
+      }));
+      
+      // Combine existing and new pay items
+      const allPayItemsData = [...existingPayItems, ...newPayItemsData];
+      
+      console.log('New pay items to add:', newPayItemsData);
+      console.log('Combined pay items (existing + new):', allPayItemsData);
+      
+      // Save combined pay items to the job
+      await jobService.replacePayItems(selectedJob.jobId, allPayItemsData);
+      console.log('✓ All pay items saved successfully');
+
+      const isAddingToExisting = existingPayItems.length > 0;
+      const addedCount = newPayItemsData.length;
+      const totalCount = allPayItemsData.length;
+      
+      if (isAddingToExisting) {
+        setMessage(`✓ Added ${addedCount} new pay item(s) successfully! Total: ${totalCount} items. Review below and generate invoice.`);
+      } else {
+        setMessage(`✓ ${addedCount} pay item(s) saved successfully! Review the details below and generate invoice.`);
+      }
+      
+      setShowPayItemsRow(false);
+      
+      // Refresh jobs and selected job to show the saved pay items
       console.log('Refreshing jobs after save...');
       const updatedJobs = await jobService.getAll();
-      console.log('Updated jobs:', updatedJobs);
-      
       const updatedJob = updatedJobs.find(j => j.jobId === selectedJob.jobId);
-      console.log('Updated selected job:', updatedJob);
-      console.log('Updated job pay items:', updatedJob?.payItems);
+      
+      console.log('Updated selected job with pay items:', updatedJob);
       
       setSelectedJob(updatedJob);
-      await fetchJobs(); // Update the jobs list
+      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
       
-      setTimeout(() => setMessage(''), 3000);
+      setTimeout(() => setMessage(''), 5000);
+      console.log('=== SAVE PAY ITEMS END ===');
     } catch (error) {
       console.error('Error saving pay items:', error);
-      setMessage('Error saving pay items');
-      setTimeout(() => setMessage(''), 3000);
+      setMessage(`Error saving pay items: ${error.message}`);
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
   const calculateTotals = () => {
     if (!selectedJob || !selectedJob.payItems) {
       console.log('calculateTotals - No job or pay items');
-      return { actualCost: 0, billingAmount: 0, profit: 0 };
+      return { actualCost: 0, billingAmount: 0, profit: 0, grossTotal: 0, advancePayment: 0, netTotal: 0 };
     }
     
     console.log('calculateTotals - payItems:', selectedJob.payItems);
@@ -302,10 +401,21 @@ function Billing() {
     }, 0);
     
     const profit = billingAmount - actualCost;
+    const grossTotal = billingAmount; // Total before advance deduction
+    const advancePayment = parseFloat(selectedJob.advancePayment) || 0;
+    const netTotal = grossTotal - advancePayment; // Final amount after advance deduction
     
-    console.log('calculateTotals - result:', { actualCost, billingAmount, profit });
+    console.log('calculateTotals - result:', { actualCost, billingAmount, profit, grossTotal, advancePayment, netTotal });
+    console.log('calculateTotals - formatted result:', { 
+      actualCost: formatAmount(actualCost), 
+      billingAmount: formatAmount(billingAmount), 
+      profit: formatAmount(profit),
+      grossTotal: formatAmount(grossTotal),
+      advancePayment: formatAmount(advancePayment),
+      netTotal: formatAmount(netTotal)
+    });
     
-    return { actualCost, billingAmount, profit };
+    return { actualCost, billingAmount, profit, grossTotal, advancePayment, netTotal };
   };
 
   const generateBill = async () => {
@@ -318,7 +428,39 @@ function Billing() {
       return;
     }
     
+    // Validate required fields before generating invoice
+    const missingFields = [];
+    if (!selectedJob.blNumber || (typeof selectedJob.blNumber === 'string' && selectedJob.blNumber.trim() === '')) {
+      missingFields.push('BL Number');
+    }
+    if (!selectedJob.cusdecNumber || (typeof selectedJob.cusdecNumber === 'string' && selectedJob.cusdecNumber.trim() === '')) {
+      missingFields.push('CUSDEC Number');
+    }
+    if (!selectedJob.lcNumber || (typeof selectedJob.lcNumber === 'string' && selectedJob.lcNumber.trim() === '')) {
+      missingFields.push('LC Number');
+    }
+    if (!selectedJob.containerNumber || (typeof selectedJob.containerNumber === 'string' && selectedJob.containerNumber.trim() === '')) {
+      missingFields.push('Container Number');
+    }
+    // Check if transporter field exists in the job object before validating
+    if (selectedJob.hasOwnProperty('transporter') && (!selectedJob.transporter || (typeof selectedJob.transporter === 'string' && selectedJob.transporter.trim() === ''))) {
+      missingFields.push('Transporter');
+    }
+    
+    console.log('generateBill - missingFields:', missingFields);
+    
+    if (missingFields.length > 0) {
+      const fieldsList = missingFields.join(', ');
+      console.error('BLOCKING INVOICE GENERATION - Missing fields:', fieldsList);
+      setValidationMessage(`Please edit the job and complete the following required fields:\n\n${missingFields.map(f => `• ${f}`).join('\n')}`);
+      setShowValidationModal(true);
+      return; // STOP HERE - Do not proceed with invoice generation
+    }
+    
+    console.log('generateBill - All required fields present, continuing...');
+    
     // Check if petty cash is settled
+    console.log('generateBill - pettyCashStatus:', selectedJob.pettyCashStatus);
     if (selectedJob.pettyCashStatus === 'Assigned') {
       setMessage('Cannot generate invoice: Petty cash must be settled first');
       setTimeout(() => setMessage(''), 5000);
@@ -327,6 +469,8 @@ function Billing() {
     
     console.log('generateBill - selectedJob.payItems:', selectedJob.payItems);
     console.log('generateBill - payItems length:', selectedJob.payItems?.length);
+    console.log('generateBill - payItems type:', typeof selectedJob.payItems);
+    console.log('generateBill - payItems is array:', Array.isArray(selectedJob.payItems));
     
     if (!selectedJob.payItems || selectedJob.payItems.length === 0) {
       setMessage('Please add pay items before generating invoice');
@@ -349,7 +493,10 @@ function Billing() {
       const billData = {
         jobId: selectedJob.jobId,
         actualCost: totals.actualCost,
-        billingAmount: totals.billingAmount
+        billingAmount: totals.billingAmount,
+        advancePayment: totals.advancePayment,
+        grossTotal: totals.grossTotal,
+        netTotal: totals.netTotal
       };
       console.log('generateBill - sending billData:', billData);
       
@@ -387,25 +534,128 @@ function Billing() {
     }
   };
 
-  const printBill = (bill) => {
-    const job = jobs.find(j => j.jobId === bill.jobId);
-    const customer = getCustomerDetails(bill.customerId);
-    
-    if (!job || !customer) {
-      setMessage('Unable to print invoice - missing data');
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
+  const printBill = async (bill) => {
+    try {
+      console.log('printBill - bill object:', bill);
+      console.log('printBill - bill.jobId:', bill.jobId);
+      
+      // Fetch complete job details including pay items
+      const response = await fetch(`http://localhost:5000/api/jobs/${bill.jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch job details');
+      }
+      
+      const jobWithPayItems = await response.json();
+      const customer = getCustomerDetails(bill.customerId);
+      
+      if (!jobWithPayItems || !customer) {
+        setMessage('Unable to print invoice - missing data');
+        setTimeout(() => setMessage(''), 3000);
+        return;
+      }
 
-    const printWindow = window.open('', '', 'height=900,width=700');
-    printWindow.document.write(generateBillHTML(bill, job, customer));
-    printWindow.document.close();
-    printWindow.print();
+      console.log('printBill - complete job data:', jobWithPayItems);
+      console.log('printBill - job.payItems:', jobWithPayItems.payItems);
+      console.log('printBill - job.payItems type:', typeof jobWithPayItems.payItems);
+      console.log('printBill - job.payItems length:', jobWithPayItems.payItems?.length);
+      console.log('printBill - job.payItems is array:', Array.isArray(jobWithPayItems.payItems));
+      console.log('printBill - job.advancePayment:', jobWithPayItems.advancePayment);
+      
+      // Additional debugging for pay items
+      if (jobWithPayItems.payItems) {
+        console.log('printBill - pay items detailed analysis:');
+        if (typeof jobWithPayItems.payItems === 'string') {
+          console.log('   Pay items is a string, attempting to parse...');
+          try {
+            const parsed = JSON.parse(jobWithPayItems.payItems);
+            console.log('   Parsed pay items:', parsed);
+            jobWithPayItems.payItems = parsed; // Replace with parsed version
+          } catch (e) {
+            console.log('   Failed to parse pay items string:', e.message);
+          }
+        } else if (Array.isArray(jobWithPayItems.payItems)) {
+          console.log('   Pay items is an array with', jobWithPayItems.payItems.length, 'items:');
+          jobWithPayItems.payItems.forEach((item, index) => {
+            console.log(`   Item ${index + 1}:`, item);
+          });
+        } else {
+          console.log('   Pay items is neither string nor array:', jobWithPayItems.payItems);
+        }
+      } else {
+        console.log('printBill - No pay items found in job data');
+      }
+      
+      console.log('printBill - bill data for comparison:', {
+        billId: bill.billId,
+        jobId: bill.jobId,
+        billingAmount: bill.billingAmount,
+        advancePayment: bill.advancePayment,
+        grossTotal: bill.grossTotal,
+        netTotal: bill.netTotal
+      });
+
+      const printWindow = window.open('', '', 'height=900,width=700');
+      printWindow.document.write(generateBillHTML(bill, jobWithPayItems, customer));
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      console.error('Error printing bill:', error);
+      setMessage('Error loading invoice data for printing');
+      setTimeout(() => setMessage(''), 3000);
+    }
   };
 
   const generateBillHTML = (bill, job, customer) => {
     const billDate = new Date(bill.billDate || bill.createdDate).toLocaleDateString('en-GB');
     const invoiceNumber = bill.invoiceNumber || bill.billId;
+    
+    console.log('generateBillHTML - bill:', bill);
+    console.log('generateBillHTML - job:', job);
+    console.log('generateBillHTML - job.payItems:', job.payItems);
+    console.log('generateBillHTML - job.advancePayment:', job.advancePayment);
+    console.log('generateBillHTML - bill.advancePayment:', bill.advancePayment);
+    console.log('generateBillHTML - customer:', customer);
+    
+    // Use job's advance payment if bill doesn't have it
+    const advancePayment = parseFloat(bill.advancePayment || job.advancePayment || 0);
+    const grossTotal = parseFloat(bill.grossTotal || bill.billingAmount || 0);
+    const netTotal = grossTotal - advancePayment; // Always calculate, don't use bill.netTotal
+    
+    console.log('generateBillHTML - calculated values:', {
+      advancePayment,
+      grossTotal,
+      netTotal,
+      hasAdvance: advancePayment > 0,
+      calculation: `${grossTotal} - ${advancePayment} = ${netTotal}`
+    });
+    
+    // Handle pay items - they might be a string that needs parsing
+    let payItemsArray = [];
+    if (job.payItems) {
+      if (typeof job.payItems === 'string') {
+        try {
+          payItemsArray = JSON.parse(job.payItems);
+          console.log('generateBillHTML - parsed pay items from string:', payItemsArray);
+        } catch (e) {
+          console.log('generateBillHTML - failed to parse pay items string:', e.message);
+          payItemsArray = [];
+        }
+      } else if (Array.isArray(job.payItems)) {
+        payItemsArray = job.payItems;
+        console.log('generateBillHTML - using pay items array:', payItemsArray);
+      } else {
+        console.log('generateBillHTML - pay items is neither string nor array:', job.payItems);
+        payItemsArray = [];
+      }
+    } else {
+      console.log('generateBillHTML - no pay items found in job');
+      payItemsArray = [];
+    }
     
     return `
       <!DOCTYPE html>
@@ -590,22 +840,42 @@ function Billing() {
             </tr>
           </thead>
           <tbody>
-            ${job.payItems && job.payItems.length > 0 ? 
-              job.payItems.map(item => `
-                <tr>
-                  <td>${item.description}</td>
-                  <td class="amount">${formatAmount(item.billingAmount || item.amount)}</td>
-                </tr>
-              `).join('') : 
-              '<tr><td colspan="2">No itemized charges</td></tr>'
+            ${payItemsArray && Array.isArray(payItemsArray) && payItemsArray.length > 0 ? 
+              payItemsArray.map(item => {
+                console.log('Invoice item:', item);
+                const description = item.description || item.name || 'Service Charge';
+                const amount = item.billingAmount || item.amount || 0;
+                return `
+                  <tr>
+                    <td>${description}</td>
+                    <td class="amount">${formatAmount(amount)}</td>
+                  </tr>
+                `;
+              }).join('') : 
+              `<tr>
+                <td>Service Charges</td>
+                <td class="amount">${formatAmount(grossTotal)}</td>
+              </tr>`
             }
           </tbody>
         </table>
 
         <div class="total-section">
-          <div class="grand-total">
-            <span>TOTAL DUE AMOUNT: LKR ${formatAmount(bill.billingAmount)}</span>
-          </div>
+          ${advancePayment > 0 ? `
+            <div class="total-row">
+              <span>GROSS TOTAL: LKR ${formatAmount(grossTotal)}</span>
+            </div>
+            <div class="total-row">
+              <span>LESS: ADVANCE PAYMENT: LKR ${formatAmount(advancePayment)}</span>
+            </div>
+            <div class="grand-total">
+              <span>NET TOTAL DUE: LKR ${formatAmount(netTotal)}</span>
+            </div>
+          ` : `
+            <div class="grand-total">
+              <span>TOTAL DUE AMOUNT: LKR ${formatAmount(bill.billingAmount)}</span>
+            </div>
+          `}
         </div>
 
         <div class="footer">
@@ -619,7 +889,7 @@ function Billing() {
     `;
   };
 
-  if (user?.role === 'User') {
+  if (user?.role === 'Waff Clerk') {
     return (
       <div className="billing-page">
         <div className="alert alert-error">Access Denied: Admin or Super Admin only</div>
@@ -634,7 +904,7 @@ function Billing() {
         <p>Generate invoices and track profitability</p>
       </div>
 
-      {message && <div className={`alert ${message.includes('Error') ? 'alert-error' : 'alert-success'}`}>{message}</div>}
+      {message && <div className={`alert ${message.includes('Error') || message.includes('Cannot') || message.includes('⚠️') ? 'alert-error' : 'alert-success'}`}>{message}</div>}
 
       <div className="card">
         <div className="card-header">
@@ -683,25 +953,41 @@ function Billing() {
                     </span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">BL Number:</span>
-                    <span className="info-value">{selectedJob.blNumber || '-'}</span>
+                    <span className="info-label">BL Number: {(!selectedJob.blNumber || selectedJob.blNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
+                    <span className={`info-value ${(!selectedJob.blNumber || selectedJob.blNumber.trim() === '') ? 'missing-value' : ''}`}>
+                      {selectedJob.blNumber || '-'}
+                    </span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">CUSDEC Number:</span>
-                    <span className="info-value">{selectedJob.cusdecNumber || '-'}</span>
+                    <span className="info-label">CUSDEC Number: {(!selectedJob.cusdecNumber || selectedJob.cusdecNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
+                    <span className={`info-value ${(!selectedJob.cusdecNumber || selectedJob.cusdecNumber.trim() === '') ? 'missing-value' : ''}`}>
+                      {selectedJob.cusdecNumber || '-'}
+                    </span>
                   </div>
                   <div className="info-row">
                     <span className="info-label">Exporter:</span>
                     <span className="info-value">{selectedJob.exporter || '-'}</span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">LC Number:</span>
-                    <span className="info-value">{selectedJob.lcNumber || '-'}</span>
+                    <span className="info-label">LC Number: {(!selectedJob.lcNumber || selectedJob.lcNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
+                    <span className={`info-value ${(!selectedJob.lcNumber || selectedJob.lcNumber.trim() === '') ? 'missing-value' : ''}`}>
+                      {selectedJob.lcNumber || '-'}
+                    </span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">Container Number:</span>
-                    <span className="info-value">{selectedJob.containerNumber || '-'}</span>
+                    <span className="info-label">Container Number: {(!selectedJob.containerNumber || selectedJob.containerNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
+                    <span className={`info-value ${(!selectedJob.containerNumber || selectedJob.containerNumber.trim() === '') ? 'missing-value' : ''}`}>
+                      {selectedJob.containerNumber || '-'}
+                    </span>
                   </div>
+                  {selectedJob.hasOwnProperty('transporter') && (
+                    <div className="info-row">
+                      <span className="info-label">Transporter: {(!selectedJob.transporter || selectedJob.transporter.trim() === '') && <span className="required-indicator">*Required</span>}</span>
+                      <span className={`info-value ${(!selectedJob.transporter || selectedJob.transporter.trim() === '') ? 'missing-value' : ''}`}>
+                        {selectedJob.transporter || '-'}
+                      </span>
+                    </div>
+                  )}
                   <div className="info-row">
                     <span className="info-label">Status:</span>
                     <span className="info-value">
@@ -710,13 +996,30 @@ function Billing() {
                       </span>
                     </span>
                   </div>
+                  <div className="info-row">
+                    <span className="info-label">Advance Payment:</span>
+                    <span className={`info-value ${selectedJob.advancePayment > 0 ? 'advance-received' : 'no-advance'}`}>
+                      LKR {formatAmount(selectedJob.advancePayment || 0)}
+                      {selectedJob.advancePayment > 0 && (
+                        <span className="advance-indicator"> ✓ Received</span>
+                      )}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               <div className="pay-items-card">
                 <div className="card-header-inline">
                   <h3>Pay Items</h3>
-                  {!showPayItemsRow && (
+                  {!showPayItemsRow && selectedJob.payItems && selectedJob.payItems.length > 0 && (
+                    <button 
+                      onClick={() => setShowPayItemsRow(true)} 
+                      className="btn btn-primary btn-small"
+                    >
+                      + Add More Items
+                    </button>
+                  )}
+                  {!showPayItemsRow && (!selectedJob.payItems || selectedJob.payItems.length === 0) && (
                     <button 
                       onClick={() => setShowPayItemsRow(true)} 
                       className="btn btn-primary btn-small"
@@ -728,11 +1031,21 @@ function Billing() {
 
                 {showPayItemsRow && (
                   <div className="pay-items-form">
+                    {selectedJob.payItems && selectedJob.payItems.length > 0 && (
+                      <div className="add-more-items-notice">
+                        <div className="notice-icon">ℹ️</div>
+                        <div className="notice-text">
+                          <strong>Adding Additional Items</strong>
+                          <p>You are adding new pay items to the existing {selectedJob.payItems.length} item(s). All items will be combined in the review table.</p>
+                        </div>
+                      </div>
+                    )}
                     <table className="pay-items-input-table">
                       <thead>
                         <tr>
                           <th>Pay Item Name</th>
                           <th>Actual Cost (LKR)</th>
+                          <th>Paid By</th>
                           <th>Billing Amount (LKR)</th>
                           <th>Same Amount</th>
                           <th>Action</th>
@@ -740,17 +1053,26 @@ function Billing() {
                       </thead>
                       <tbody>
                         {payItems.map((item, index) => (
-                          <tr key={index}>
+                          <tr key={index} className={item.isOfficePayItem ? 'office-pay-item-row' : item.isPettyCashItem ? 'petty-cash-item-row' : ''}>
                             <td>
-                              <input
-                                type="text"
-                                value={item.name}
-                                onChange={(e) => handlePayItemChange(index, 'name', e.target.value)}
-                                placeholder="e.g., SLPA Bill, Transport"
-                                className="form-control-small"
-                              />
+                              <div className="pay-item-name-container">
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(e) => handlePayItemChange(index, 'name', e.target.value)}
+                                  placeholder="e.g., SLPA Bill, Transport"
+                                  className="form-control-small"
+                                  disabled={item.paidByName}
+                                />
+                                {item.isOfficePayItem && (
+                                  <span className="source-badge office-badge">Office Payment</span>
+                                )}
+                                {item.isPettyCashItem && (
+                                  <span className="source-badge petty-cash-badge">Petty Cash</span>
+                                )}
+                              </div>
                             </td>
-                            <td>
+                            <td data-label="Actual Cost (LKR)">
                               <input
                                 type="number"
                                 step="0.01"
@@ -758,9 +1080,17 @@ function Billing() {
                                 onChange={(e) => handlePayItemChange(index, 'actualCost', e.target.value)}
                                 placeholder="0.00"
                                 className="form-control-small"
+                                disabled={item.paidByName}
                               />
                             </td>
-                            <td>
+                            <td data-label="Paid By">
+                              {item.paidByName ? (
+                                <span className="paid-by-name">{item.paidByName}</span>
+                              ) : (
+                                <span className="paid-by-empty">-</span>
+                              )}
+                            </td>
+                            <td data-label="Billing Amount (LKR)">
                               <input
                                 type="number"
                                 step="0.01"
@@ -771,7 +1101,7 @@ function Billing() {
                                 disabled={item.sameAmount}
                               />
                             </td>
-                            <td className="checkbox-cell">
+                            <td data-label="Same Amount" className="checkbox-cell">
                               <input
                                 type="checkbox"
                                 checked={item.sameAmount}
@@ -779,7 +1109,7 @@ function Billing() {
                               />
                             </td>
                             <td>
-                              {payItems.length > 1 && (
+                              {payItems.length > 1 && !item.paidByName && (
                                 <button
                                   type="button"
                                   onClick={() => removePayItemRow(index)}
@@ -817,41 +1147,93 @@ function Billing() {
 
                 {selectedJob.payItems && selectedJob.payItems.length > 0 && (
                   <div className="saved-pay-items">
-                    <table className="pay-items-display-table">
-                      <thead>
-                        <tr>
-                          <th>Description</th>
-                          <th style={{textAlign: 'right'}}>Actual Cost (LKR)</th>
-                          <th style={{textAlign: 'right'}}>Billing Amount (LKR)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                    <div className="pay-items-review-header">
+                      <h4>📋 Pay Items Review</h4>
+                      <p className="review-subtitle">Review all pay items before generating invoice</p>
+                    </div>
+                    <div className="pay-items-review-table">
+                      <div className="table-header">
+                        <div className="header-cell description-header">Description</div>
+                        <div className="header-cell amount-header">Actual Cost (LKR)</div>
+                        <div className="header-cell amount-header">Billing Amount (LKR)</div>
+                      </div>
+                      <div className="table-body">
                         {selectedJob.payItems.map((item, idx) => (
-                          <tr key={idx}>
-                            <td>{item.description}</td>
-                            <td className="amount">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</td>
-                            <td className="amount">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</td>
-                          </tr>
+                          <div key={idx} className="table-row">
+                            <div className="table-cell description-cell">{item.description}</div>
+                            <div className="table-cell amount-cell">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</div>
+                            <div className="table-cell amount-cell">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</div>
+                          </div>
                         ))}
-                        <tr className="total-row">
-                          <td><strong>Total</strong></td>
-                          <td className="amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></td>
-                          <td className="amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></td>
-                        </tr>
-                        <tr className="profit-row">
-                          <td colSpan="2"><strong>Profit</strong></td>
-                          <td className="amount">
+                        <div className="table-row total-row">
+                          <div className="table-cell description-cell total-label"><strong>Total</strong></div>
+                          <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></div>
+                          <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></div>
+                        </div>
+                        <div className="table-row profit-row">
+                          <div className="table-cell description-cell profit-label"><strong>Profit Margin</strong></div>
+                          <div className="table-cell amount-cell"></div>
+                          <div className="table-cell amount-cell profit-amount">
                             <strong className={calculateTotals().profit >= 0 ? 'profit-positive' : 'profit-negative'}>
                               {formatAmount(calculateTotals().profit)}
                             </strong>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                          </div>
+                        </div>
+                        {/* Advance Payment Summary */}
+                        <div className="table-row advance-summary-row">
+                          <div className="table-cell description-cell advance-summary-label"><strong>Invoice Summary</strong></div>
+                          <div className="table-cell amount-cell"></div>
+                          <div className="table-cell amount-cell"></div>
+                        </div>
+                        <div className="table-row gross-total-row">
+                          <div className="table-cell description-cell gross-total-label">Gross Total</div>
+                          <div className="table-cell amount-cell"></div>
+                          <div className="table-cell amount-cell gross-total-amount">
+                            <strong>{formatAmount(calculateTotals().grossTotal)}</strong>
+                          </div>
+                        </div>
+                        {selectedJob.advancePayment > 0 && (
+                          <div className="table-row advance-payment-row">
+                            <div className="table-cell description-cell advance-payment-label">Less: Advance Payment</div>
+                            <div className="table-cell amount-cell"></div>
+                            <div className="table-cell amount-cell advance-payment-amount">
+                              <strong className="advance-deduction">({formatAmount(calculateTotals().advancePayment)})</strong>
+                            </div>
+                          </div>
+                        )}
+                        <div className="table-row net-total-row">
+                          <div className="table-cell description-cell net-total-label"><strong>Net Total (Customer Payable)</strong></div>
+                          <div className="table-cell amount-cell"></div>
+                          <div className="table-cell amount-cell net-total-amount">
+                            <strong className="final-amount">{formatAmount(calculateTotals().netTotal)}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                     <div className="generate-bill-section">
                       <button onClick={generateBill} className="btn btn-success btn-large">
-                        Generate Invoice
+                        ✓ Generate Invoice
                       </button>
+                      
+                      {/* Validation Modal */}
+                      {showValidationModal && (
+                        <div className="validation-modal-overlay" onClick={() => setShowValidationModal(false)}>
+                          <div className="validation-modal" onClick={(e) => e.stopPropagation()}>
+                            <div className="validation-modal-header">
+                              <h3>⚠️ Cannot Generate Invoice</h3>
+                              <button className="modal-close-btn" onClick={() => setShowValidationModal(false)}>×</button>
+                            </div>
+                            <div className="validation-modal-body">
+                              <p style={{ whiteSpace: 'pre-line' }}>{validationMessage}</p>
+                            </div>
+                            <div className="validation-modal-footer">
+                              <button onClick={() => setShowValidationModal(false)} className="btn btn-primary">
+                                OK, I'll Update the Job
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -884,64 +1266,94 @@ function Billing() {
                   <th>Customer</th>
                   <th>Invoice Date</th>
                   <th>Due Date</th>
-                  <th>Actual Cost</th>
-                  <th>Billing Amount</th>
-                  <th>Profit</th>
-                  <th>Total Due</th>
                   <th>Status</th>
+                  <th className="expand-header"></th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {bills.map(bill => (
-                  <tr key={bill.billId} className={bill.isOverdue ? 'overdue-row' : ''}>
-                    <td data-label="Invoice No"><strong>{bill.invoiceNumber || bill.billId}</strong></td>
-                    <td data-label="Job ID">{bill.jobId}</td>
-                    <td data-label="Customer">{getCustomerName(bill.customerId)}</td>
-                    <td data-label="Invoice Date">
-                      {bill.invoiceDate ? new Date(bill.invoiceDate).toLocaleDateString() : '-'}
-                    </td>
-                    <td data-label="Due Date">
-                      {bill.dueDate ? (
-                        <div className="due-date-cell">
-                          {new Date(bill.dueDate).toLocaleDateString()}
-                          {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
-                        </div>
-                      ) : '-'}
-                    </td>
-                    <td data-label="Actual Cost">LKR {formatAmount(bill.actualCost)}</td>
-                    <td data-label="Billing Amount">LKR {formatAmount(bill.billingAmount)}</td>
-                    <td data-label="Profit">
-                      <span className={bill.profit >= 0 ? 'profit-positive' : 'profit-negative'}>
-                        LKR {formatAmount(bill.profit)}
-                      </span>
-                    </td>
-                    <td data-label="Total"><strong>LKR {formatAmount(bill.total)}</strong></td>
-                    <td data-label="Status">
-                      <span className={`status-badge status-${bill.paymentStatus.toLowerCase()}`}>
-                        {bill.paymentStatus}
-                      </span>
-                    </td>
-                    <td data-label="Actions">
-                      <div className="action-buttons">
-                        <button 
-                          onClick={() => printBill(bill)} 
-                          className="btn btn-primary btn-small"
-                          title="Print Invoice"
+                  <React.Fragment key={bill.billId}>
+                    <tr className={bill.isOverdue ? 'overdue-row' : ''}>
+                      <td data-label="Invoice No"><strong>{bill.invoiceNumber || bill.billId}</strong></td>
+                      <td data-label="Job ID">{bill.jobId}</td>
+                      <td data-label="Customer">{getCustomerName(bill.customerId)}</td>
+                      <td data-label="Invoice Date">
+                        {bill.invoiceDate ? new Date(bill.invoiceDate).toLocaleDateString() : '-'}
+                      </td>
+                      <td data-label="Due Date">
+                        {bill.dueDate ? (
+                          <div className="due-date-cell">
+                            {new Date(bill.dueDate).toLocaleDateString()}
+                            {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td data-label="Status">
+                        <span className={`status-badge status-${bill.paymentStatus.toLowerCase()}`}>
+                          {bill.paymentStatus}
+                        </span>
+                      </td>
+                      <td className="expand-column">
+                        <button
+                          className="expand-btn-middle"
+                          onClick={() => setExpandedBillId(expandedBillId === bill.billId ? null : bill.billId)}
+                          title={expandedBillId === bill.billId ? "Hide details" : "View details"}
                         >
-                          Print
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points={expandedBillId === bill.billId ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+                          </svg>
                         </button>
-                        {bill.paymentStatus === 'Unpaid' && (
+                      </td>
+                      <td data-label="Actions">
+                        <div className="action-buttons">
                           <button 
-                            onClick={() => markAsPaid(bill.billId)} 
-                            className="btn btn-success btn-small"
+                            onClick={() => printBill(bill)} 
+                            className="btn btn-primary btn-small"
+                            title="Print Invoice"
                           >
-                            Mark Paid
+                            Print
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                          {bill.paymentStatus === 'Unpaid' && (
+                            <button 
+                              onClick={() => markAsPaid(bill.billId)} 
+                              className="btn btn-success btn-small"
+                            >
+                              Mark Paid
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedBillId === bill.billId && (
+                      <tr className="details-row">
+                        <td colSpan="8">
+                          <div className="bill-details-expanded">
+                            <div className="details-grid">
+                              <div className="detail-card">
+                                <div className="detail-label">Actual Cost</div>
+                                <div className="detail-value">LKR {formatAmount(bill.actualCost)}</div>
+                              </div>
+                              <div className="detail-card">
+                                <div className="detail-label">Billing Amount</div>
+                                <div className="detail-value">LKR {formatAmount(bill.billingAmount)}</div>
+                              </div>
+                              <div className="detail-card">
+                                <div className="detail-label">Profit</div>
+                                <div className={`detail-value ${bill.profit >= 0 ? 'profit-positive' : 'profit-negative'}`}>
+                                  LKR {formatAmount(bill.profit)}
+                                </div>
+                              </div>
+                              <div className="detail-card">
+                                <div className="detail-label">Total Due</div>
+                                <div className="detail-value total-due"><strong>LKR {formatAmount(bill.total)}</strong></div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

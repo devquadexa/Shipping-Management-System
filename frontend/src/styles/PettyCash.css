@@ -458,6 +458,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1rem;
     padding: 0.75rem 0;
     border-bottom: 1px solid #f3f4f6;
     text-align: right;
@@ -478,6 +479,7 @@
     font-size: 0.75rem;
     letter-spacing: 0.5px;
     text-align: left;
+    flex-shrink: 0;
   }
 
   .modal-medium {
@@ -788,4 +790,658 @@
 
 .form-group input.error {
   border-color: #dc2626;
+}
+/* No users message */
+.no-users-message {
+  color: #6b7280;
+  font-style: italic;
+  text-align: center;
+  padding: 0.5rem;
+  margin: 0.5rem 0 0 0;
+  font-size: 0.875rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+/* Helper text for form fields */
+.helper-text {
+  margin: 0.5rem 0 0 0;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.helper-text.warning {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+}
+
+.helper-text.info {
+  color: #1e40af;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+}
+
+
+/* Paid By Badge */
+.paid-by-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid #bfdbfe;
+}
+
+/* Settlement Items Table - Paid By Column */
+.settlement-items-table th:last-child,
+.settlement-items-table td:last-child {
+  text-align: center;
+}
+
+
+/* Paid Item Row Styling */
+.settlement-item-row.paid-item-row {
+  background: #f0f9ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.paid-input {
+  background: #f0f9ff !important;
+  color: #1e40af !important;
+  font-weight: 600 !important;
+  cursor: not-allowed !important;
+}
+
+.paid-by-indicator {
+  display: flex;
+  align-items: center;
+  margin-left: 0.5rem;
+}
+
+/* Helper text at top of form */
+.settlement-form .helper-text {
+  margin-bottom: 1rem;
+}
+
+/* Remove number input spinners (up/down arrows) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Cash Balance Settlement Styles */
+.settlement-checkbox {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settlement-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.settlement-checkbox label {
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.settlement-checkbox input[type="checkbox"]:checked + label {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* Settlement request status */
+.settlement-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+/* Settlement Action Buttons */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  min-width: 140px;
+}
+
+.btn-return-balance {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
+}
+
+.btn-return-balance:hover {
+  background: linear-gradient(135deg, #047857, #065f46);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
+}
+
+.btn-collect-overdue {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+}
+
+.btn-collect-overdue:hover {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+}
+
+.btn-settle,
+.btn-view {
+  margin-bottom: 6px;
+}
+
+/* Settlement Modal Styles */
+.settlement-modal {
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.settlement-modal .modal-header {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.settlement-modal .modal-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settlement-modal .modal-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.8rem;
+  cursor: pointer;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+  line-height: 1;
+}
+
+.settlement-modal .modal-close:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.settlement-modal .modal-body {
+  padding: 24px;
+  background: white;
+}
+
+/* Assignment Info Section */
+.assignment-info {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border-left: 4px solid #2563eb;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px 0;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+  margin-top: 8px;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.info-value {
+  font-weight: 700;
+  color: #1f2937;
+  font-size: 1rem;
+}
+
+.info-value.balance-positive {
+  color: #059669;
+  font-size: 1.1rem;
+}
+
+.info-value.balance-negative {
+  color: #dc2626;
+  font-size: 1.1rem;
+}
+
+/* Settlement Form */
+.settlement-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settlement-form .form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.settlement-form .form-group label {
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.settlement-form .form-control {
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  background: white;
+  font-family: inherit;
+}
+
+.settlement-form .form-control:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.settlement-form .form-control.disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+  border-color: #d1d5db;
+}
+
+.settlement-form textarea.form-control {
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+/* Modal Actions */
+.settlement-modal .modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.settlement-modal .btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.settlement-modal .btn-primary {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+}
+
+.settlement-modal .btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+}
+
+.settlement-modal .btn-secondary {
+  background: #6b7280;
+  color: white;
+  box-shadow: 0 2px 4px rgba(107, 114, 128, 0.2);
+}
+
+.settlement-modal .btn-secondary:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(107, 114, 128, 0.3);
+}
+
+/* Responsive Design for Settlement Modal */
+@media (max-width: 768px) {
+  .settlement-modal {
+    width: 95%;
+    margin: 20px auto;
+  }
+  
+  .settlement-modal .modal-header {
+    padding: 16px 20px;
+  }
+  
+  .settlement-modal .modal-header h3 {
+    font-size: 1.25rem;
+  }
+  
+  .settlement-modal .modal-body {
+    padding: 20px;
+  }
+  
+  .settlement-modal .modal-actions {
+    flex-direction: column;
+  }
+  
+  .action-buttons {
+    align-items: stretch;
+  }
+  
+  .btn-return-balance,
+  .btn-collect-overdue {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+/* Remove old settlement checkbox styles */
+.settlement-checkbox {
+  display: none;
+}
+
+.settlement-pending {
+  display: none;
+}
+/* Management Settlement Section */
+.management-settlements {
+  margin-bottom: 30px;
+}
+
+.management-settlements .card-header h2 {
+  color: #1e40af;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+/* Settlement Tabs */
+.settlement-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.tab-button {
+  background: transparent;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.tab-button:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.tab-button.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+/* Settlements Content */
+.settlements-content {
+  min-height: 200px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+/* Settlements Table */
+.settlements-table-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.settlements-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.settlements-table th {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  color: #374151;
+  font-weight: 600;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 2px solid #e5e7eb;
+  font-size: 0.9rem;
+}
+
+.settlements-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.settlements-table tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Type Badges */
+.type-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.type-return {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.type-collect {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+/* Status Badges for Settlements */
+.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-approved {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.status-completed {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-rejected {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+/* Settlement Actions */
+.settlement-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-approve {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-approve:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857, #065f46);
+  transform: translateY(-1px);
+}
+
+.btn-reject {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-reject:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+  transform: translateY(-1px);
+}
+
+.btn-complete {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-complete:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-1px);
+}
+
+.btn-approve:disabled,
+.btn-reject:disabled,
+.btn-complete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Responsive Design for Management Section */
+@media (max-width: 768px) {
+  .settlement-tabs {
+    flex-direction: column;
+  }
+  
+  .tab-button {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .settlements-table-wrapper {
+    font-size: 0.9rem;
+  }
+  
+  .settlements-table th,
+  .settlements-table td {
+    padding: 8px 12px;
+  }
+  
+  .settlement-actions {
+    flex-direction: column;
+  }
+  
+  .settlement-actions .btn-action {
+    width: 100%;
+    text-align: center;
+  }
 }

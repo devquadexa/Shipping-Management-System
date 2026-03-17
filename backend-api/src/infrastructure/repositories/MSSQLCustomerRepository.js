@@ -24,16 +24,36 @@ class MSSQLCustomerRepository extends ICustomerRepository {
       .input('name', this.sql.VarChar, customer.name)
       .input('mainPhone', this.sql.VarChar, customer.mainPhone)
       .input('email', this.sql.VarChar, customer.email)
-      .input('address', this.sql.VarChar, customer.address)
-      .input('officeLocation', this.sql.VarChar, customer.officeLocation || customer.address)
-      .input('isSameLocation', this.sql.Bit, customer.isSameLocation)
+      .input('addressNumber', this.sql.VarChar, customer.addressNumber)
+      .input('addressStreet1', this.sql.VarChar, customer.addressStreet1)
+      .input('addressStreet2', this.sql.VarChar, customer.addressStreet2)
+      .input('addressDistrict', this.sql.VarChar, customer.addressDistrict)
+      .input('addressCity', this.sql.VarChar, customer.addressCity)
+      .input('addressCountry', this.sql.VarChar, customer.addressCountry || 'Sri Lanka')
+      .input('officeAddressNumber', this.sql.VarChar, customer.officeAddressNumber)
+      .input('officeAddressStreet1', this.sql.VarChar, customer.officeAddressStreet1)
+      .input('officeAddressStreet2', this.sql.VarChar, customer.officeAddressStreet2)
+      .input('officeAddressDistrict', this.sql.VarChar, customer.officeAddressDistrict)
+      .input('officeAddressCity', this.sql.VarChar, customer.officeAddressCity)
+      .input('officeAddressCountry', this.sql.VarChar, customer.officeAddressCountry || 'Sri Lanka')
+      .input('isOfficeAddressSame', this.sql.Bit, customer.isOfficeAddressSame)
       .input('website', this.sql.VarChar, customer.website || null)
       .input('registrationDate', this.sql.DateTime, customer.registrationDate)
       .input('creditPeriodDays', this.sql.Int, customer.creditPeriodDays || 30)
       .input('isActive', this.sql.Bit, customer.isActive)
       .query(`
-        INSERT INTO Customers (CustomerId, Name, MainPhone, Email, Address, OfficeLocation, IsSameLocation, Website, RegistrationDate, creditPeriodDays, IsActive)
-        VALUES (@customerId, @name, @mainPhone, @email, @address, @officeLocation, @isSameLocation, @website, @registrationDate, @creditPeriodDays, @isActive)
+        INSERT INTO Customers (
+          CustomerId, Name, MainPhone, Email, 
+          addressNumber, addressStreet1, addressStreet2, addressDistrict, addressCity, addressCountry,
+          officeAddressNumber, officeAddressStreet1, officeAddressStreet2, officeAddressDistrict, officeAddressCity, officeAddressCountry,
+          isOfficeAddressSame, Website, RegistrationDate, creditPeriodDays, IsActive
+        )
+        VALUES (
+          @customerId, @name, @mainPhone, @email,
+          @addressNumber, @addressStreet1, @addressStreet2, @addressDistrict, @addressCity, @addressCountry,
+          @officeAddressNumber, @officeAddressStreet1, @officeAddressStreet2, @officeAddressDistrict, @officeAddressCity, @officeAddressCountry,
+          @isOfficeAddressSame, @website, @registrationDate, @creditPeriodDays, @isActive
+        )
       `);
     
     // Insert contact persons with IDs starting from 1 (will be formatted as 000001, 000002, etc.)
@@ -66,7 +86,9 @@ class MSSQLCustomerRepository extends ICustomerRepository {
     
     const result = await pool.request()
       .input('customerId', this.sql.VarChar, customerId)
-      .query('SELECT * FROM Customers WHERE CustomerId = @customerId');
+      .query(`
+        SELECT * FROM Customers WHERE CustomerId = @customerId
+      `);
     
     if (result.recordset.length === 0) {
       return null;
@@ -86,7 +108,7 @@ class MSSQLCustomerRepository extends ICustomerRepository {
   async findAll(filters = {}) {
     const pool = await this.db();
     
-    let query = 'SELECT * FROM Customers WHERE IsActive = 1';
+    let query = `SELECT * FROM Customers WHERE IsActive = 1`;
     
     if (filters.name) {
       query += ` AND Name LIKE '%${filters.name}%'`;
@@ -120,17 +142,32 @@ class MSSQLCustomerRepository extends ICustomerRepository {
       .input('name', this.sql.VarChar, customer.name)
       .input('mainPhone', this.sql.VarChar, customer.mainPhone)
       .input('email', this.sql.VarChar, customer.email)
-      .input('address', this.sql.VarChar, customer.address)
-      .input('officeLocation', this.sql.VarChar, customer.officeLocation || customer.address)
-      .input('isSameLocation', this.sql.Bit, customer.isSameLocation)
+      .input('addressNumber', this.sql.VarChar, customer.addressNumber)
+      .input('addressStreet1', this.sql.VarChar, customer.addressStreet1)
+      .input('addressStreet2', this.sql.VarChar, customer.addressStreet2)
+      .input('addressDistrict', this.sql.VarChar, customer.addressDistrict)
+      .input('addressCity', this.sql.VarChar, customer.addressCity)
+      .input('addressCountry', this.sql.VarChar, customer.addressCountry || 'Sri Lanka')
+      .input('officeAddressNumber', this.sql.VarChar, customer.officeAddressNumber)
+      .input('officeAddressStreet1', this.sql.VarChar, customer.officeAddressStreet1)
+      .input('officeAddressStreet2', this.sql.VarChar, customer.officeAddressStreet2)
+      .input('officeAddressDistrict', this.sql.VarChar, customer.officeAddressDistrict)
+      .input('officeAddressCity', this.sql.VarChar, customer.officeAddressCity)
+      .input('officeAddressCountry', this.sql.VarChar, customer.officeAddressCountry || 'Sri Lanka')
+      .input('isOfficeAddressSame', this.sql.Bit, customer.isOfficeAddressSame)
       .input('website', this.sql.VarChar, customer.website || null)
       .input('creditPeriodDays', this.sql.Int, customer.creditPeriodDays || 30)
       .input('isActive', this.sql.Bit, customer.isActive !== undefined ? customer.isActive : true)
       .query(`
         UPDATE Customers 
-        SET Name = @name, MainPhone = @mainPhone, Email = @email, Address = @address,
-            OfficeLocation = @officeLocation, IsSameLocation = @isSameLocation, Website = @website,
-            creditPeriodDays = @creditPeriodDays, IsActive = @isActive
+        SET Name = @name, MainPhone = @mainPhone, Email = @email,
+            addressNumber = @addressNumber, addressStreet1 = @addressStreet1, addressStreet2 = @addressStreet2, 
+            addressDistrict = @addressDistrict, addressCity = @addressCity, addressCountry = @addressCountry,
+            officeAddressNumber = @officeAddressNumber, officeAddressStreet1 = @officeAddressStreet1, 
+            officeAddressStreet2 = @officeAddressStreet2, officeAddressDistrict = @officeAddressDistrict, 
+            officeAddressCity = @officeAddressCity, officeAddressCountry = @officeAddressCountry, 
+            isOfficeAddressSame = @isOfficeAddressSame,
+            Website = @website, creditPeriodDays = @creditPeriodDays, IsActive = @isActive
         WHERE CustomerId = @customerId
       `);
     
@@ -214,9 +251,19 @@ class MSSQLCustomerRepository extends ICustomerRepository {
       name: row.Name,
       mainPhone: row.MainPhone,
       email: row.Email,
-      address: row.Address,
-      officeLocation: row.OfficeLocation,
-      isSameLocation: row.IsSameLocation,
+      addressNumber: row.addressNumber,
+      addressStreet1: row.addressStreet1,
+      addressStreet2: row.addressStreet2,
+      addressDistrict: row.addressDistrict,
+      addressCity: row.addressCity,
+      addressCountry: row.addressCountry || 'Sri Lanka',
+      officeAddressNumber: row.officeAddressNumber,
+      officeAddressStreet1: row.officeAddressStreet1,
+      officeAddressStreet2: row.officeAddressStreet2,
+      officeAddressDistrict: row.officeAddressDistrict,
+      officeAddressCity: row.officeAddressCity,
+      officeAddressCountry: row.officeAddressCountry || 'Sri Lanka',
+      isOfficeAddressSame: row.isOfficeAddressSame,
       website: row.Website,
       registrationDate: row.RegistrationDate,
       creditPeriodDays: row.creditPeriodDays || 30,

@@ -133,6 +133,22 @@
   word-break: break-word;
 }
 
+.required-indicator {
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 0.5rem;
+  padding: 2px 6px;
+  background: #fee2e2;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.missing-value {
+  color: #dc2626 !important;
+  font-style: italic;
+}
+
 .pay-items-card {
   background: white;
   padding: 1.5rem;
@@ -168,23 +184,36 @@
   border-collapse: collapse;
   margin-bottom: 1rem;
   background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .pay-items-input-table thead {
-  background: #101036;
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%);
   color: white;
 }
 
 .pay-items-input-table th {
-  padding: 0.75rem;
+  padding: 0.85rem;
   text-align: left;
   font-weight: 600;
   font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: white;
 }
 
 .pay-items-input-table td {
-  padding: 0.75rem;
+  padding: 0.85rem;
   border-bottom: 1px solid #e0e0e0;
+  vertical-align: middle;
+}
+
+.pay-items-input-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.pay-items-input-table tbody tr:hover {
+  background-color: #f8f9fa;
 }
 
 .pay-items-input-table tbody tr:last-child td {
@@ -210,6 +239,18 @@
   cursor: not-allowed;
 }
 
+/* Remove number input spinners (up/down arrows) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .checkbox-cell {
   text-align: center;
 }
@@ -218,6 +259,25 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
+}
+
+.paid-by-name {
+  display: inline-block;
+  padding: 0.35rem 0.85rem;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  color: #1565c0;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid #90caf9;
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.1);
+}
+
+.paid-by-empty {
+  color: #999;
+  font-style: italic;
+  font-size: 0.9rem;
 }
 
 .pay-items-actions {
@@ -236,55 +296,150 @@
   margin-top: 1.5rem;
 }
 
-.pay-items-display-table {
+.pay-items-review-header {
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%);
+  color: white;
+  padding: 1.5rem;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: 0;
+}
+
+.pay-items-review-header h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.review-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  font-style: italic;
+}
+
+/* Pay Items Review Table - Grid-based for perfect alignment */
+.pay-items-review-table {
   width: 100%;
-  border-collapse: collapse;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
   margin-bottom: 1.5rem;
+  background: white;
 }
 
-.pay-items-display-table thead {
+.table-header {
+  display: grid;
+  grid-template-columns: 50% 25% 25%;
   background: #f0f4ff;
+  border-bottom: 2px solid #e0e0e0;
 }
 
-.pay-items-display-table th {
+.header-cell {
   padding: 0.75rem;
-  text-align: left;
   font-weight: 600;
   color: #101036;
-  border-bottom: 2px solid #e0e0e0;
   font-size: 0.9rem;
+  border-right: 1px solid #e0e0e0;
 }
 
-.pay-items-display-table th:nth-child(2),
-.pay-items-display-table th:nth-child(3) {
+.header-cell:last-child {
+  border-right: none;
+}
+
+.description-header {
+  text-align: left;
+  padding-left: 0.75rem;
+}
+
+.amount-header {
   text-align: right;
+  padding-right: 1rem;
 }
 
-.pay-items-display-table td {
-  padding: 0.75rem;
+.table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 50% 25% 25%;
   border-bottom: 1px solid #e0e0e0;
-  font-size: 0.9rem;
 }
 
-.pay-items-display-table td.amount {
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.table-cell {
+  padding: 0.75rem;
+  font-size: 0.9rem;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+}
+
+.table-cell:last-child {
+  border-right: none;
+}
+
+.description-cell {
+  text-align: left;
+  justify-content: flex-start;
+  padding-left: 0.75rem;
+}
+
+.amount-cell {
   text-align: right;
+  justify-content: flex-end;
+  padding-right: 1rem;
+  font-family: 'Courier New', monospace;
   font-weight: 500;
+}
+
+.total-row {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+  border-top: 2px solid #101036;
+  border-bottom: 2px solid #101036;
+}
+
+.total-row .table-cell {
+  padding: 1rem 0.75rem;
+  font-weight: 700;
+  color: #101036;
+  font-size: 0.95rem;
+}
+
+.total-row .description-cell {
+  padding-left: 0.75rem;
+}
+
+.total-row .amount-cell {
+  padding-right: 1rem;
   font-family: 'Courier New', monospace;
 }
 
-.pay-items-display-table .total-row {
-  background: #f0f4ff;
-  font-weight: 600;
+.profit-row {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-bottom: 2px solid #059669;
 }
 
-.pay-items-display-table .total-row td {
-  padding-top: 1rem;
+.profit-row .table-cell {
+  padding: 1rem 0.75rem;
+  font-weight: 700;
+  color: #101036;
+  font-size: 0.95rem;
 }
 
-.pay-items-display-table .profit-row {
-  background: #f8f9fa;
-  font-weight: 600;
-  border-top: 2px solid #101036;
+.profit-row .description-cell {
+  padding-left: 0.75rem;
+}
+
+.profit-row .amount-cell {
+  padding-right: 1rem;
+  font-family: 'Courier New', monospace;
 }
 
 .profit-positive {
@@ -456,25 +611,29 @@
 }
 
 .billing-table thead {
-  background: #f8f9fa;
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%);
+  color: white;
 }
 
 .billing-table th {
   padding: 1rem;
   text-align: left;
   font-weight: 600;
-  color: #101036;
-  border-bottom: 2px solid #e0e0e0;
+  color: white;
+  border-bottom: 2px solid #0f172a;
   font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .billing-table tbody tr {
   border-bottom: 1px solid #e0e0e0;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, box-shadow 0.2s;
 }
 
 .billing-table tbody tr:hover {
   background-color: #f8f9fa;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .billing-table td {
@@ -487,6 +646,14 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1;
+}
+
+.action-buttons .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .empty-state {
@@ -548,9 +715,82 @@
     width: 100%;
   }
 
+  .pay-items-form {
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
   .pay-items-input-table {
-    display: block;
-    overflow-x: auto;
+    display: block !important;
+    width: 100%;
+  }
+
+  .pay-items-input-table thead {
+    display: none !important;
+  }
+
+  .pay-items-input-table tbody,
+  .pay-items-input-table tbody tr {
+    display: block !important;
+    width: 100%;
+  }
+
+  .pay-items-input-table tbody tr {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  }
+
+  .pay-items-input-table td {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    gap: 0.75rem;
+  }
+
+  .pay-items-input-table td:last-child {
+    border-bottom: none;
+    justify-content: flex-end;
+  }
+
+  .pay-items-input-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .pay-items-input-table td[data-label="Action"]::before {
+    display: none;
+  }
+
+  .pay-items-input-table td input,
+  .pay-items-input-table td select,
+  .pay-items-input-table td .form-control-small {
+    width: 60% !important;
+    max-width: 60%;
+    text-align: right;
+    padding: 0.5rem 0.6rem;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
+
+  .pay-items-input-table td .btn {
+    width: auto !important;
+  }
+
+  .pay-items-input-table .form-control-small {
+    width: 60% !important;
+    min-width: 0;
+    font-size: 1rem;
+    padding: 0.5rem 0.6rem;
   }
 
   .pay-items-actions {
@@ -616,6 +856,134 @@
   .action-buttons .btn {
     width: 100%;
   }
+
+  .action-buttons-with-expand {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .expand-btn-right {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .expand-column {
+    width: 50px;
+    padding: 0.5rem !important;
+  }
+
+  .expand-btn-middle {
+    width: 36px;
+    height: 36px;
+  }
+
+  .expand-header {
+    width: 50px;
+  }
+
+  .details-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .detail-card {
+    padding: 1rem;
+  }
+
+  .detail-value {
+    font-size: 1.1rem;
+  }
+
+  .bill-details-expanded {
+    padding: 1rem;
+    margin: 0.5rem;
+  }
+
+  .pay-items-review-table {
+    display: block;
+  }
+
+  .table-header {
+    display: none;
+  }
+
+  .table-body {
+    display: block;
+  }
+
+  .table-row {
+    display: block;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-row.total-row {
+    background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+    border-color: #c7d2fe;
+  }
+
+  .table-row.profit-row {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-color: #86efac;
+  }
+
+  .table-cell {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    border-right: none;
+  }
+
+  .table-cell:last-child {
+    border-bottom: none;
+  }
+
+  .table-cell::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .description-cell::before {
+    content: "Description";
+  }
+
+  .amount-cell:nth-child(2)::before {
+    content: "Actual Cost";
+  }
+
+  .amount-cell:nth-child(3)::before {
+    content: "Billing Amount";
+  }
+
+  .total-row .description-cell::before {
+    content: "";
+  }
+
+  .profit-row .description-cell::before {
+    content: "";
+  }
+
+  .total-row .description-cell,
+  .profit-row .description-cell {
+    display: block;
+    justify-content: flex-start;
+    font-weight: 700;
+    color: #101036;
+    border-bottom: 2px solid #d1d5db;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    text-align: left;
+  }
 }
 
 /* Overdue Invoice Styles */
@@ -661,4 +1029,439 @@
   color: #666;
   margin-top: 0.25rem;
   font-style: italic;
+}
+
+/* Validation Modal */
+.validation-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.validation-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  animation: slideUp 0.3s ease;
+  position: relative;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.validation-modal-header {
+  background: #fee2e2;
+  border-bottom: 2px solid #dc2626;
+  padding: 1.5rem;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.validation-modal-header h3 {
+  margin: 0;
+  color: #dc2626;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.modal-close-btn:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.validation-modal-body {
+  padding: 2rem;
+  color: #374151;
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.validation-modal-body p {
+  margin: 0;
+}
+
+.validation-modal-footer {
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.validation-modal-footer .btn {
+  min-width: 120px;
+}
+
+/* Expandable Details Row */
+.expand-header {
+  width: 50px;
+  padding: 0 !important;
+}
+
+.expand-column {
+  width: 50px;
+  padding: 0.5rem !important;
+  text-align: center;
+  vertical-align: middle;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f4ff 100%);
+  border-left: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
+}
+
+.expand-btn-middle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #101036;
+  transition: all 0.3s ease;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.expand-btn-middle:hover {
+  background: rgba(16, 16, 54, 0.15);
+  transform: scale(1.2);
+  color: #1e40af;
+}
+
+.expand-btn-middle svg {
+  transition: transform 0.3s ease;
+}
+
+.action-buttons-with-expand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.expand-btn-right {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #101036;
+  transition: all 0.3s ease;
+  border-radius: 4px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+}
+
+.expand-btn-right:hover {
+  background: rgba(16, 16, 54, 0.1);
+  transform: scale(1.15);
+}
+
+.expand-btn-right svg {
+  transition: transform 0.3s ease;
+}
+
+.details-row {
+  background: #f8f9fa;
+  border-top: 2px solid #e0e0e0;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.details-row td {
+  padding: 0 !important;
+}
+
+.bill-details-expanded {
+  padding: 2rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f4ff 100%);
+  border-radius: 8px;
+  margin: 1rem;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.detail-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border-left: 4px solid #101036;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.detail-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.detail-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.detail-value {
+  font-size: 1.25rem;
+  color: #101036;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.detail-value.profit-positive {
+  color: #388e3c;
+}
+
+.detail-value.profit-negative {
+  color: #d32f2f;
+}
+
+.detail-value.total-due {
+  color: #1976d2;
+  font-size: 1.4rem;
+}
+
+/* Add More Items Notice */
+.add-more-items-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
+  border: 1px solid #29b6f6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 4px rgba(41, 182, 246, 0.1);
+}
+
+.notice-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.notice-text {
+  flex: 1;
+}
+
+.notice-text strong {
+  color: #0277bd;
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.notice-text p {
+  color: #01579b;
+  font-size: 0.85rem;
+  margin: 0;
+  line-height: 1.4;
+}
+.pay-item-name-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.source-badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  align-self: flex-start;
+}
+
+.office-badge {
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%);
+  color: white;
+}
+
+.petty-cash-badge {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: white;
+}
+
+.office-pay-item-row {
+  background-color: #f8fafc;
+  border-left: 3px solid #101036;
+}
+
+.petty-cash-item-row {
+  background-color: #f0fdf4;
+  border-left: 3px solid #059669;
+}
+/* Advance Payment Styles */
+.advance-received {
+  color: #059669 !important;
+  font-weight: 600;
+}
+
+.no-advance {
+  color: #6b7280;
+}
+
+.advance-indicator {
+  font-size: 0.8rem;
+  color: #059669;
+  font-weight: 500;
+}
+
+/* Advance Payment Summary Rows */
+.advance-summary-row {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%) !important;
+  border-top: 2px solid #101036 !important;
+  border-bottom: 1px solid #d1d5db !important;
+}
+
+.advance-summary-label {
+  color: #101036 !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gross-total-row {
+  background: rgba(16, 16, 54, 0.05) !important;
+}
+
+.gross-total-label {
+  color: #374151;
+  font-weight: 600;
+  padding-left: 1rem !important;
+}
+
+.gross-total-amount {
+  color: #101036;
+  font-weight: 700;
+}
+
+.advance-payment-row {
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.advance-payment-label {
+  color: #dc2626;
+  font-weight: 600;
+  padding-left: 1rem !important;
+}
+
+.advance-deduction {
+  color: #dc2626 !important;
+  font-weight: 700;
+}
+
+.net-total-row {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+  color: white !important;
+  border-top: 2px solid #059669 !important;
+  border-bottom: 2px solid #059669 !important;
+}
+
+.net-total-label {
+  color: white !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.final-amount {
+  color: white !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem;
+}
+
+/* Enhanced table styling for advance payment */
+.pay-items-review-table .table-row:hover {
+  background: rgba(16, 16, 54, 0.02);
+}
+
+.advance-summary-row:hover,
+.gross-total-row:hover,
+.advance-payment-row:hover,
+.net-total-row:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Professional spacing for advance payment sections */
+.advance-summary-row .table-cell,
+.gross-total-row .table-cell,
+.advance-payment-row .table-cell,
+.net-total-row .table-cell {
+  padding: 0.75rem 1rem;
+}
+
+/* Responsive design for advance payment */
+@media (max-width: 768px) {
+  .advance-summary-label,
+  .gross-total-label,
+  .advance-payment-label,
+  .net-total-label {
+    font-size: 0.9rem;
+  }
+  
+  .gross-total-amount,
+  .advance-deduction,
+  .final-amount {
+    font-size: 1rem;
+  }
 }
