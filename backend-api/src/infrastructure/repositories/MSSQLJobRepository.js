@@ -43,6 +43,39 @@ class MSSQLJobRepository extends IJobRepository {
 
       IF COL_LENGTH('Jobs', 'CreatedDate') IS NULL
         ALTER TABLE Jobs ADD CreatedDate DATETIME DEFAULT GETDATE();
+      
+      IF COL_LENGTH('Jobs', 'payItems') IS NULL
+        ALTER TABLE Jobs ADD payItems NVARCHAR(MAX) NULL;
+      
+      IF COL_LENGTH('Jobs', 'shipmentCategory') IS NULL
+        ALTER TABLE Jobs ADD shipmentCategory NVARCHAR(100) NULL;
+      
+      IF COL_LENGTH('Jobs', 'openDate') IS NULL
+        ALTER TABLE Jobs ADD openDate DATETIME NULL;
+      
+      IF COL_LENGTH('Jobs', 'pettyCashStatus') IS NULL
+        ALTER TABLE Jobs ADD pettyCashStatus NVARCHAR(50) NULL;
+      
+      IF COL_LENGTH('Jobs', 'assignedUsers') IS NULL
+        ALTER TABLE Jobs ADD assignedUsers NVARCHAR(MAX) NULL;
+      
+      IF COL_LENGTH('Jobs', 'officePayItems') IS NULL
+        ALTER TABLE Jobs ADD officePayItems NVARCHAR(MAX) NULL;
+      
+      IF COL_LENGTH('Jobs', 'advancePayment') IS NULL
+        ALTER TABLE Jobs ADD advancePayment DECIMAL(18,2) DEFAULT 0.00;
+      
+      IF COL_LENGTH('Jobs', 'advancePaymentDate') IS NULL
+        ALTER TABLE Jobs ADD advancePaymentDate DATETIME NULL;
+      
+      IF COL_LENGTH('Jobs', 'advancePaymentNotes') IS NULL
+        ALTER TABLE Jobs ADD advancePaymentNotes NVARCHAR(MAX) NULL;
+      
+      IF COL_LENGTH('Jobs', 'advancePaymentRecordedBy') IS NULL
+        ALTER TABLE Jobs ADD advancePaymentRecordedBy VARCHAR(50) NULL;
+      
+      IF COL_LENGTH('Jobs', 'metadata') IS NULL
+        ALTER TABLE Jobs ADD metadata NVARCHAR(MAX) NULL;
     `);
 
     this.schemaEnsured = true;
@@ -494,40 +527,80 @@ class MSSQLJobRepository extends IJobRepository {
       console.log('Could not fetch office pay items:', error.message);
     }
     
-    // Get assigned users for this job (new feature)
-    let assignedUsers = [];
+    // Parse JSON fields from database
+    let assignedUsersFromJson = [];
+    let officePayItemsFromJson = [];
+    let metadataFromJson = {};
+    
     try {
-      const pool = await this.db();
-      
-      // Check if JobAssignments table exists first
-      const tableCheck = await pool.request()
-        .query(`
-          SELECT COUNT(*) as tableExists
-          FROM sys.tables 
-          WHERE name = 'JobAssignments'
-        `);
-      
-      const hasJobAssignments = tableCheck.recordset[0].tableExists > 0;
-      
-      if (hasJobAssignments) {
-        // Try to get from JobAssignments table directly
-        const assignmentResult = await pool.request()
-          .input('jobId', this.sql.VarChar, row.jobId || row.JobId)
-          .query(`
-            SELECT ja.userId, u.fullName as userName 
-            FROM JobAssignments ja
-            INNER JOIN Users u ON ja.userId = u.userId
-            WHERE ja.jobId = @jobId
-          `);
-        
-        assignedUsers = assignmentResult.recordset.map(a => ({
-          userId: a.userId,
-          userName: a.userName
-        }));
+      if (row.assignedUsers && typeof row.assignedUsers === 'string') {
+        assignedUsersFromJson = JSON.parse(row.assignedUsers);
+      } else if (Array.isArray(row.assignedUsers)) {
+        assignedUsersFromJson = row.assignedUsers;
       }
     } catch (error) {
-      console.log('Could not fetch assigned users:', error.message);
+      console.log('Could not parse assignedUsers JSON:', error.message);
     }
+    
+    try {
+      if (row.officePayItems && typeof row.officePayItems === 'string') {
+        officePayItemsFromJson = JSON.parse(row.officePayItems);
+      } else if (Array.isArray(row.officePayItems)) {
+        officePayItemsFromJson = row.officePayItems;
+      }
+    } catch (error) {
+      console.log('Could not parse officePayItems JSON:', error.message);
+    }
+    
+    try {
+      if (row.metadata && typeof row.metadata === 'string') {
+        metadataFromJson = JSON.parse(row.metadata);
+      } else if (typeof row.metadata === 'object' && row.metadata !== null) {
+        metadataFromJson = row.metadata;
+      }
+    } catch (error) {
+      console.log('Could not parse metadata JSON:', error.message);
+    }
+    
+    // Get assigned users for this job (new feature) - prefer JSON data, fallback to table
+    let assignedUsers = assignedUsersFromJson;
+    if (assignedUsers.length === 0) {
+      try {
+        const pool = await this.db();
+        
+        // Check if JobAssignments table exists first
+        const tableCheck = await pool.request()
+          .query(`
+            SELECT COUNT(*) as tableExists
+            FROM sys.tables 
+            WHERE name = 'JobAssignments'
+          `);
+        
+        const hasJobAssignments = tableCheck.recordset[0].tableExists > 0;
+        
+        if (hasJobAssignments) {
+          // Try to get from JobAssignments table directly
+          const assignmentResult = await pool.request()
+            .input('jobId', this.sql.VarChar, row.jobId || row.JobId)
+            .query(`
+              SELECT ja.userId, u.fullName as userName 
+              FROM JobAssignments ja
+              INNER JOIN Users u ON ja.userId = u.userId
+              WHERE ja.jobId = @jobId
+            `);
+          
+          assignedUsers = assignmentResult.recordset.map(a => ({
+            userId: a.userId,
+            userName: a.userName
+          }));
+        }
+      } catch (error) {
+        console.log('Could not fetch assigned users:', error.message);
+      }
+    }
+    
+    // Merge office pay items from JSON and table (prefer table data)
+    const finalOfficePayItems = officePayItems.length > 0 ? officePayItems : officePayItemsFromJson;
     
     // Create and return Job entity instance
     const job = new Job({
@@ -535,8 +608,8 @@ class MSSQLJobRepository extends IJobRepository {
       customerId: row.CustomerId,
       blNumber: row.BLNumber,
       cusdecNumber: row.CUSDECNumber,
-      openDate: row.OpenDate,
-      shipmentCategory: row.ShipmentCategory,
+      openDate: row.openDate || row.OpenDate,
+      shipmentCategory: row.shipmentCategory || row.ShipmentCategory,
       exporter: row.Exporter,
       transporter: row.Transporter,
       lcNumber: row.LCNumber,
@@ -552,7 +625,8 @@ class MSSQLJobRepository extends IJobRepository {
       advancePaymentNotes: row.advancePaymentNotes,
       advancePaymentRecordedBy: row.advancePaymentRecordedBy,
       payItems: payItems || [],
-      officePayItems: officePayItems || [] // New field for office pay items
+      officePayItems: finalOfficePayItems || [], // New field for office pay items
+      metadata: metadataFromJson
     });
     
     console.log('mapToEntity result:', job.toJSON());

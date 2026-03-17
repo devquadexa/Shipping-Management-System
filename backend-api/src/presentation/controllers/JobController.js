@@ -222,11 +222,22 @@ class JobController {
     try {
       console.log('Received pay items data:', req.body);
       
-      const payItemsData = req.body.payItems.map(item => ({
-        description: item.description,
-        amount: item.amount,
-        billingAmount: item.billingAmount
-      }));
+      const payItemsData = req.body.payItems.map(item => {
+        // Handle different data structures for backward compatibility
+        const description = item.description || item.name || '';
+        const amount = parseFloat(item.amount || item.actualCost || 0);
+        const billingAmount = parseFloat(item.billingAmount || item.amount || item.actualCost || 0);
+        
+        return {
+          description: description,
+          amount: amount,
+          actualCost: amount,
+          billingAmount: billingAmount,
+          paidBy: item.paidBy || 'Office',
+          source: item.source || 'Custom',
+          addedDate: item.addedDate || new Date()
+        };
+      });
       
       console.log('Processed pay items data:', payItemsData);
       

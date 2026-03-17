@@ -367,8 +367,22 @@ function Billing() {
       const updatedJob = updatedJobs.find(j => j.jobId === selectedJob.jobId);
       
       console.log('Updated selected job with pay items:', updatedJob);
+      console.log('Updated job payItems:', updatedJob?.payItems);
+      console.log('Updated job payItems length:', updatedJob?.payItems?.length);
       
-      setSelectedJob(updatedJob);
+      if (updatedJob) {
+        setSelectedJob(updatedJob);
+        console.log('✓ Selected job updated successfully');
+      } else {
+        console.error('❌ Could not find updated job');
+        // Fallback: just update the current selectedJob with new pay items
+        setSelectedJob({
+          ...selectedJob,
+          payItems: allPayItemsData
+        });
+      }
+      
+      // Reset the pay items form
       setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
       
       setTimeout(() => setMessage(''), 5000);
