@@ -119,7 +119,7 @@ class CashBalanceSettlement {
   getStatusDisplay() {
     const statusMap = {
       'PENDING': 'Pending Approval',
-      'APPROVED': 'Approved - Ready for Settlement',
+      'APPROVED': 'Approved',
       'COMPLETED': 'Completed',
       'REJECTED': 'Rejected'
     };

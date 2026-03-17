@@ -573,6 +573,8 @@ function PettyCash() {
     switch (status) {
       case 'Assigned': return 'status-assigned';
       case 'Settled': return 'status-settled';
+      case 'Settled/Approved': return 'status-approved';
+      case 'Settled/Rejected': return 'status-rejected';
       case 'Returned': return 'status-returned';
       case 'Paid': return 'status-paid';
       case 'Pending Approval': return 'status-pending-approval';
@@ -699,7 +701,7 @@ function PettyCash() {
                 <div className="balance-detail-row">
                   <span>Settled Assignments:</span>
                   <span className="balance-value">
-                    {assignments.filter(a => a.status === 'Settled').length}
+                    {assignments.filter(a => a.status === 'Settled' || a.status === 'Settled/Approved' || a.status === 'Settled/Rejected').length}
                   </span>
                 </div>
               </div>
@@ -803,7 +805,7 @@ function PettyCash() {
                           )}
                           
                           {/* Settlement buttons for Waff Clerks with balance/over amounts */}
-                          {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
+                          {(assignment.status === 'Settled' || assignment.status === 'Settled/Rejected') && user?.role === 'Waff Clerk' && (
                             <>
                               {assignment.balanceAmount > 0 && (
                                 <button
@@ -826,7 +828,7 @@ function PettyCash() {
                             </>
                           )}
                           
-                          {(assignment.status === 'Settled' || assignment.status === 'Pending Approval' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') && (
+                          {(assignment.status === 'Settled' || assignment.status === 'Pending Approval' || assignment.status === 'Settled/Approved' || assignment.status === 'Settled/Rejected' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') && (
                             <button
                               className="btn-action btn-view"
                               onClick={async () => {
@@ -966,7 +968,7 @@ function PettyCash() {
         }}>
           <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
+              <h2>{(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
               <button className="btn-close" onClick={() => {
                 setShowSettleModal(false);
                 setSelectedAssignment(null);
@@ -985,7 +987,7 @@ function PettyCash() {
                 <span className="info-label">Assigned Amount:</span>
                 <span className="info-value">LKR {formatAmount(selectedAssignment.assignedAmount)}</span>
               </div>
-              {selectedAssignment.status === 'Settled' && (
+              {(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected') && (
                 <>
                   <div className="info-row">
                     <span className="info-label">Actual Spent:</span>
@@ -1011,7 +1013,7 @@ function PettyCash() {
               )}
             </div>
 
-            {(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? (
+            {(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? (
               <div className="settlement-items-view">
                 <h3>Settlement Items</h3>
                 <table className="settlement-items-table">
@@ -1270,19 +1272,12 @@ const ManagementSettlementSection = ({ user }) => {
 
   useEffect(() => {
     fetchSettlements();
-  }, [activeTab]);
+  }, []);
 
   const fetchSettlements = async () => {
     setLoading(true);
     try {
-      let endpoint = 'http://localhost:5000/api/cash-balance-settlements';
-      if (activeTab === 'pending') {
-        endpoint += '?status=PENDING';
-      } else if (activeTab === 'approved') {
-        endpoint += '?status=APPROVED';
-      } else if (activeTab === 'rejected') {
-        endpoint += '?status=REJECTED';
-      }
+      const endpoint = 'http://localhost:5000/api/cash-balance-settlements';
 
       const response = await fetch(endpoint, {
         headers: {
@@ -1305,6 +1300,17 @@ const ManagementSettlementSection = ({ user }) => {
       setLoading(false);
     }
   };
+
+  const pendingCount = settlements.filter(settlement => settlement.status === 'PENDING').length;
+  const approvedCount = settlements.filter(settlement => settlement.status === 'APPROVED').length;
+  const rejectedCount = settlements.filter(settlement => settlement.status === 'REJECTED').length;
+
+  const filteredSettlements = settlements.filter(settlement => {
+    if (activeTab === 'pending') return settlement.status === 'PENDING';
+    if (activeTab === 'approved') return settlement.status === 'APPROVED';
+    if (activeTab === 'rejected') return settlement.status === 'REJECTED';
+    return true;
+  });
 
   const handleApprove = async (settlementId, managerNotes = '') => {
     setActionLoading(prev => ({ ...prev, [settlementId]: 'approving' }));
@@ -1408,7 +1414,7 @@ const ManagementSettlementSection = ({ user }) => {
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
-          Pending ({settlements.length})
+          Pending ({pendingCount})
         </button>
         <button 
           className={`tab-button ${activeTab === 'approved' ? 'active' : ''}`}
@@ -1418,7 +1424,7 @@ const ManagementSettlementSection = ({ user }) => {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
-          Approved ({settlements.length})
+          Approved ({approvedCount})
         </button>
         <button 
           className={`tab-button ${activeTab === 'rejected' ? 'active' : ''}`}
@@ -1430,7 +1436,7 @@ const ManagementSettlementSection = ({ user }) => {
             <line x1="15" y1="9" x2="9" y2="15"></line>
             <line x1="9" y1="9" x2="15" y2="15"></line>
           </svg>
-          Rejected ({settlements.length})
+          Rejected ({rejectedCount})
         </button>
         <button 
           className={`tab-button ${activeTab === 'all' ? 'active' : ''}`}
@@ -1448,13 +1454,13 @@ const ManagementSettlementSection = ({ user }) => {
       <div className="settlements-content">
         {loading && <div className="loading">Loading settlements...</div>}
         
-        {!loading && settlements.length === 0 && (
+        {!loading && filteredSettlements.length === 0 && (
           <div className="empty-state">
             <p>No {activeTab} settlements found.</p>
           </div>
         )}
 
-        {!loading && settlements.length > 0 && (
+        {!loading && filteredSettlements.length > 0 && (
           <div className="settlements-table-wrapper">
             <table className="settlements-table">
               <thead>
@@ -1469,7 +1475,7 @@ const ManagementSettlementSection = ({ user }) => {
                 </tr>
               </thead>
               <tbody>
-                {settlements.map(settlement => (
+                {filteredSettlements.map(settlement => (
                   <tr key={settlement.settlementId}>
                     <td data-label="Settlement ID">
                       <strong>{settlement.settlementId}</strong>
