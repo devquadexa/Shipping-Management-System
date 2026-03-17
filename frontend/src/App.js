@@ -39,7 +39,14 @@ function AppContent() {
           <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
           <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
           <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
-          <Route path="/petty-cash" element={<PrivateRoute><PettyCash /></PrivateRoute>} />
+          <Route
+            path="/petty-cash"
+            element={
+              <PrivateRoute>
+                {user?.role === 'Office Executive' ? <Navigate to="/" /> : <PettyCash />}
+              </PrivateRoute>
+            }
+          />
           <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
           <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />

@@ -61,8 +61,13 @@ class MSSQLJobAssignmentRepository extends IJobAssignmentRepository {
       INNER JOIN Users u ON ja.userId = u.userId
       LEFT JOIN Users ab ON ja.assignedBy = ab.userId
       WHERE ja.jobId = @jobId
-      ORDER BY ja.assignedDate DESC
     `;
+
+    if (activeOnly) {
+      query += ' AND ja.isActive = 1';
+    }
+
+    query += ' ORDER BY ja.assignedDate DESC';
     
     const result = await pool.request()
       .input('jobId', this.sql.VarChar, jobId)
@@ -81,8 +86,13 @@ class MSSQLJobAssignmentRepository extends IJobAssignmentRepository {
       INNER JOIN Users u ON ja.userId = u.userId
       LEFT JOIN Users ab ON ja.assignedBy = ab.userId
       WHERE ja.userId = @userId
-      ORDER BY ja.assignedDate DESC
     `;
+
+    if (activeOnly) {
+      query += ' AND ja.isActive = 1';
+    }
+
+    query += ' ORDER BY ja.assignedDate DESC';
     
     const result = await pool.request()
       .input('userId', this.sql.VarChar, userId)
@@ -93,17 +103,76 @@ class MSSQLJobAssignmentRepository extends IJobAssignmentRepository {
 
   async assignUsersToJob(jobId, userIds, assignedBy, notes = null) {
     const pool = await this.db();
+    const transaction = new this.sql.Transaction(pool);
     
     try {
-      const result = await pool.request()
+      await transaction.begin();
+
+      // Replace existing assignments for this job.
+      await transaction.request()
         .input('jobId', this.sql.VarChar, jobId)
-        .input('userIds', this.sql.VarChar, userIds.join(','))
-        .input('assignedBy', this.sql.VarChar, assignedBy)
-        .execute('sp_AssignUsersToJob');
-      
-      // Return the number of users assigned (userIds length since SP doesn't return count)
+        .query(`
+          UPDATE JobAssignments
+          SET isActive = 0
+          WHERE jobId = @jobId
+        `);
+
+      for (const userId of userIds) {
+        const existingResult = await transaction.request()
+          .input('jobId', this.sql.VarChar, jobId)
+          .input('userId', this.sql.VarChar, userId)
+          .query(`
+            SELECT TOP 1 assignmentId
+            FROM JobAssignments
+            WHERE jobId = @jobId AND userId = @userId
+            ORDER BY assignedDate DESC
+          `);
+
+        if (existingResult.recordset.length > 0) {
+          await transaction.request()
+            .input('assignmentId', this.sql.Int, existingResult.recordset[0].assignmentId)
+            .input('assignedBy', this.sql.VarChar, assignedBy)
+            .input('notes', this.sql.NVarChar, notes)
+            .query(`
+              UPDATE JobAssignments
+              SET isActive = 1,
+                  assignedDate = GETDATE(),
+                  assignedBy = @assignedBy,
+                  notes = @notes
+              WHERE assignmentId = @assignmentId
+            `);
+        } else {
+          await transaction.request()
+            .input('jobId', this.sql.VarChar, jobId)
+            .input('userId', this.sql.VarChar, userId)
+            .input('assignedBy', this.sql.VarChar, assignedBy)
+            .input('notes', this.sql.NVarChar, notes)
+            .query(`
+              INSERT INTO JobAssignments (jobId, userId, assignedBy, notes, isActive)
+              VALUES (@jobId, @userId, @assignedBy, @notes, 1)
+            `);
+        }
+      }
+
+      await transaction.request()
+        .input('jobId', this.sql.VarChar, jobId)
+        .input('assignedTo', this.sql.VarChar, userIds[0] || null)
+        .query(`
+          UPDATE Jobs
+          SET assignedTo = @assignedTo
+          WHERE jobId = @jobId
+        `);
+
+      await transaction.commit();
       return userIds.length;
     } catch (error) {
+      if (transaction._aborted !== true) {
+        try {
+          await transaction.rollback();
+        } catch (rollbackError) {
+          console.error('Rollback failed in assignUsersToJob:', rollbackError);
+        }
+      }
       console.error('Error in assignUsersToJob:', error);
       throw error;
     }

@@ -166,6 +166,12 @@
   margin-bottom: 1.25rem;
 }
 
+.form-row-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -279,6 +285,11 @@ textarea.form-control {
 
   .form-actions {
     flex-direction: column;
+  }
+
+  .form-row-two {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
 
   .btn {
