@@ -208,11 +208,11 @@ class Container {
     this.dependencies.authenticateUser = new AuthenticateUser(userRepository, jwtSecret);
     
     // Cash Balance Settlement use cases
-    this.dependencies.CreateCashBalanceSettlement = new CreateCashBalanceSettlement(cashBalanceSettlementRepository);
+    this.dependencies.CreateCashBalanceSettlement = new CreateCashBalanceSettlement(cashBalanceSettlementRepository, pettyCashAssignmentRepository);
     this.dependencies.GetCashBalanceSettlements = new GetCashBalanceSettlements(cashBalanceSettlementRepository);
-    this.dependencies.ApproveCashBalanceSettlement = new ApproveCashBalanceSettlement(cashBalanceSettlementRepository);
+    this.dependencies.ApproveCashBalanceSettlement = new ApproveCashBalanceSettlement(cashBalanceSettlementRepository, pettyCashAssignmentRepository);
     this.dependencies.CompleteCashBalanceSettlement = new CompleteCashBalanceSettlement(cashBalanceSettlementRepository);
-    this.dependencies.RejectCashBalanceSettlement = new RejectCashBalanceSettlement(cashBalanceSettlementRepository);
+    this.dependencies.RejectCashBalanceSettlement = new RejectCashBalanceSettlement(cashBalanceSettlementRepository, pettyCashAssignmentRepository);
     this.dependencies.CashBalanceSettlementRepository = cashBalanceSettlementRepository;
     
     // Controllers

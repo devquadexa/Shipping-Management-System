@@ -1185,10 +1185,10 @@ function Customers() {
               )}
               
               <div className="form-actions">
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary">
                   {editingCustomer ? 'Update Customer' : 'Register Customer'}
                 </button>
-                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="btn btn-secondary">Cancel</button>
               </div>
             </form>
           </div>

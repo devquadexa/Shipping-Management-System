@@ -119,6 +119,14 @@ class MSSQLCashBalanceSettlementRepository {
     return result.recordset.map(row => this.mapToEntity(row));
   }
 
+  async findRejectedSettlements() {
+    const pool = await this.db();
+    const result = await pool.request()
+      .query("SELECT * FROM CashBalanceSettlements WHERE status = 'REJECTED' ORDER BY updatedDate DESC");
+    
+    return result.recordset.map(row => this.mapToEntity(row));
+  }
+
   async update(settlementId, settlement) {
     const pool = await this.db();
     

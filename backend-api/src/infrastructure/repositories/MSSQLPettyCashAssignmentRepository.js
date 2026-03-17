@@ -378,7 +378,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           .query(`
             SELECT COUNT(*) as unsettledCount
             FROM PettyCashAssignments
-            WHERE jobId = @jobId AND status != 'Settled'
+            WHERE jobId = @jobId AND status NOT IN ('Settled', 'Balance Returned', 'Overdue Collected')
           `);
         
         console.log('settle - unsettledCount:', unsettledCount.recordset[0].unsettledCount);

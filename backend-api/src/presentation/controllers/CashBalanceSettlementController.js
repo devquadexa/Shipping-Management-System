@@ -275,6 +275,34 @@ class CashBalanceSettlementController {
       });
     }
   }
+
+  async getRejectedSettlements(req, res) {
+    try {
+      const { role } = req.user;
+
+      // Check if user has management role
+      if (!['Super Admin', 'Admin', 'Manager'].includes(role)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized: Only management can view rejected settlements'
+        });
+      }
+
+      const cashBalanceSettlementRepository = this.container.get('CashBalanceSettlementRepository');
+      const settlements = await cashBalanceSettlementRepository.findRejectedSettlements();
+
+      res.json({
+        success: true,
+        data: settlements.map(settlement => settlement.toJSON())
+      });
+    } catch (error) {
+      console.error('Error fetching rejected settlements:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
 }
 
 module.exports = CashBalanceSettlementController;

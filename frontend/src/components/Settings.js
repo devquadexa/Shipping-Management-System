@@ -316,11 +316,11 @@ function Settings() {
                 />
               </div>
               <div className="modal-actions">
-                <button className="btn btn-primary" onClick={handleAddItem}>
-                  Add Item
-                </button>
                 <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                   Cancel
+                </button>
+                <button className="btn btn-primary" onClick={handleAddItem}>
+                  Add Item
                 </button>
               </div>
             </div>

@@ -575,6 +575,9 @@ function PettyCash() {
       case 'Settled': return 'status-settled';
       case 'Returned': return 'status-returned';
       case 'Paid': return 'status-paid';
+      case 'Pending Approval': return 'status-pending-approval';
+      case 'Balance Returned': return 'status-balance-returned';
+      case 'Overdue Collected': return 'status-overdue-collected';
       default: return 'status-assigned';
     }
   };
@@ -823,7 +826,7 @@ function PettyCash() {
                             </>
                           )}
                           
-                          {assignment.status === 'Settled' && (
+                          {(assignment.status === 'Settled' || assignment.status === 'Pending Approval' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') && (
                             <button
                               className="btn-action btn-view"
                               onClick={async () => {
@@ -942,10 +945,10 @@ function PettyCash() {
               </div>
 
               <div className="modal-actions">
-                <button type="submit" className="btn btn-primary">Assign Petty Cash</button>
                 <button type="button" onClick={() => setShowAssignModal(false)} className="btn btn-secondary">
                   Cancel
                 </button>
+                <button type="submit" className="btn btn-primary">Assign Petty Cash</button>
               </div>
             </form>
           </div>
@@ -963,7 +966,7 @@ function PettyCash() {
         }}>
           <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{selectedAssignment.status === 'Settled' ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
+              <h2>{(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
               <button className="btn-close" onClick={() => {
                 setShowSettleModal(false);
                 setSelectedAssignment(null);
@@ -1008,7 +1011,7 @@ function PettyCash() {
               )}
             </div>
 
-            {selectedAssignment.status === 'Settled' ? (
+            {(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? (
               <div className="settlement-items-view">
                 <h3>Settlement Items</h3>
                 <table className="settlement-items-table">
@@ -1137,7 +1140,6 @@ function PettyCash() {
                 </div>
 
                 <div className="modal-actions">
-                  <button type="submit" className="btn btn-success">Settle Petty Cash</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1149,6 +1151,7 @@ function PettyCash() {
                   >
                     Cancel
                   </button>
+                  <button type="submit" className="btn btn-success">Settle Petty Cash</button>
                 </div>
               </form>
             )}
@@ -1163,7 +1166,7 @@ function PettyCash() {
           <div className="modal-content settlement-modal">
             <div className="modal-header">
               <h3>
-                {settlementFormData.settlementType === 'BALANCE_RETURN' ? '💰 Return Balance Cash' : '📋 Collect Overdue Cash'}
+                {settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Return Balance Cash' : 'Collect Overdue Cash'}
               </h3>
               <button
                 className="modal-close"
@@ -1233,9 +1236,6 @@ function PettyCash() {
                 </div>
 
                 <div className="modal-actions">
-                  <button type="submit" className="btn btn-primary">
-                    {settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Request Balance Return' : 'Request Overdue Collection'}
-                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1246,6 +1246,9 @@ function PettyCash() {
                     className="btn btn-secondary"
                   >
                     Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    {settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Request Balance Return' : 'Request Overdue Collection'}
                   </button>
                 </div>
               </form>
@@ -1274,9 +1277,11 @@ const ManagementSettlementSection = ({ user }) => {
     try {
       let endpoint = 'http://localhost:5000/api/cash-balance-settlements';
       if (activeTab === 'pending') {
-        endpoint += '/pending';
+        endpoint += '?status=PENDING';
       } else if (activeTab === 'approved') {
-        endpoint += '/approved';
+        endpoint += '?status=APPROVED';
+      } else if (activeTab === 'rejected') {
+        endpoint += '?status=REJECTED';
       }
 
       const response = await fetch(endpoint, {
@@ -1331,36 +1336,6 @@ const ManagementSettlementSection = ({ user }) => {
     }
   };
 
-  const handleComplete = async (settlementId, managerNotes = '') => {
-    setActionLoading(prev => ({ ...prev, [settlementId]: 'completing' }));
-    try {
-      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/complete`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ managerNotes })
-      });
-
-      if (response.ok) {
-        setMessage('Settlement completed successfully');
-        fetchSettlements();
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        const data = await response.json();
-        setMessage(data.message || 'Failed to complete settlement');
-        setTimeout(() => setMessage(''), 3000);
-      }
-    } catch (error) {
-      console.error('Error completing settlement:', error);
-      setMessage('Error completing settlement');
-      setTimeout(() => setMessage(''), 3000);
-    } finally {
-      setActionLoading(prev => ({ ...prev, [settlementId]: null }));
-    }
-  };
-
   const handleReject = async (settlementId, managerNotes) => {
     if (!managerNotes.trim()) {
       setMessage('Please provide a reason for rejection');
@@ -1401,7 +1376,6 @@ const ManagementSettlementSection = ({ user }) => {
     switch (status) {
       case 'PENDING': return 'status-pending';
       case 'APPROVED': return 'status-approved';
-      case 'COMPLETED': return 'status-completed';
       case 'REJECTED': return 'status-rejected';
       default: return 'status-assigned';
     }
@@ -1410,7 +1384,12 @@ const ManagementSettlementSection = ({ user }) => {
   return (
     <div className="card management-settlements">
       <div className="card-header">
-        <h2>🏢 Cash Balance Settlement Management</h2>
+        <h2>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="header-icon">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>
+          </svg>
+          Cash Balance Settlement Management
+        </h2>
       </div>
 
       {message && (
@@ -1423,20 +1402,46 @@ const ManagementSettlementSection = ({ user }) => {
         <button 
           className={`tab-button ${activeTab === 'pending' ? 'active' : ''}`}
           onClick={() => setActiveTab('pending')}
+          title="View pending settlements"
         >
-          ⏳ Pending ({settlements.length})
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          Pending ({settlements.length})
         </button>
         <button 
           className={`tab-button ${activeTab === 'approved' ? 'active' : ''}`}
           onClick={() => setActiveTab('approved')}
+          title="View approved settlements"
         >
-          ✅ Approved ({settlements.length})
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Approved ({settlements.length})
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'rejected' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rejected')}
+          title="View rejected settlements"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+          </svg>
+          Rejected ({settlements.length})
         </button>
         <button 
           className={`tab-button ${activeTab === 'all' ? 'active' : ''}`}
           onClick={() => setActiveTab('all')}
+          title="View all settlements"
         >
-          📋 All Settlements
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          All Settlements
         </button>
       </div>
 
@@ -1495,7 +1500,7 @@ const ManagementSettlementSection = ({ user }) => {
                               onClick={() => handleApprove(settlement.settlementId)}
                               disabled={actionLoading[settlement.settlementId]}
                             >
-                              {actionLoading[settlement.settlementId] === 'approving' ? 'Approving...' : '✅ Approve'}
+                              {actionLoading[settlement.settlementId] === 'approving' ? 'Approving...' : 'Approve'}
                             </button>
                             <button
                               className="btn-action btn-reject"
@@ -1505,18 +1510,9 @@ const ManagementSettlementSection = ({ user }) => {
                               }}
                               disabled={actionLoading[settlement.settlementId]}
                             >
-                              {actionLoading[settlement.settlementId] === 'rejecting' ? 'Rejecting...' : '❌ Reject'}
+                              {actionLoading[settlement.settlementId] === 'rejecting' ? 'Rejecting...' : 'Reject'}
                             </button>
                           </>
-                        )}
-                        {settlement.status === 'APPROVED' && (
-                          <button
-                            className="btn-action btn-complete"
-                            onClick={() => handleComplete(settlement.settlementId)}
-                            disabled={actionLoading[settlement.settlementId]}
-                          >
-                            {actionLoading[settlement.settlementId] === 'completing' ? 'Completing...' : '🏁 Complete'}
-                          </button>
                         )}
                       </div>
                     </td>
