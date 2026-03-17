@@ -25,14 +25,17 @@ class MSSQLBillRepository extends IBillRepository {
       .input('actualCost', this.sql.Decimal(10, 2), bill.actualCost)
       .input('billingAmount', this.sql.Decimal(10, 2), bill.billingAmount)
       .input('profit', this.sql.Decimal(10, 2), bill.profit)
+      .input('advancePayment', this.sql.Decimal(18, 2), bill.advancePayment || 0.00)
+      .input('grossTotal', this.sql.Decimal(18, 2), bill.grossTotal || bill.billingAmount)
+      .input('netTotal', this.sql.Decimal(18, 2), bill.netTotal || bill.billingAmount)
       .input('paymentStatus', this.sql.VarChar, bill.paymentStatus)
       .input('invoiceNumber', this.sql.VarChar, bill.invoiceNumber)
       .input('invoiceDate', this.sql.DateTime, bill.invoiceDate || new Date())
       .input('dueDate', this.sql.DateTime, bill.dueDate)
       .input('isOverdue', this.sql.Bit, bill.isOverdue || false)
       .query(`
-        INSERT INTO Bills (BillId, JobId, CustomerId, Amount, Tax, Total, ActualCost, BillingAmount, Profit, PaymentStatus, InvoiceNumber, CreatedDate, BillDate, invoiceDate, dueDate, isOverdue)
-        VALUES (@billId, @jobId, @customerId, @amount, @tax, @total, @actualCost, @billingAmount, @profit, @paymentStatus, @invoiceNumber, GETDATE(), GETDATE(), @invoiceDate, @dueDate, @isOverdue)
+        INSERT INTO Bills (BillId, JobId, CustomerId, Amount, Tax, Total, ActualCost, BillingAmount, Profit, advancePayment, grossTotal, netTotal, PaymentStatus, InvoiceNumber, CreatedDate, BillDate, invoiceDate, dueDate, isOverdue)
+        VALUES (@billId, @jobId, @customerId, @amount, @tax, @total, @actualCost, @billingAmount, @profit, @advancePayment, @grossTotal, @netTotal, @paymentStatus, @invoiceNumber, GETDATE(), GETDATE(), @invoiceDate, @dueDate, @isOverdue)
       `);
     
     return bill;
@@ -117,6 +120,18 @@ class MSSQLBillRepository extends IBillRepository {
       request.input('total', this.sql.Decimal(10, 2), bill.total);
       updates.push('Total = @total');
     }
+    if (bill.advancePayment !== undefined) {
+      request.input('advancePayment', this.sql.Decimal(18, 2), bill.advancePayment);
+      updates.push('advancePayment = @advancePayment');
+    }
+    if (bill.grossTotal !== undefined) {
+      request.input('grossTotal', this.sql.Decimal(18, 2), bill.grossTotal);
+      updates.push('grossTotal = @grossTotal');
+    }
+    if (bill.netTotal !== undefined) {
+      request.input('netTotal', this.sql.Decimal(18, 2), bill.netTotal);
+      updates.push('netTotal = @netTotal');
+    }
     if (bill.paymentStatus !== undefined) {
       request.input('paymentStatus', this.sql.VarChar, bill.paymentStatus);
       updates.push('PaymentStatus = @paymentStatus');
@@ -175,6 +190,9 @@ class MSSQLBillRepository extends IBillRepository {
       actualCost: row.ActualCost || 0,
       billingAmount: row.BillingAmount || row.Amount,
       profit: row.Profit || 0,
+      advancePayment: row.advancePayment || 0.00,
+      grossTotal: row.grossTotal || row.BillingAmount || row.Amount,
+      netTotal: row.netTotal || row.BillingAmount || row.Amount,
       paymentStatus: row.PaymentStatus,
       createdDate: row.CreatedDate,
       billDate: row.BillDate || row.CreatedDate,

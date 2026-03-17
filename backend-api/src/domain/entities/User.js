@@ -51,7 +51,7 @@ class User {
   }
 
   isValidRole(role) {
-    const validRoles = ['Super Admin', 'Admin', 'Manager', 'User'];
+    const validRoles = ['Super Admin', 'Admin', 'Manager', 'Office Executive', 'Waff Clerk'];
     return validRoles.includes(role);
   }
 
@@ -65,7 +65,8 @@ class User {
       'Super Admin': ['*'], // All permissions
       'Admin': ['manage_customers', 'manage_jobs', 'manage_billing', 'manage_petty_cash'],
       'Manager': ['manage_customers', 'manage_jobs', 'manage_billing', 'manage_petty_cash'],
-      'User': ['view_assigned_jobs', 'manage_own_petty_cash']
+      'Office Executive': ['manage_customers', 'manage_jobs', 'manage_office_pay_items'], // No billing access
+      'Waff Clerk': ['view_assigned_jobs', 'manage_own_petty_cash']
     };
     
     const userPermissions = permissions[this.role] || [];
@@ -77,7 +78,7 @@ class User {
   }
 
   canManageCustomers() {
-    return this.role === 'Super Admin' || this.role === 'Admin' || this.role === 'Manager';
+    return this.role === 'Super Admin' || this.role === 'Admin' || this.role === 'Manager' || this.role === 'Office Executive';
   }
 
   // Remove sensitive data for API responses

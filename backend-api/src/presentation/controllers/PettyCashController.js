@@ -3,10 +3,11 @@
  * Handles HTTP requests for petty cash operations
  */
 class PettyCashController {
-  constructor(createPettyCashEntry, getAllPettyCashEntries, getPettyCashBalance) {
+  constructor(createPettyCashEntry, getAllPettyCashEntries, getPettyCashBalance, getAvailablePettyCashBalance) {
     this.createPettyCashEntry = createPettyCashEntry;
     this.getAllPettyCashEntries = getAllPettyCashEntries;
     this.getPettyCashBalance = getPettyCashBalance;
+    this.getAvailablePettyCashBalance = getAvailablePettyCashBalance;
   }
 
   async create(req, res) {
@@ -31,7 +32,7 @@ class PettyCashController {
       const filters = {};
       
       // Filter by user role
-      if (req.user.role === 'User') {
+      if (req.user.role === 'Waff Clerk') {
         filters.createdBy = req.user.userId;
       }
       
@@ -49,6 +50,16 @@ class PettyCashController {
       res.json({ balance });
     } catch (error) {
       console.error('Get balance error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  async getAvailableBalance(req, res) {
+    try {
+      const balanceInfo = await this.getAvailablePettyCashBalance.execute();
+      res.json(balanceInfo);
+    } catch (error) {
+      console.error('Get available balance error:', error);
       res.status(500).json({ message: error.message });
     }
   }

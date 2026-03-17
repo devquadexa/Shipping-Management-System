@@ -15,7 +15,8 @@ function Dashboard() {
     openJobs: 0,
     totalBills: 0,
     unpaidBills: 0,
-    pettyCashBalance: 0
+    pettyCashBalance: 0,
+    userPettyCash: 0
   });
   const [accountingData, setAccountingData] = useState(null);
 
@@ -28,11 +29,21 @@ function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const [customers, jobs, bills, pettyCash] = await Promise.all([
-        (user?.role !== 'User') ? customerService.getAll() : Promise.resolve([]),
+      let pettyCashData = { balance: 0 };
+
+      // Fetch petty cash based on role
+      if (user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') {
+        // For admin/super admin/manager/office executive, get overall balance
+        pettyCashData = await pettyCashService.getBalance();
+      } else if (user?.role === 'Waff Clerk') {
+        // For regular users, get their assigned petty cash
+        pettyCashData = await pettyCashService.getUserAssignedBalance();
+      }
+
+      const [customers, jobs, bills] = await Promise.all([
+        (user?.role !== 'Waff Clerk') ? customerService.getAll() : Promise.resolve([]),
         jobService.getAll(),
-        (user?.role !== 'User') ? billingService.getBills() : Promise.resolve([]),
-        pettyCashService.getBalance()
+        (user?.role !== 'Waff Clerk') ? billingService.getBills() : Promise.resolve([])
       ]);
 
       setStats({
@@ -41,7 +52,8 @@ function Dashboard() {
         openJobs: jobs.filter(j => j.status === 'Open').length,
         totalBills: bills.length,
         unpaidBills: bills.filter(b => b.paymentStatus === 'Unpaid').length,
-        pettyCashBalance: pettyCash.balance
+        pettyCashBalance: pettyCashData.balance,
+        userPettyCash: pettyCashData.balance
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -140,7 +152,7 @@ function Dashboard() {
       {/* Regular Dashboard Stats */}
       <h2 className="section-title">{user?.role === 'Super Admin' ? 'Operations Overview' : 'Dashboard Overview'}</h2>
       <div className="stats-grid">
-        {(user?.role !== 'User') && (
+        {(user?.role !== 'Waff Clerk') && (
           <div className="stat-card">
             <h3>Total Customers</h3>
             <div className="value">{stats.totalCustomers}</div>
@@ -150,14 +162,14 @@ function Dashboard() {
         <div className="stat-card">
           <h3>Total Jobs</h3>
           <div className="value">{stats.totalJobs}</div>
-          <div className="label">{user?.role === 'User' ? 'Assigned to you' : 'All jobs'}</div>
+          <div className="label">{user?.role === 'Waff Clerk' ? 'Assigned to you' : 'All jobs'}</div>
         </div>
         <div className="stat-card">
           <h3>Open Jobs</h3>
           <div className="value">{stats.openJobs}</div>
           <div className="label">Pending</div>
         </div>
-        {(user?.role !== 'User') && (
+        {(user?.role !== 'Waff Clerk') && (
           <>
             <div className="stat-card">
               <h3>Total Invoices</h3>
@@ -173,8 +185,12 @@ function Dashboard() {
         )}
         <div className="stat-card">
           <h3>Petty Cash</h3>
-          <div className="value">LKR {stats.pettyCashBalance.toFixed(2)}</div>
-          <div className="label">Current Balance</div>
+          <div className="value">
+            LKR {(user?.role === 'Waff Clerk' ? stats.userPettyCash : stats.pettyCashBalance).toFixed(2)}
+          </div>
+          <div className="label">
+            {user?.role === 'Waff Clerk' ? 'Assigned to you' : 'Current Balance'}
+          </div>
         </div>
       </div>
     </div>

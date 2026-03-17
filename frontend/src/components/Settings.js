@@ -127,7 +127,7 @@ function Settings() {
     }
   };
 
-  if (user?.role === 'User') {
+  if (user?.role === 'Waff Clerk') {
     return (
       <div className="container">
         <div className="alert alert-error">Access Denied: Admin or Super Admin only</div>
@@ -316,11 +316,11 @@ function Settings() {
                 />
               </div>
               <div className="modal-actions">
-                <button className="btn btn-primary" onClick={handleAddItem}>
-                  Add Item
-                </button>
                 <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                   Cancel
+                </button>
+                <button className="btn btn-primary" onClick={handleAddItem}>
+                  Add Item
                 </button>
               </div>
             </div>

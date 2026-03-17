@@ -7,6 +7,10 @@ function Customers() {
   const { user } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [filteredCities, setFilteredCities] = useState([]);
+  const [filteredOfficeCities, setFilteredOfficeCities] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [expandedRow, setExpandedRow] = useState(null);
@@ -14,9 +18,21 @@ function Customers() {
     name: '',
     mainPhone: '',
     email: '',
-    address: '',
-    officeLocation: '',
-    isSameLocation: false,
+    // Residential Address
+    addressNumber: '',
+    addressStreet1: '',
+    addressStreet2: '',
+    addressDistrict: '',
+    addressCity: '',
+    addressCountry: 'Sri Lanka',
+    // Office Address
+    officeAddressNumber: '',
+    officeAddressStreet1: '',
+    officeAddressStreet2: '',
+    officeAddressDistrict: '',
+    officeAddressCity: '',
+    officeAddressCountry: 'Sri Lanka',
+    isOfficeAddressSame: false,
     website: '',
     registrationDate: new Date().toISOString().split('T')[0],
     creditPeriodDays: 30,
@@ -28,15 +44,29 @@ function Customers() {
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Check if user is Admin, Super Admin, or Manager
+  // Check if user is Admin, Super Admin, Manager, or Office Executive
   const isAdminOrSuperAdmin = () => {
-    return user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager');
+    return user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive');
   };
 
   useEffect(() => {
     fetchCustomers();
     fetchCategories();
+    fetchDistricts();
+    fetchAllCities();
   }, []);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (showModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showModal]);
 
   const fetchCategories = async () => {
     try {
@@ -49,6 +79,50 @@ function Customers() {
       setCategories(data);
     } catch (error) {
       console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchDistricts = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/locations/districts', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      setDistricts(data);
+    } catch (error) {
+      console.error('Error fetching districts:', error);
+    }
+  };
+
+  const fetchCities = async (districtId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/locations/cities/${districtId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      setCities(data);
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+      setCities([]);
+    }
+  };
+
+  const fetchAllCities = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/locations/cities', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      setCities(data);
+    } catch (error) {
+      console.error('Error fetching all cities:', error);
+      setCities([]);
     }
   };
 
@@ -96,8 +170,47 @@ function Customers() {
     }
     
     // Address validation
-    if (!formData.address.trim()) {
-      errors.address = 'Address is required';
+    if (!formData.addressNumber.trim()) {
+      errors.addressNumber = 'Address number is required';
+    }
+    
+    if (!formData.addressStreet1.trim()) {
+      errors.addressStreet1 = 'Street name is required';
+    }
+    
+    if (!formData.addressDistrict.trim()) {
+      errors.addressDistrict = 'District is required';
+    }
+    
+    if (!formData.addressCity.trim()) {
+      errors.addressCity = 'City is required';
+    }
+
+    if (!formData.addressCountry.trim()) {
+      errors.addressCountry = 'Country is required';
+    }
+
+    // Office address validation (if not same as residential)
+    if (!formData.isOfficeAddressSame) {
+      if (!formData.officeAddressNumber.trim()) {
+        errors.officeAddressNumber = 'Office address number is required';
+      }
+      
+      if (!formData.officeAddressStreet1.trim()) {
+        errors.officeAddressStreet1 = 'Office street name is required';
+      }
+      
+      if (!formData.officeAddressDistrict.trim()) {
+        errors.officeAddressDistrict = 'Office district is required';
+      }
+      
+      if (!formData.officeAddressCity.trim()) {
+        errors.officeAddressCity = 'Office city is required';
+      }
+
+      if (!formData.officeAddressCountry.trim()) {
+        errors.officeAddressCountry = 'Office country is required';
+      }
     }
     
     // Contact persons validation - at least one required
@@ -188,9 +301,19 @@ function Customers() {
       name: '', 
       mainPhone: '', 
       email: '', 
-      address: '',
-      officeLocation: '',
-      isSameLocation: false,
+      addressNumber: '',
+      addressStreet1: '',
+      addressStreet2: '',
+      addressDistrict: '',
+      addressCity: '',
+      addressCountry: 'Sri Lanka',
+      officeAddressNumber: '',
+      officeAddressStreet1: '',
+      officeAddressStreet2: '',
+      officeAddressDistrict: '',
+      officeAddressCity: '',
+      officeAddressCountry: 'Sri Lanka',
+      isOfficeAddressSame: false,
       website: '',
       contactPersons: [{ name: '', phone: '' }],
       categories: [],
@@ -198,11 +321,13 @@ function Customers() {
     });
     setFormErrors({});
     setEditingCustomer(null);
+    setFilteredCities([]);
+    setFilteredOfficeCities([]);
   };
 
   const handleEdit = (customer) => {
     if (!isAdminOrSuperAdmin()) {
-      setMessage('Only Admin, Super Admin, or Manager can edit customers');
+      setMessage('Only Admin, Super Admin, Manager, or Office Executive can edit customers');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -212,9 +337,19 @@ function Customers() {
       name: customer.name || '',
       mainPhone: customer.mainPhone || '',
       email: customer.email || '',
-      address: customer.address || '',
-      officeLocation: customer.officeLocation || '',
-      isSameLocation: customer.isSameLocation || false,
+      addressNumber: customer.addressNumber || '',
+      addressStreet1: customer.addressStreet1 || '',
+      addressStreet2: customer.addressStreet2 || '',
+      addressDistrict: customer.addressDistrict || '',
+      addressCity: customer.addressCity || '',
+      addressCountry: customer.addressCountry || 'Sri Lanka',
+      officeAddressNumber: customer.officeAddressNumber || '',
+      officeAddressStreet1: customer.officeAddressStreet1 || '',
+      officeAddressStreet2: customer.officeAddressStreet2 || '',
+      officeAddressDistrict: customer.officeAddressDistrict || '',
+      officeAddressCity: customer.officeAddressCity || '',
+      officeAddressCountry: customer.officeAddressCountry || 'Sri Lanka',
+      isOfficeAddressSame: customer.isOfficeAddressSame || false,
       website: customer.website || '',
       registrationDate: customer.registrationDate ? new Date(customer.registrationDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       creditPeriodDays: customer.creditPeriodDays || 30,
@@ -229,12 +364,21 @@ function Customers() {
       categories: customer.categories ? customer.categories.map(cat => cat.categoryId) : [],
       isActive: customer.isActive !== undefined ? customer.isActive : true
     });
+    
+    // Set up filtered cities for editing
+    if (customer.addressDistrict) {
+      handleDistrictChange(customer.addressDistrict, false);
+    }
+    if (customer.officeAddressDistrict) {
+      handleDistrictChange(customer.officeAddressDistrict, true);
+    }
+    
     setShowModal(true);
   };
 
   const handleDeactivate = async (customerId) => {
     if (!isAdminOrSuperAdmin()) {
-      setMessage('Only Admin, Super Admin, or Manager can deactivate customers');
+      setMessage('Only Admin, Super Admin, Manager, or Office Executive can deactivate customers');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -255,6 +399,32 @@ function Customers() {
     }
   };
 
+  const handleDistrictChange = (districtName, isOffice = false) => {
+    // Find the district to get its ID
+    const selectedDistrict = districts.find(d => d.districtName === districtName);
+    
+    if (selectedDistrict) {
+      // Filter cities for this district
+      const districtCities = cities.filter(c => c.districtId === selectedDistrict.districtId);
+      
+      if (isOffice) {
+        setFilteredOfficeCities(districtCities);
+        setFormData(prev => ({ 
+          ...prev, 
+          officeAddressDistrict: districtName,
+          officeAddressCity: '' // Reset city when district changes
+        }));
+      } else {
+        setFilteredCities(districtCities);
+        setFormData(prev => ({ 
+          ...prev, 
+          addressDistrict: districtName,
+          addressCity: '' // Reset city when district changes
+        }));
+      }
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
@@ -262,6 +432,13 @@ function Customers() {
       setFormData({ ...formData, [name]: checked });
     } else {
       setFormData({ ...formData, [name]: value });
+      
+      // Handle district changes
+      if (name === 'addressDistrict') {
+        handleDistrictChange(value, false);
+      } else if (name === 'officeAddressDistrict') {
+        handleDistrictChange(value, true);
+      }
     }
     
     // Clear error for this field when user starts typing
@@ -430,12 +607,19 @@ function Customers() {
                             <div className="detail-section">
                               <h4 className="section-title">Address Information</h4>
                               <div className="detail-item-block">
-                                <span className="detail-label">Address:</span>
-                                <span className="detail-value-block">{customer.address}</span>
+                                <span className="detail-label">Residential Address:</span>
+                                <span className="detail-value-block">
+                                  {customer.getFormattedResidentialAddress ? customer.getFormattedResidentialAddress() : 
+                                   `${customer.addressNumber || ''}, ${customer.addressStreet1 || ''}, ${customer.addressStreet2 ? customer.addressStreet2 + ', ' : ''}${customer.addressDistrict || ''}, ${customer.addressCity || ''}, ${customer.addressCountry || 'Sri Lanka'}`}
+                                </span>
                               </div>
                               <div className="detail-item-block">
-                                <span className="detail-label">Office Location:</span>
-                                <span className="detail-value-block">{customer.officeLocation || customer.address}</span>
+                                <span className="detail-label">Office Address:</span>
+                                <span className="detail-value-block">
+                                  {customer.isOfficeAddressSame ? 'Same as residential address' : 
+                                   (customer.getFormattedOfficeAddress ? customer.getFormattedOfficeAddress() : 
+                                    `${customer.officeAddressNumber || ''}, ${customer.officeAddressStreet1 || ''}, ${customer.officeAddressStreet2 ? customer.officeAddressStreet2 + ', ' : ''}${customer.officeAddressDistrict || ''}, ${customer.officeAddressCity || ''}, ${customer.officeAddressCountry || 'Sri Lanka'}`)}
+                                </span>
                               </div>
                               {customer.website && (
                                 <div className="detail-item">
@@ -642,49 +826,232 @@ function Customers() {
                 </div>
               </div>
 
-              {/* Location Information */}
+              {/* Address Information */}
               <div className="form-section">
-                <h3 className="section-heading">Location Information</h3>
-                <div className="form-row">
+                <h3 className="section-heading">Residential Address (Standard Sri Lankan Format)</h3>
+                
+                {/* Three column row: Address Number, Street Name 1, Street Name 2 */}
+                <div className="form-row form-row-three">
                   <div className="form-group">
-                    <label>Address <span className="required">*</span></label>
-                    <textarea 
-                      name="address" 
-                      value={formData.address} 
+                    <label>Address Number <span className="required">*</span></label>
+                    <input 
+                      type="text" 
+                      name="addressNumber" 
+                      value={formData.addressNumber} 
                       onChange={handleChange}
-                      className={formErrors.address ? 'error' : ''}
-                      placeholder="Enter full address"
+                      className={formErrors.addressNumber ? 'error' : ''}
+                      placeholder="e.g., 45, 123/2A"
                       required 
-                      rows="2" 
                     />
-                    {formErrors.address && <span className="error-message">{formErrors.address}</span>}
+                    {formErrors.addressNumber && <span className="error-message">{formErrors.addressNumber}</span>}
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Street Name 1 <span className="required">*</span></label>
+                    <input 
+                      type="text" 
+                      name="addressStreet1" 
+                      value={formData.addressStreet1} 
+                      onChange={handleChange}
+                      className={formErrors.addressStreet1 ? 'error' : ''}
+                      placeholder="e.g., Galle Road, Temple Road"
+                      required 
+                    />
+                    {formErrors.addressStreet1 && <span className="error-message">{formErrors.addressStreet1}</span>}
                   </div>
 
                   <div className="form-group">
-                    <label>Office Location</label>
-                    <textarea 
-                      name="officeLocation" 
-                      value={formData.officeLocation} 
-                      onChange={handleChange} 
-                      placeholder="Leave blank if same as address"
-                      rows="2" 
+                    <label>Street Name 2 (Optional)</label>
+                    <input 
+                      type="text" 
+                      name="addressStreet2" 
+                      value={formData.addressStreet2} 
+                      onChange={handleChange}
+                      placeholder="e.g., Lane 3, Near School"
                     />
+                    <small className="help-text">Additional street info</small>
                   </div>
                 </div>
+
+                {/* Three column row: District (left), City (right), Country */}
+                <div className="form-row form-row-three-address">
+                  <div className="form-group">
+                    <label>District <span className="required">*</span></label>
+                    <select 
+                      name="addressDistrict" 
+                      value={formData.addressDistrict} 
+                      onChange={handleChange}
+                      className={formErrors.addressDistrict ? 'error' : ''}
+                      required 
+                    >
+                      <option value="">Select District</option>
+                      {districts.map(district => (
+                        <option key={district.districtId} value={district.districtName}>
+                          {district.districtName}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.addressDistrict && <span className="error-message">{formErrors.addressDistrict}</span>}
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>City/Town <span className="required">*</span></label>
+                    <select 
+                      name="addressCity" 
+                      value={formData.addressCity} 
+                      onChange={handleChange}
+                      className={formErrors.addressCity ? 'error' : ''}
+                      disabled={!formData.addressDistrict}
+                      required 
+                    >
+                      <option value="">Select City</option>
+                      {filteredCities.map(city => (
+                        <option key={city.cityId} value={city.cityName}>
+                          {city.cityName}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.addressCity && <span className="error-message">{formErrors.addressCity}</span>}
+                    {!formData.addressDistrict && <small className="help-text">Select district first</small>}
+                  </div>
+
+                  <div className="form-group">
+                    <label>Country <span className="required">*</span></label>
+                    <input 
+                      type="text" 
+                      name="addressCountry" 
+                      value={formData.addressCountry} 
+                      onChange={handleChange}
+                      className={formErrors.addressCountry ? 'error' : ''}
+                      placeholder="Sri Lanka"
+                      required 
+                    />
+                    {formErrors.addressCountry && <span className="error-message">{formErrors.addressCountry}</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Office Address Information */}
+              <div className="form-section">
+                <h3 className="section-heading">Office Address</h3>
                 
                 <div className="form-row">
                   <div className="form-group">
                     <label className="checkbox-label">
                       <input 
                         type="checkbox" 
-                        name="isSameLocation" 
-                        checked={formData.isSameLocation} 
+                        name="isOfficeAddressSame" 
+                        checked={formData.isOfficeAddressSame} 
                         onChange={handleChange}
                       />
-                      <span>Office location is same as address</span>
+                      <span>Office address is same as residential address</span>
                     </label>
                   </div>
                 </div>
+
+                {!formData.isOfficeAddressSame && (
+                  <>
+                    {/* Three column row: Office Address Number, Street Name 1, Street Name 2 */}
+                    <div className="form-row form-row-three">
+                      <div className="form-group">
+                        <label>Office Address Number <span className="required">*</span></label>
+                        <input 
+                          type="text" 
+                          name="officeAddressNumber" 
+                          value={formData.officeAddressNumber} 
+                          onChange={handleChange}
+                          className={formErrors.officeAddressNumber ? 'error' : ''}
+                          placeholder="e.g., 45, 123/2A"
+                          required={!formData.isOfficeAddressSame}
+                        />
+                        {formErrors.officeAddressNumber && <span className="error-message">{formErrors.officeAddressNumber}</span>}
+                      </div>
+                      
+                      <div className="form-group">
+                        <label>Office Street Name 1 <span className="required">*</span></label>
+                        <input 
+                          type="text" 
+                          name="officeAddressStreet1" 
+                          value={formData.officeAddressStreet1} 
+                          onChange={handleChange}
+                          className={formErrors.officeAddressStreet1 ? 'error' : ''}
+                          placeholder="e.g., Galle Road, Temple Road"
+                          required={!formData.isOfficeAddressSame}
+                        />
+                        {formErrors.officeAddressStreet1 && <span className="error-message">{formErrors.officeAddressStreet1}</span>}
+                      </div>
+
+                      <div className="form-group">
+                        <label>Office Street Name 2 (Optional)</label>
+                        <input 
+                          type="text" 
+                          name="officeAddressStreet2" 
+                          value={formData.officeAddressStreet2} 
+                          onChange={handleChange}
+                          placeholder="e.g., Lane 3, Near School"
+                        />
+                        <small className="help-text">Additional street info</small>
+                      </div>
+                    </div>
+
+                    {/* Three column row: Office District (left), City (right), Country */}
+                    <div className="form-row form-row-three-address">
+                      <div className="form-group">
+                        <label>Office District <span className="required">*</span></label>
+                        <select 
+                          name="officeAddressDistrict" 
+                          value={formData.officeAddressDistrict} 
+                          onChange={handleChange}
+                          className={formErrors.officeAddressDistrict ? 'error' : ''}
+                          required={!formData.isOfficeAddressSame}
+                        >
+                          <option value="">Select District</option>
+                          {districts.map(district => (
+                            <option key={district.districtId} value={district.districtName}>
+                              {district.districtName}
+                            </option>
+                          ))}
+                        </select>
+                        {formErrors.officeAddressDistrict && <span className="error-message">{formErrors.officeAddressDistrict}</span>}
+                      </div>
+                      
+                      <div className="form-group">
+                        <label>Office City/Town <span className="required">*</span></label>
+                        <select 
+                          name="officeAddressCity" 
+                          value={formData.officeAddressCity} 
+                          onChange={handleChange}
+                          className={formErrors.officeAddressCity ? 'error' : ''}
+                          disabled={!formData.officeAddressDistrict}
+                          required={!formData.isOfficeAddressSame}
+                        >
+                          <option value="">Select City</option>
+                          {filteredOfficeCities.map(city => (
+                            <option key={city.cityId} value={city.cityName}>
+                              {city.cityName}
+                            </option>
+                          ))}
+                        </select>
+                        {formErrors.officeAddressCity && <span className="error-message">{formErrors.officeAddressCity}</span>}
+                        {!formData.officeAddressDistrict && <small className="help-text">Select district first</small>}
+                      </div>
+
+                      <div className="form-group">
+                        <label>Office Country <span className="required">*</span></label>
+                        <input 
+                          type="text" 
+                          name="officeAddressCountry" 
+                          value={formData.officeAddressCountry} 
+                          onChange={handleChange}
+                          className={formErrors.officeAddressCountry ? 'error' : ''}
+                          placeholder="Sri Lanka"
+                          required={!formData.isOfficeAddressSame}
+                        />
+                        {formErrors.officeAddressCountry && <span className="error-message">{formErrors.officeAddressCountry}</span>}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Categories */}
@@ -818,10 +1185,10 @@ function Customers() {
               )}
               
               <div className="form-actions">
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary">
                   {editingCustomer ? 'Update Customer' : 'Register Customer'}
                 </button>
-                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="btn btn-secondary">Cancel</button>
               </div>
             </form>
           </div>

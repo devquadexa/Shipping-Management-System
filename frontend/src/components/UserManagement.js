@@ -12,7 +12,7 @@ function UserManagement() {
     username: '',
     password: '',
     fullName: '',
-    role: 'User',
+    role: 'Waff Clerk',
     email: ''
   });
   const [message, setMessage] = useState('');
@@ -38,7 +38,7 @@ function UserManagement() {
     try {
       await authService.createUser(formData);
       setMessage('User created successfully!');
-      setFormData({ username: '', password: '', fullName: '', role: 'User', email: '' });
+      setFormData({ username: '', password: '', fullName: '', role: 'Waff Clerk', email: '' });
       setShowPassword(false);
       setShowModal(false);
       fetchUsers();
@@ -225,7 +225,8 @@ function UserManagement() {
                   <div className="form-group">
                     <label>Role *</label>
                     <select name="role" value={formData.role} onChange={handleChange} required>
-                      <option value="User">User</option>
+                      <option value="Waff Clerk">Waff Clerk</option>
+                      <option value="Office Executive">Office Executive</option>
                       <option value="Manager">Manager</option>
                       <option value="Admin">Admin</option>
                       <option value="Super Admin">Super Admin</option>
@@ -235,8 +236,8 @@ function UserManagement() {
               </div>
               
               <div className="form-actions">
-                <button type="submit" className="btn btn-primary">Create User</button>
                 <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">Create User</button>
               </div>
             </form>
           </div>

@@ -26,6 +26,7 @@ class AuthenticateUser {
       { 
         userId: user.userId, 
         username: user.username, 
+        fullName: user.fullName,
         role: user.role 
       },
       this.jwtSecret,
