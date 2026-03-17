@@ -65,14 +65,16 @@ function Navbar() {
           <ul className="desktop-menu">
             <li><Link to="/" className={isActive('/')}>Dashboard</Link></li>
             <li><Link to="/customers" className={isActive('/customers')}>Customers</Link></li>
-            {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+            {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') && (
               <li><Link to="/transporters" className={isActive('/transporters')}>Transporters</Link></li>
             )}
             <li><Link to="/jobs" className={isActive('/jobs')}>Jobs</Link></li>
             {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
               <li><Link to="/billing" className={isActive('/billing')}>Invoicing</Link></li>
             )}
-            <li><Link to="/petty-cash" className={isActive('/petty-cash')}>Petty Cash</Link></li>
+            {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Waff Clerk') && (
+              <li><Link to="/petty-cash" className={isActive('/petty-cash')}>Petty Cash</Link></li>
+            )}
             {user?.role === 'Super Admin' && (
               <li><Link to="/accounting" className={isActive('/accounting')}>Accounting</Link></li>
             )}
@@ -176,7 +178,7 @@ function Navbar() {
               </svg>
             </span> Customers
           </Link></li>
-          {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+          {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') && (
             <li><Link to="/transporters" className={isActive('/transporters')} onClick={closeMobileMenu}>
               <span className="menu-icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -208,14 +210,16 @@ function Navbar() {
               </span> Invoicing
             </Link></li>
           )}
-          <li><Link to="/petty-cash" className={isActive('/petty-cash')} onClick={closeMobileMenu}>
-            <span className="menu-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="1" x2="12" y2="23"></line>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-              </svg>
-            </span> Petty Cash
-          </Link></li>
+          {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Waff Clerk') && (
+            <li><Link to="/petty-cash" className={isActive('/petty-cash')} onClick={closeMobileMenu}>
+              <span className="menu-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="1" x2="12" y2="23"></line>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+              </span> Petty Cash
+            </Link></li>
+          )}
           {user?.role === 'Super Admin' && (
             <li><Link to="/accounting" className={isActive('/accounting')} onClick={closeMobileMenu}>
               <span className="menu-icon">
