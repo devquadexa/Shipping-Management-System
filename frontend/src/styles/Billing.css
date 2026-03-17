@@ -1349,3 +1349,119 @@ input[type="number"] {
   background-color: #f0fdf4;
   border-left: 3px solid #059669;
 }
+/* Advance Payment Styles */
+.advance-received {
+  color: #059669 !important;
+  font-weight: 600;
+}
+
+.no-advance {
+  color: #6b7280;
+}
+
+.advance-indicator {
+  font-size: 0.8rem;
+  color: #059669;
+  font-weight: 500;
+}
+
+/* Advance Payment Summary Rows */
+.advance-summary-row {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%) !important;
+  border-top: 2px solid #101036 !important;
+  border-bottom: 1px solid #d1d5db !important;
+}
+
+.advance-summary-label {
+  color: #101036 !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gross-total-row {
+  background: rgba(16, 16, 54, 0.05) !important;
+}
+
+.gross-total-label {
+  color: #374151;
+  font-weight: 600;
+  padding-left: 1rem !important;
+}
+
+.gross-total-amount {
+  color: #101036;
+  font-weight: 700;
+}
+
+.advance-payment-row {
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.advance-payment-label {
+  color: #dc2626;
+  font-weight: 600;
+  padding-left: 1rem !important;
+}
+
+.advance-deduction {
+  color: #dc2626 !important;
+  font-weight: 700;
+}
+
+.net-total-row {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+  color: white !important;
+  border-top: 2px solid #059669 !important;
+  border-bottom: 2px solid #059669 !important;
+}
+
+.net-total-label {
+  color: white !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.final-amount {
+  color: white !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem;
+}
+
+/* Enhanced table styling for advance payment */
+.pay-items-review-table .table-row:hover {
+  background: rgba(16, 16, 54, 0.02);
+}
+
+.advance-summary-row:hover,
+.gross-total-row:hover,
+.advance-payment-row:hover,
+.net-total-row:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Professional spacing for advance payment sections */
+.advance-summary-row .table-cell,
+.gross-total-row .table-cell,
+.advance-payment-row .table-cell,
+.net-total-row .table-cell {
+  padding: 0.75rem 1rem;
+}
+
+/* Responsive design for advance payment */
+@media (max-width: 768px) {
+  .advance-summary-label,
+  .gross-total-label,
+  .advance-payment-label,
+  .net-total-label {
+    font-size: 0.9rem;
+  }
+  
+  .gross-total-amount,
+  .advance-deduction,
+  .final-amount {
+    font-size: 1rem;
+  }
+}

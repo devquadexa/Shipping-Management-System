@@ -17,6 +17,7 @@ const MSSQLPayItemTemplateRepository = require('../repositories/MSSQLPayItemTemp
 const MSSQLPettyCashAssignmentRepository = require('../repositories/MSSQLPettyCashAssignmentRepository');
 const MSSQLOfficePayItemRepository = require('../repositories/MSSQLOfficePayItemRepository');
 const MSSQLTransporterRepository = require('../repositories/MSSQLTransporterRepository');
+const MSSQLCashBalanceSettlementRepository = require('../repositories/MSSQLCashBalanceSettlementRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -79,8 +80,18 @@ const GetOfficePayItemsByJob = require('../../application/use-cases/officepayite
 const UpdateOfficePayItem = require('../../application/use-cases/officepayitem/UpdateOfficePayItem');
 const DeleteOfficePayItem = require('../../application/use-cases/officepayitem/DeleteOfficePayItem');
 
+// Cash Balance Settlement Use Cases
+const CreateCashBalanceSettlement = require('../../application/use-cases/cashbalancesettlement/CreateCashBalanceSettlement');
+const GetCashBalanceSettlements = require('../../application/use-cases/cashbalancesettlement/GetCashBalanceSettlements');
+const ApproveCashBalanceSettlement = require('../../application/use-cases/cashbalancesettlement/ApproveCashBalanceSettlement');
+const CompleteCashBalanceSettlement = require('../../application/use-cases/cashbalancesettlement/CompleteCashBalanceSettlement');
+const RejectCashBalanceSettlement = require('../../application/use-cases/cashbalancesettlement/RejectCashBalanceSettlement');
+
 // Auth Use Cases
 const AuthenticateUser = require('../../application/use-cases/auth/AuthenticateUser');
+
+// Controllers
+const CashBalanceSettlementController = require('../../presentation/controllers/CashBalanceSettlementController');
 
 class Container {
   constructor() {
@@ -108,6 +119,7 @@ class Container {
     this.dependencies.pettyCashAssignmentRepository = new MSSQLPettyCashAssignmentRepository(getConnection, sql);
     this.dependencies.officePayItemRepository = new MSSQLOfficePayItemRepository(getConnection, sql);
     this.dependencies.transporterRepository = new MSSQLTransporterRepository(getConnection, sql);
+    this.dependencies.cashBalanceSettlementRepository = new MSSQLCashBalanceSettlementRepository(getConnection, sql);
   }
 
   setupUseCases() {
@@ -122,6 +134,7 @@ class Container {
       pettyCashAssignmentRepository,
       officePayItemRepository,
       transporterRepository,
+      cashBalanceSettlementRepository,
     } = this.dependencies;
     
     // Customer use cases
@@ -193,6 +206,17 @@ class Container {
     // Auth use cases
     const jwtSecret = process.env.JWT_SECRET || 'default_secret';
     this.dependencies.authenticateUser = new AuthenticateUser(userRepository, jwtSecret);
+    
+    // Cash Balance Settlement use cases
+    this.dependencies.CreateCashBalanceSettlement = new CreateCashBalanceSettlement(cashBalanceSettlementRepository);
+    this.dependencies.GetCashBalanceSettlements = new GetCashBalanceSettlements(cashBalanceSettlementRepository);
+    this.dependencies.ApproveCashBalanceSettlement = new ApproveCashBalanceSettlement(cashBalanceSettlementRepository);
+    this.dependencies.CompleteCashBalanceSettlement = new CompleteCashBalanceSettlement(cashBalanceSettlementRepository);
+    this.dependencies.RejectCashBalanceSettlement = new RejectCashBalanceSettlement(cashBalanceSettlementRepository);
+    this.dependencies.CashBalanceSettlementRepository = cashBalanceSettlementRepository;
+    
+    // Controllers
+    this.dependencies.CashBalanceSettlementController = new CashBalanceSettlementController(this);
   }
 
   get(name) {

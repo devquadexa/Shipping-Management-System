@@ -383,7 +383,7 @@ function Billing() {
   const calculateTotals = () => {
     if (!selectedJob || !selectedJob.payItems) {
       console.log('calculateTotals - No job or pay items');
-      return { actualCost: 0, billingAmount: 0, profit: 0 };
+      return { actualCost: 0, billingAmount: 0, profit: 0, grossTotal: 0, advancePayment: 0, netTotal: 0 };
     }
     
     console.log('calculateTotals - payItems:', selectedJob.payItems);
@@ -401,15 +401,21 @@ function Billing() {
     }, 0);
     
     const profit = billingAmount - actualCost;
+    const grossTotal = billingAmount; // Total before advance deduction
+    const advancePayment = parseFloat(selectedJob.advancePayment) || 0;
+    const netTotal = grossTotal - advancePayment; // Final amount after advance deduction
     
-    console.log('calculateTotals - result:', { actualCost, billingAmount, profit });
+    console.log('calculateTotals - result:', { actualCost, billingAmount, profit, grossTotal, advancePayment, netTotal });
     console.log('calculateTotals - formatted result:', { 
       actualCost: formatAmount(actualCost), 
       billingAmount: formatAmount(billingAmount), 
-      profit: formatAmount(profit) 
+      profit: formatAmount(profit),
+      grossTotal: formatAmount(grossTotal),
+      advancePayment: formatAmount(advancePayment),
+      netTotal: formatAmount(netTotal)
     });
     
-    return { actualCost, billingAmount, profit };
+    return { actualCost, billingAmount, profit, grossTotal, advancePayment, netTotal };
   };
 
   const generateBill = async () => {
@@ -487,7 +493,10 @@ function Billing() {
       const billData = {
         jobId: selectedJob.jobId,
         actualCost: totals.actualCost,
-        billingAmount: totals.billingAmount
+        billingAmount: totals.billingAmount,
+        advancePayment: totals.advancePayment,
+        grossTotal: totals.grossTotal,
+        netTotal: totals.netTotal
       };
       console.log('generateBill - sending billData:', billData);
       
@@ -525,25 +534,128 @@ function Billing() {
     }
   };
 
-  const printBill = (bill) => {
-    const job = jobs.find(j => j.jobId === bill.jobId);
-    const customer = getCustomerDetails(bill.customerId);
-    
-    if (!job || !customer) {
-      setMessage('Unable to print invoice - missing data');
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
+  const printBill = async (bill) => {
+    try {
+      console.log('printBill - bill object:', bill);
+      console.log('printBill - bill.jobId:', bill.jobId);
+      
+      // Fetch complete job details including pay items
+      const response = await fetch(`http://localhost:5000/api/jobs/${bill.jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch job details');
+      }
+      
+      const jobWithPayItems = await response.json();
+      const customer = getCustomerDetails(bill.customerId);
+      
+      if (!jobWithPayItems || !customer) {
+        setMessage('Unable to print invoice - missing data');
+        setTimeout(() => setMessage(''), 3000);
+        return;
+      }
 
-    const printWindow = window.open('', '', 'height=900,width=700');
-    printWindow.document.write(generateBillHTML(bill, job, customer));
-    printWindow.document.close();
-    printWindow.print();
+      console.log('printBill - complete job data:', jobWithPayItems);
+      console.log('printBill - job.payItems:', jobWithPayItems.payItems);
+      console.log('printBill - job.payItems type:', typeof jobWithPayItems.payItems);
+      console.log('printBill - job.payItems length:', jobWithPayItems.payItems?.length);
+      console.log('printBill - job.payItems is array:', Array.isArray(jobWithPayItems.payItems));
+      console.log('printBill - job.advancePayment:', jobWithPayItems.advancePayment);
+      
+      // Additional debugging for pay items
+      if (jobWithPayItems.payItems) {
+        console.log('printBill - pay items detailed analysis:');
+        if (typeof jobWithPayItems.payItems === 'string') {
+          console.log('   Pay items is a string, attempting to parse...');
+          try {
+            const parsed = JSON.parse(jobWithPayItems.payItems);
+            console.log('   Parsed pay items:', parsed);
+            jobWithPayItems.payItems = parsed; // Replace with parsed version
+          } catch (e) {
+            console.log('   Failed to parse pay items string:', e.message);
+          }
+        } else if (Array.isArray(jobWithPayItems.payItems)) {
+          console.log('   Pay items is an array with', jobWithPayItems.payItems.length, 'items:');
+          jobWithPayItems.payItems.forEach((item, index) => {
+            console.log(`   Item ${index + 1}:`, item);
+          });
+        } else {
+          console.log('   Pay items is neither string nor array:', jobWithPayItems.payItems);
+        }
+      } else {
+        console.log('printBill - No pay items found in job data');
+      }
+      
+      console.log('printBill - bill data for comparison:', {
+        billId: bill.billId,
+        jobId: bill.jobId,
+        billingAmount: bill.billingAmount,
+        advancePayment: bill.advancePayment,
+        grossTotal: bill.grossTotal,
+        netTotal: bill.netTotal
+      });
+
+      const printWindow = window.open('', '', 'height=900,width=700');
+      printWindow.document.write(generateBillHTML(bill, jobWithPayItems, customer));
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      console.error('Error printing bill:', error);
+      setMessage('Error loading invoice data for printing');
+      setTimeout(() => setMessage(''), 3000);
+    }
   };
 
   const generateBillHTML = (bill, job, customer) => {
     const billDate = new Date(bill.billDate || bill.createdDate).toLocaleDateString('en-GB');
     const invoiceNumber = bill.invoiceNumber || bill.billId;
+    
+    console.log('generateBillHTML - bill:', bill);
+    console.log('generateBillHTML - job:', job);
+    console.log('generateBillHTML - job.payItems:', job.payItems);
+    console.log('generateBillHTML - job.advancePayment:', job.advancePayment);
+    console.log('generateBillHTML - bill.advancePayment:', bill.advancePayment);
+    console.log('generateBillHTML - customer:', customer);
+    
+    // Use job's advance payment if bill doesn't have it
+    const advancePayment = parseFloat(bill.advancePayment || job.advancePayment || 0);
+    const grossTotal = parseFloat(bill.grossTotal || bill.billingAmount || 0);
+    const netTotal = grossTotal - advancePayment; // Always calculate, don't use bill.netTotal
+    
+    console.log('generateBillHTML - calculated values:', {
+      advancePayment,
+      grossTotal,
+      netTotal,
+      hasAdvance: advancePayment > 0,
+      calculation: `${grossTotal} - ${advancePayment} = ${netTotal}`
+    });
+    
+    // Handle pay items - they might be a string that needs parsing
+    let payItemsArray = [];
+    if (job.payItems) {
+      if (typeof job.payItems === 'string') {
+        try {
+          payItemsArray = JSON.parse(job.payItems);
+          console.log('generateBillHTML - parsed pay items from string:', payItemsArray);
+        } catch (e) {
+          console.log('generateBillHTML - failed to parse pay items string:', e.message);
+          payItemsArray = [];
+        }
+      } else if (Array.isArray(job.payItems)) {
+        payItemsArray = job.payItems;
+        console.log('generateBillHTML - using pay items array:', payItemsArray);
+      } else {
+        console.log('generateBillHTML - pay items is neither string nor array:', job.payItems);
+        payItemsArray = [];
+      }
+    } else {
+      console.log('generateBillHTML - no pay items found in job');
+      payItemsArray = [];
+    }
     
     return `
       <!DOCTYPE html>
@@ -728,22 +840,42 @@ function Billing() {
             </tr>
           </thead>
           <tbody>
-            ${job.payItems && job.payItems.length > 0 ? 
-              job.payItems.map(item => `
-                <tr>
-                  <td>${item.description}</td>
-                  <td class="amount">${formatAmount(item.billingAmount || item.amount)}</td>
-                </tr>
-              `).join('') : 
-              '<tr><td colspan="2">No itemized charges</td></tr>'
+            ${payItemsArray && Array.isArray(payItemsArray) && payItemsArray.length > 0 ? 
+              payItemsArray.map(item => {
+                console.log('Invoice item:', item);
+                const description = item.description || item.name || 'Service Charge';
+                const amount = item.billingAmount || item.amount || 0;
+                return `
+                  <tr>
+                    <td>${description}</td>
+                    <td class="amount">${formatAmount(amount)}</td>
+                  </tr>
+                `;
+              }).join('') : 
+              `<tr>
+                <td>Service Charges</td>
+                <td class="amount">${formatAmount(grossTotal)}</td>
+              </tr>`
             }
           </tbody>
         </table>
 
         <div class="total-section">
-          <div class="grand-total">
-            <span>TOTAL DUE AMOUNT: LKR ${formatAmount(bill.billingAmount)}</span>
-          </div>
+          ${advancePayment > 0 ? `
+            <div class="total-row">
+              <span>GROSS TOTAL: LKR ${formatAmount(grossTotal)}</span>
+            </div>
+            <div class="total-row">
+              <span>LESS: ADVANCE PAYMENT: LKR ${formatAmount(advancePayment)}</span>
+            </div>
+            <div class="grand-total">
+              <span>NET TOTAL DUE: LKR ${formatAmount(netTotal)}</span>
+            </div>
+          ` : `
+            <div class="grand-total">
+              <span>TOTAL DUE AMOUNT: LKR ${formatAmount(bill.billingAmount)}</span>
+            </div>
+          `}
         </div>
 
         <div class="footer">
@@ -862,6 +994,15 @@ function Billing() {
                       <span className={`status-badge status-${(selectedJob.status || 'Open').toLowerCase()}`}>
                         {selectedJob.status}
                       </span>
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Advance Payment:</span>
+                    <span className={`info-value ${selectedJob.advancePayment > 0 ? 'advance-received' : 'no-advance'}`}>
+                      LKR {formatAmount(selectedJob.advancePayment || 0)}
+                      {selectedJob.advancePayment > 0 && (
+                        <span className="advance-indicator"> ✓ Received</span>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -1036,6 +1177,35 @@ function Billing() {
                             <strong className={calculateTotals().profit >= 0 ? 'profit-positive' : 'profit-negative'}>
                               {formatAmount(calculateTotals().profit)}
                             </strong>
+                          </div>
+                        </div>
+                        {/* Advance Payment Summary */}
+                        <div className="table-row advance-summary-row">
+                          <div className="table-cell description-cell advance-summary-label"><strong>Invoice Summary</strong></div>
+                          <div className="table-cell amount-cell"></div>
+                          <div className="table-cell amount-cell"></div>
+                        </div>
+                        <div className="table-row gross-total-row">
+                          <div className="table-cell description-cell gross-total-label">Gross Total</div>
+                          <div className="table-cell amount-cell"></div>
+                          <div className="table-cell amount-cell gross-total-amount">
+                            <strong>{formatAmount(calculateTotals().grossTotal)}</strong>
+                          </div>
+                        </div>
+                        {selectedJob.advancePayment > 0 && (
+                          <div className="table-row advance-payment-row">
+                            <div className="table-cell description-cell advance-payment-label">Less: Advance Payment</div>
+                            <div className="table-cell amount-cell"></div>
+                            <div className="table-cell amount-cell advance-payment-amount">
+                              <strong className="advance-deduction">({formatAmount(calculateTotals().advancePayment)})</strong>
+                            </div>
+                          </div>
+                        )}
+                        <div className="table-row net-total-row">
+                          <div className="table-cell description-cell net-total-label"><strong>Net Total (Customer Payable)</strong></div>
+                          <div className="table-cell amount-cell"></div>
+                          <div className="table-cell amount-cell net-total-amount">
+                            <strong className="final-amount">{formatAmount(calculateTotals().netTotal)}</strong>
                           </div>
                         </div>
                       </div>

@@ -30,6 +30,14 @@ function PettyCash() {
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [settlementItems, setSettlementItems] = useState([]);
 
+  // Cash Balance Settlement Modal
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [settlementFormData, setSettlementFormData] = useState({
+    settlementType: '',
+    amount: '',
+    notes: ''
+  });
+
   useEffect(() => {
     fetchAssignments();
     fetchJobs();
@@ -496,6 +504,64 @@ function PettyCash() {
     }
   };
 
+  // Open settlement modal for balance return or overdue collection
+  const openSettlementModal = (assignment, settlementType) => {
+    setSelectedAssignment(assignment);
+    const amount = settlementType === 'BALANCE_RETURN' ? assignment.balanceAmount : assignment.overAmount;
+    setSettlementFormData({
+      settlementType,
+      amount: amount.toString(),
+      notes: `${settlementType === 'BALANCE_RETURN' ? 'Balance return' : 'Overdue collection'} for Assignment #${assignment.assignmentId} (${assignment.jobId})`
+    });
+    setShowSettlementModal(true);
+  };
+
+  // Handle settlement form submission
+  const handleSettlementSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!settlementFormData.settlementType || !settlementFormData.amount) {
+      setMessage('Please fill in all required fields');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/cash-balance-settlements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          settlementType: settlementFormData.settlementType,
+          amount: parseFloat(settlementFormData.amount),
+          notes: settlementFormData.notes,
+          relatedAssignments: [selectedAssignment.assignmentId]
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage('Settlement request created successfully');
+        setShowSettlementModal(false);
+        setSettlementFormData({ settlementType: '', amount: '', notes: '' });
+        setSelectedAssignment(null);
+        // Refresh assignments to update UI
+        fetchAssignments();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage(data.message || 'Failed to create settlement request');
+        setTimeout(() => setMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error creating settlement request:', error);
+      setMessage('Error creating settlement request');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
   const formatAmount = (amount) => {
     return parseFloat(amount || 0).toLocaleString('en-US', {
       minimumFractionDigits: 2,
@@ -645,6 +711,11 @@ function PettyCash() {
         </div>
       )}
 
+      {/* Management Settlement Section */}
+      {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
+        <ManagementSettlementSection user={user} />
+      )}
+
       <div className="card">
         <div className="card-header">
           <h2>Petty Cash Assignments ({assignments.length})</h2>
@@ -718,51 +789,78 @@ function PettyCash() {
                         {new Date(assignment.assignedDate).toLocaleDateString()}
                       </td>
                       <td data-label="Actions">
-                        {assignment.status === 'Assigned' && user?.role === 'Waff Clerk' && (
-                          <button
-                            className="btn-action btn-settle"
-                            onClick={() => openSettleModal(assignment)}
-                          >
-                            Settle
-                          </button>
-                        )}
-                        {assignment.status === 'Settled' && (
-                          <button
-                            className="btn-action btn-view"
-                            onClick={async () => {
-                              console.log('Loading settlement details for assignment:', assignment.assignmentId);
-                              setSelectedAssignment(assignment);
-                              
-                              // Load settlement items from API
-                              try {
-                                const response = await fetch(
-                                  `http://localhost:5000/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
-                                  {
-                                    headers: {
-                                      'Authorization': `Bearer ${localStorage.getItem('token')}`
-                                    }
-                                  }
-                                );
+                        <div className="action-buttons">
+                          {assignment.status === 'Assigned' && user?.role === 'Waff Clerk' && (
+                            <button
+                              className="btn-action btn-settle"
+                              onClick={() => openSettleModal(assignment)}
+                            >
+                              Settle
+                            </button>
+                          )}
+                          
+                          {/* Settlement buttons for Waff Clerks with balance/over amounts */}
+                          {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
+                            <>
+                              {assignment.balanceAmount > 0 && (
+                                <button
+                                  className="btn-action btn-return-balance"
+                                  onClick={() => openSettlementModal(assignment, 'BALANCE_RETURN')}
+                                  title="Return balance cash to management"
+                                >
+                                  Return Balance
+                                </button>
+                              )}
+                              {assignment.overAmount > 0 && (
+                                <button
+                                  className="btn-action btn-collect-overdue"
+                                  onClick={() => openSettlementModal(assignment, 'OVERDUE_COLLECTION')}
+                                  title="Collect overdue cash from management"
+                                >
+                                  Collect Overdue
+                                </button>
+                              )}
+                            </>
+                          )}
+                          
+                          {assignment.status === 'Settled' && (
+                            <button
+                              className="btn-action btn-view"
+                              onClick={async () => {
+                                console.log('Loading settlement details for assignment:', assignment.assignmentId);
+                                setSelectedAssignment(assignment);
                                 
-                                if (response.ok) {
-                                  const items = await response.json();
-                                  console.log('Loaded settlement items:', items);
-                                  setSettlementItems(items);
-                                } else {
-                                  console.error('Failed to load settlement items:', response.status);
+                                // Load settlement items from API
+                                try {
+                                  const response = await fetch(
+                                    `http://localhost:5000/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
+                                    {
+                                      headers: {
+                                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                      }
+                                    }
+                                  );
+                                  
+                                  if (response.ok) {
+                                    const items = await response.json();
+                                    console.log('Loaded settlement items:', items);
+                                    setSettlementItems(items);
+                                  } else {
+                                    console.error('Failed to load settlement items:', response.status);
+                                    setSettlementItems(assignment.settlementItems || []);
+                                  }
+                                } catch (error) {
+                                  console.error('Error loading settlement items:', error);
                                   setSettlementItems(assignment.settlementItems || []);
                                 }
-                              } catch (error) {
-                                console.error('Error loading settlement items:', error);
-                                setSettlementItems(assignment.settlementItems || []);
-                              }
-                              
-                              setShowSettleModal(true);
-                            }}
-                          >
-                            View Details
-                          </button>
-                        )}
+                                
+                                setShowSettleModal(true);
+                              }}
+                            >
+                              View Details
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1058,8 +1156,379 @@ function PettyCash() {
           </div>
         </div>
       )}
+
+      {/* Cash Balance Settlement Modal */}
+      {showSettlementModal && selectedAssignment && (
+        <div className="modal-overlay">
+          <div className="modal-content settlement-modal">
+            <div className="modal-header">
+              <h3>
+                {settlementFormData.settlementType === 'BALANCE_RETURN' ? '💰 Return Balance Cash' : '📋 Collect Overdue Cash'}
+              </h3>
+              <button
+                className="modal-close"
+                onClick={() => {
+                  setShowSettlementModal(false);
+                  setSelectedAssignment(null);
+                  setSettlementFormData({ settlementType: '', amount: '', notes: '' });
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="assignment-info">
+                <div className="info-row">
+                  <span className="info-label">Assignment:</span>
+                  <span className="info-value">#{selectedAssignment.assignmentId}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Job ID:</span>
+                  <span className="info-value">{selectedAssignment.jobId}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">
+                    {settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Balance Amount:' : 'Overdue Amount:'}
+                  </span>
+                  <span className={`info-value ${settlementFormData.settlementType === 'BALANCE_RETURN' ? 'balance-positive' : 'balance-negative'}`}>
+                    LKR {formatAmount(settlementFormData.amount)}
+                  </span>
+                </div>
+              </div>
+
+              <form onSubmit={handleSettlementSubmit} className="settlement-form">
+                <div className="form-group">
+                  <label>Settlement Type</label>
+                  <input
+                    type="text"
+                    value={settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Return Balance to Management' : 'Collect Overdue from Management'}
+                    disabled
+                    className="form-control disabled"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Amount (LKR)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={settlementFormData.amount}
+                    onChange={(e) => setSettlementFormData({...settlementFormData, amount: e.target.value})}
+                    className="form-control"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Notes</label>
+                  <textarea
+                    value={settlementFormData.notes}
+                    onChange={(e) => setSettlementFormData({...settlementFormData, notes: e.target.value})}
+                    className="form-control"
+                    rows="3"
+                    placeholder="Add any additional notes or details"
+                  />
+                </div>
+
+                <div className="modal-actions">
+                  <button type="submit" className="btn btn-primary">
+                    {settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Request Balance Return' : 'Request Overdue Collection'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSettlementModal(false);
+                      setSelectedAssignment(null);
+                      setSettlementFormData({ settlementType: '', amount: '', notes: '' });
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// Management Settlement Section Component
+const ManagementSettlementSection = ({ user }) => {
+  const [settlements, setSettlements] = useState([]);
+  const [activeTab, setActiveTab] = useState('pending');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [actionLoading, setActionLoading] = useState({});
+
+  useEffect(() => {
+    fetchSettlements();
+  }, [activeTab]);
+
+  const fetchSettlements = async () => {
+    setLoading(true);
+    try {
+      let endpoint = 'http://localhost:5000/api/cash-balance-settlements';
+      if (activeTab === 'pending') {
+        endpoint += '/pending';
+      } else if (activeTab === 'approved') {
+        endpoint += '/approved';
+      }
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSettlements(data.data || []);
+      } else {
+        setMessage('Failed to fetch settlements');
+        setTimeout(() => setMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error fetching settlements:', error);
+      setMessage('Error fetching settlements');
+      setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (settlementId, managerNotes = '') => {
+    setActionLoading(prev => ({ ...prev, [settlementId]: 'approving' }));
+    try {
+      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/approve`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ managerNotes })
+      });
+
+      if (response.ok) {
+        setMessage('Settlement approved successfully');
+        fetchSettlements();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const data = await response.json();
+        setMessage(data.message || 'Failed to approve settlement');
+        setTimeout(() => setMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error approving settlement:', error);
+      setMessage('Error approving settlement');
+      setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [settlementId]: null }));
+    }
+  };
+
+  const handleComplete = async (settlementId, managerNotes = '') => {
+    setActionLoading(prev => ({ ...prev, [settlementId]: 'completing' }));
+    try {
+      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/complete`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ managerNotes })
+      });
+
+      if (response.ok) {
+        setMessage('Settlement completed successfully');
+        fetchSettlements();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const data = await response.json();
+        setMessage(data.message || 'Failed to complete settlement');
+        setTimeout(() => setMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error completing settlement:', error);
+      setMessage('Error completing settlement');
+      setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [settlementId]: null }));
+    }
+  };
+
+  const handleReject = async (settlementId, managerNotes) => {
+    if (!managerNotes.trim()) {
+      setMessage('Please provide a reason for rejection');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    setActionLoading(prev => ({ ...prev, [settlementId]: 'rejecting' }));
+    try {
+      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/reject`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ managerNotes })
+      });
+
+      if (response.ok) {
+        setMessage('Settlement rejected successfully');
+        fetchSettlements();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const data = await response.json();
+        setMessage(data.message || 'Failed to reject settlement');
+        setTimeout(() => setMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error rejecting settlement:', error);
+      setMessage('Error rejecting settlement');
+      setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [settlementId]: null }));
+    }
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'PENDING': return 'status-pending';
+      case 'APPROVED': return 'status-approved';
+      case 'COMPLETED': return 'status-completed';
+      case 'REJECTED': return 'status-rejected';
+      default: return 'status-assigned';
+    }
+  };
+
+  return (
+    <div className="card management-settlements">
+      <div className="card-header">
+        <h2>🏢 Cash Balance Settlement Management</h2>
+      </div>
+
+      {message && (
+        <div className={`alert ${message.includes('Error') || message.includes('Failed') ? 'alert-error' : 'alert-success'}`}>
+          {message}
+        </div>
+      )}
+
+      <div className="settlement-tabs">
+        <button 
+          className={`tab-button ${activeTab === 'pending' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pending')}
+        >
+          ⏳ Pending ({settlements.length})
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'approved' ? 'active' : ''}`}
+          onClick={() => setActiveTab('approved')}
+        >
+          ✅ Approved ({settlements.length})
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'all' ? 'active' : ''}`}
+          onClick={() => setActiveTab('all')}
+        >
+          📋 All Settlements
+        </button>
+      </div>
+
+      <div className="settlements-content">
+        {loading && <div className="loading">Loading settlements...</div>}
+        
+        {!loading && settlements.length === 0 && (
+          <div className="empty-state">
+            <p>No {activeTab} settlements found.</p>
+          </div>
+        )}
+
+        {!loading && settlements.length > 0 && (
+          <div className="settlements-table-wrapper">
+            <table className="settlements-table">
+              <thead>
+                <tr>
+                  <th>Settlement ID</th>
+                  <th>Waff Clerk</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Request Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {settlements.map(settlement => (
+                  <tr key={settlement.settlementId}>
+                    <td data-label="Settlement ID">
+                      <strong>{settlement.settlementId}</strong>
+                    </td>
+                    <td data-label="Waff Clerk">{settlement.userName}</td>
+                    <td data-label="Type">
+                      <span className={`type-badge ${settlement.settlementType === 'BALANCE_RETURN' ? 'type-return' : 'type-collect'}`}>
+                        {settlement.settlementType === 'BALANCE_RETURN' ? 'Balance Return' : 'Overdue Collection'}
+                      </span>
+                    </td>
+                    <td data-label="Amount">
+                      <strong>LKR {settlement.amount.toLocaleString()}</strong>
+                    </td>
+                    <td data-label="Status">
+                      <span className={`status-badge ${getStatusBadgeClass(settlement.status)}`}>
+                        {settlement.statusDisplay}
+                      </span>
+                    </td>
+                    <td data-label="Request Date">
+                      {new Date(settlement.requestDate).toLocaleDateString()}
+                    </td>
+                    <td data-label="Actions">
+                      <div className="settlement-actions">
+                        {settlement.status === 'PENDING' && (
+                          <>
+                            <button
+                              className="btn-action btn-approve"
+                              onClick={() => handleApprove(settlement.settlementId)}
+                              disabled={actionLoading[settlement.settlementId]}
+                            >
+                              {actionLoading[settlement.settlementId] === 'approving' ? 'Approving...' : '✅ Approve'}
+                            </button>
+                            <button
+                              className="btn-action btn-reject"
+                              onClick={() => {
+                                const notes = prompt('Please provide a reason for rejection:');
+                                if (notes) handleReject(settlement.settlementId, notes);
+                              }}
+                              disabled={actionLoading[settlement.settlementId]}
+                            >
+                              {actionLoading[settlement.settlementId] === 'rejecting' ? 'Rejecting...' : '❌ Reject'}
+                            </button>
+                          </>
+                        )}
+                        {settlement.status === 'APPROVED' && (
+                          <button
+                            className="btn-action btn-complete"
+                            onClick={() => handleComplete(settlement.settlementId)}
+                            disabled={actionLoading[settlement.settlementId]}
+                          >
+                            {actionLoading[settlement.settlementId] === 'completing' ? 'Completing...' : '🏁 Complete'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default PettyCash;

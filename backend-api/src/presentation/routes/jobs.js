@@ -61,4 +61,9 @@ router.put('/:id/pay-items', auth, checkRole('Admin', 'Super Admin', 'Manager', 
   jobController.replacePayItems(req, res)
 );
 
+// New route for advance payment
+router.put('/:jobId/advance-payment', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
+  jobController.updateAdvancePayment(req, res)
+);
+
 module.exports = router;
