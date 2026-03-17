@@ -29,13 +29,10 @@ class ApproveCashBalanceSettlement {
       updatedDate: settlement.updatedDate
     });
 
-    // Update related assignment statuses based on settlement type
-    // BALANCE_RETURN → "Balance Returned" (clerk returned excess cash to management)
-    // OVERDUE_COLLECTION → "Overdue Collected" (management paid the overdue to clerk)
+    // Update related assignment statuses after management approval
+    // Clerk-facing status should clearly show both settlement and decision state.
     if (settlement.relatedAssignments && settlement.relatedAssignments.length > 0) {
-      const finalStatus = settlement.settlementType === 'BALANCE_RETURN'
-        ? 'Balance Returned'
-        : 'Overdue Collected';
+      const finalStatus = 'Settled/Approved';
 
       for (const assignmentId of settlement.relatedAssignments) {
         try {

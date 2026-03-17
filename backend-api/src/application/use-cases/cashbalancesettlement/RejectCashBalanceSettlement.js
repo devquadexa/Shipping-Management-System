@@ -28,11 +28,11 @@ class RejectCashBalanceSettlement {
       updatedDate: settlement.updatedDate
     });
 
-    // Revert related assignment statuses back to "Settled" so Waff Clerk can try again
+    // Mark related assignment statuses as rejected to make manager decision explicit to clerks.
     if (settlement.relatedAssignments && settlement.relatedAssignments.length > 0) {
       for (const assignmentId of settlement.relatedAssignments) {
         try {
-          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, 'Settled');
+          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, 'Settled/Rejected');
         } catch (error) {
           console.error(`Failed to update assignment ${assignmentId} status:`, error);
           // Don't throw - settlement was rejected successfully, just log the error
