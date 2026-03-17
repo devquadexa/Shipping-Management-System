@@ -24,6 +24,8 @@ class Job {
     pettyCashStatus = null,
     advancePayment = 0.00, // New: Advance payment amount
     advancePaymentDate = null, // New: Date when advance was received
+    advancePaymentType = null, // New: Payment type (cash/check/bank transfer)
+    advancePaymentCheckNo = null, // New: Check number when payment type is check
     advancePaymentNotes = null, // New: Notes about advance payment
     advancePaymentRecordedBy = null, // New: User who recorded the advance
     metadata = {}
@@ -48,6 +50,8 @@ class Job {
     this.pettyCashStatus = pettyCashStatus;
     this.advancePayment = parseFloat(advancePayment) || 0.00;
     this.advancePaymentDate = advancePaymentDate;
+    this.advancePaymentType = advancePaymentType;
+    this.advancePaymentCheckNo = advancePaymentCheckNo;
     this.advancePaymentNotes = advancePaymentNotes;
     this.advancePaymentRecordedBy = advancePaymentRecordedBy;
     this.metadata = metadata;
@@ -129,29 +133,36 @@ class Job {
   }
 
   // Advance Payment Methods
-  recordAdvancePayment(amount, notes, recordedByUserId) {
+  recordAdvancePayment(amount, paymentDate, paymentType, checkNo, notes, recordedByUserId) {
     if (amount <= 0) {
       throw new Error('Advance payment amount must be greater than 0');
     }
     
     this.advancePayment = parseFloat(amount);
-    this.advancePaymentDate = new Date();
+    this.advancePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
+    this.advancePaymentType = paymentType || null;
+    this.advancePaymentCheckNo = paymentType === 'check' ? (checkNo || null) : null;
     this.advancePaymentNotes = notes || null;
     this.advancePaymentRecordedBy = recordedByUserId;
   }
 
-  updateAdvancePayment(amount, notes) {
+  updateAdvancePayment(amount, paymentDate, paymentType, checkNo, notes) {
     if (amount < 0) {
       throw new Error('Advance payment amount cannot be negative');
     }
     
     this.advancePayment = parseFloat(amount);
+    this.advancePaymentDate = amount > 0 ? (paymentDate ? new Date(paymentDate) : this.advancePaymentDate) : null;
+    this.advancePaymentType = amount > 0 ? (paymentType || null) : null;
+    this.advancePaymentCheckNo = amount > 0 && paymentType === 'check' ? (checkNo || null) : null;
     this.advancePaymentNotes = notes || null;
   }
 
   clearAdvancePayment() {
     this.advancePayment = 0.00;
     this.advancePaymentDate = null;
+    this.advancePaymentType = null;
+    this.advancePaymentCheckNo = null;
     this.advancePaymentNotes = null;
     this.advancePaymentRecordedBy = null;
   }
@@ -164,6 +175,8 @@ class Job {
     return {
       amount: this.advancePayment,
       date: this.advancePaymentDate,
+      paymentType: this.advancePaymentType,
+      checkNo: this.advancePaymentCheckNo,
       notes: this.advancePaymentNotes,
       recordedBy: this.advancePaymentRecordedBy,
       hasAdvance: this.hasAdvancePayment()
@@ -194,6 +207,8 @@ class Job {
       pettyCashStatus: this.pettyCashStatus,
       advancePayment: this.advancePayment,
       advancePaymentDate: this.advancePaymentDate,
+      advancePaymentType: this.advancePaymentType,
+      advancePaymentCheckNo: this.advancePaymentCheckNo,
       advancePaymentNotes: this.advancePaymentNotes,
       advancePaymentRecordedBy: this.advancePaymentRecordedBy,
       metadata: this.metadata

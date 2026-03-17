@@ -253,10 +253,10 @@ class JobController {
   async updateAdvancePayment(req, res) {
     try {
       const { jobId } = req.params;
-      const { advancePayment, notes } = req.body;
+      const { advancePayment, paymentMadeDate, paymentType, checkNo, notes } = req.body;
       const userId = req.user.userId;
 
-      console.log('Update advance payment request:', { jobId, advancePayment, notes, userId });
+      console.log('Update advance payment request:', { jobId, advancePayment, paymentMadeDate, paymentType, checkNo, notes, userId });
 
       // Validate advance payment amount
       const amount = parseFloat(advancePayment);
@@ -264,12 +264,27 @@ class JobController {
         return res.status(400).json({ message: 'Valid advance payment amount is required (must be 0 or greater)' });
       }
 
+      if (amount > 0) {
+        const validPaymentTypes = ['cash', 'check', 'bank transfer'];
+        if (!paymentType || !validPaymentTypes.includes(paymentType)) {
+          return res.status(400).json({ message: 'Payment type is required (cash, check, or bank transfer)' });
+        }
+
+        if (!paymentMadeDate) {
+          return res.status(400).json({ message: 'Payment made date is required' });
+        }
+
+        if (paymentType === 'check' && (!checkNo || !String(checkNo).trim())) {
+          return res.status(400).json({ message: 'Check number is required for check payments' });
+        }
+      }
+
       // Get the job repository from the container (imported at module level)
       const container = require('../../infrastructure/di/container');
       const jobRepository = container.get('jobRepository');
       
       // Update advance payment
-      await jobRepository.updateAdvancePayment(jobId, amount, notes, userId);
+      await jobRepository.updateAdvancePayment(jobId, amount, paymentMadeDate, paymentType, checkNo, notes, userId);
       
       // Get updated job
       const updatedJob = await this.getJobById.execute(jobId);

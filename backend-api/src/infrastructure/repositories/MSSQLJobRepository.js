@@ -67,6 +67,12 @@ class MSSQLJobRepository extends IJobRepository {
       
       IF COL_LENGTH('Jobs', 'advancePaymentDate') IS NULL
         ALTER TABLE Jobs ADD advancePaymentDate DATETIME NULL;
+
+      IF COL_LENGTH('Jobs', 'advancePaymentType') IS NULL AND COL_LENGTH('Jobs', 'AdvancePaymentType') IS NULL
+        ALTER TABLE Jobs ADD advancePaymentType NVARCHAR(50) NULL;
+
+      IF COL_LENGTH('Jobs', 'advancePaymentCheckNo') IS NULL AND COL_LENGTH('Jobs', 'AdvancePaymentCheckNo') IS NULL
+        ALTER TABLE Jobs ADD advancePaymentCheckNo NVARCHAR(100) NULL;
       
       IF COL_LENGTH('Jobs', 'advancePaymentNotes') IS NULL
         ALTER TABLE Jobs ADD advancePaymentNotes NVARCHAR(MAX) NULL;
@@ -206,17 +212,11 @@ class MSSQLJobRepository extends IJobRepository {
       .input('containerNumber', this.sql.VarChar, job.containerNumber)
       .input('status', this.sql.VarChar, job.status)
       .input('assignedTo', this.sql.VarChar, job.assignedTo)
-      .input('advancePayment', this.sql.Decimal(18,2), job.advancePayment || 0.00)
-      .input('advancePaymentDate', this.sql.DateTime, job.advancePaymentDate)
-      .input('advancePaymentNotes', this.sql.VarChar, job.advancePaymentNotes)
-      .input('advancePaymentRecordedBy', this.sql.VarChar, job.advancePaymentRecordedBy)
       .query(`
         UPDATE Jobs 
         SET BLNumber = @blNumber, CUSDECNumber = @cusdecNumber, OpenDate = @openDate,
             ShipmentCategory = @shipmentCategory, Exporter = @exporter, Transporter = @transporter,
-            LCNumber = @lcNumber, ContainerNumber = @containerNumber, Status = @status, AssignedTo = @assignedTo,
-            advancePayment = @advancePayment, advancePaymentDate = @advancePaymentDate,
-            advancePaymentNotes = @advancePaymentNotes, advancePaymentRecordedBy = @advancePaymentRecordedBy
+            LCNumber = @lcNumber, ContainerNumber = @containerNumber, Status = @status, AssignedTo = @assignedTo
         WHERE JobId = @jobId
       `);
     
@@ -224,16 +224,20 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   // New method for updating advance payment specifically
-  async updateAdvancePayment(jobId, advancePayment, notes, recordedByUserId) {
+  async updateAdvancePayment(jobId, advancePayment, paymentDate, paymentType, checkNo, notes, recordedByUserId) {
     await this.ensureSchema();
     const pool = await this.db();
     
-    const advanceDate = advancePayment > 0 ? new Date() : null;
+    const advanceDate = advancePayment > 0 ? (paymentDate ? new Date(paymentDate) : new Date()) : null;
+    const finalPaymentType = advancePayment > 0 ? paymentType : null;
+    const finalCheckNo = advancePayment > 0 && paymentType === 'check' ? checkNo : null;
     
     await pool.request()
       .input('jobId', this.sql.VarChar, jobId)
       .input('advancePayment', this.sql.Decimal(18,2), parseFloat(advancePayment) || 0.00)
       .input('advancePaymentDate', this.sql.DateTime, advanceDate)
+      .input('advancePaymentType', this.sql.VarChar, finalPaymentType)
+      .input('advancePaymentCheckNo', this.sql.VarChar, finalCheckNo)
       .input('advancePaymentNotes', this.sql.VarChar, notes)
       .input('advancePaymentRecordedBy', this.sql.VarChar, recordedByUserId)
       .query(`
@@ -243,6 +247,18 @@ class MSSQLJobRepository extends IJobRepository {
             advancePaymentNotes = @advancePaymentNotes,
             advancePaymentRecordedBy = @advancePaymentRecordedBy
         WHERE JobId = @jobId
+
+        IF COL_LENGTH('Jobs', 'advancePaymentType') IS NOT NULL
+          UPDATE Jobs SET advancePaymentType = @advancePaymentType WHERE JobId = @jobId
+
+        IF COL_LENGTH('Jobs', 'advancePaymentCheckNo') IS NOT NULL
+          UPDATE Jobs SET advancePaymentCheckNo = @advancePaymentCheckNo WHERE JobId = @jobId
+
+        IF COL_LENGTH('Jobs', 'AdvancePaymentType') IS NOT NULL
+          UPDATE Jobs SET AdvancePaymentType = @advancePaymentType WHERE JobId = @jobId
+
+        IF COL_LENGTH('Jobs', 'AdvancePaymentCheckNo') IS NOT NULL
+          UPDATE Jobs SET AdvancePaymentCheckNo = @advancePaymentCheckNo WHERE JobId = @jobId
       `);
     
     return true;
@@ -533,10 +549,34 @@ class MSSQLJobRepository extends IJobRepository {
     let metadataFromJson = {};
     
     try {
-      if (row.assignedUsers && typeof row.assignedUsers === 'string') {
-        assignedUsersFromJson = JSON.parse(row.assignedUsers);
-      } else if (Array.isArray(row.assignedUsers)) {
-        assignedUsersFromJson = row.assignedUsers;
+      const pool = await this.db();
+      
+      // Check if JobAssignments table exists first
+      const tableCheck = await pool.request()
+        .query(`
+          SELECT COUNT(*) as tableExists
+          FROM sys.tables 
+          WHERE name = 'JobAssignments'
+        `);
+      
+      const hasJobAssignments = tableCheck.recordset[0].tableExists > 0;
+      
+      if (hasJobAssignments) {
+        // Try to get from JobAssignments table directly
+        const assignmentResult = await pool.request()
+          .input('jobId', this.sql.VarChar, row.jobId || row.JobId)
+          .query(`
+            SELECT ja.userId, u.fullName as userName 
+            FROM JobAssignments ja
+            INNER JOIN Users u ON ja.userId = u.userId
+            WHERE ja.jobId = @jobId AND ja.isActive = 1
+            ORDER BY ja.assignedDate DESC
+          `);
+        
+        assignedUsers = assignmentResult.recordset.map(a => ({
+          userId: a.userId,
+          userName: a.userName
+        }));
       }
     } catch (error) {
       console.log('Could not parse assignedUsers JSON:', error.message);
@@ -620,10 +660,12 @@ class MSSQLJobRepository extends IJobRepository {
       createdDate: row.createdDate || row.CreatedDate,
       completedDate: row.completedDate || row.CompletedDate,
       pettyCashStatus: row.pettyCashStatus,
-      advancePayment: row.advancePayment || 0.00,
-      advancePaymentDate: row.advancePaymentDate,
-      advancePaymentNotes: row.advancePaymentNotes,
-      advancePaymentRecordedBy: row.advancePaymentRecordedBy,
+      advancePayment: row.advancePayment ?? row.AdvancePayment ?? 0.00,
+      advancePaymentDate: row.advancePaymentDate || row.AdvancePaymentDate,
+      advancePaymentType: row.advancePaymentType || row.AdvancePaymentType,
+      advancePaymentCheckNo: row.advancePaymentCheckNo || row.AdvancePaymentCheckNo,
+      advancePaymentNotes: row.advancePaymentNotes || row.AdvancePaymentNotes,
+      advancePaymentRecordedBy: row.advancePaymentRecordedBy || row.AdvancePaymentRecordedBy,
       payItems: payItems || [],
       officePayItems: finalOfficePayItems || [], // New field for office pay items
       metadata: metadataFromJson

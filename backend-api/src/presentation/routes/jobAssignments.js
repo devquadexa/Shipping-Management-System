@@ -27,10 +27,31 @@ router.post('/jobs/:jobId/assign-users', auth, async (req, res) => {
     const { userIds, notes } = req.body;
     const assignedBy = req.user.userId;
 
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+    if (!Array.isArray(userIds)) {
       console.log('Invalid userIds:', userIds);
       return res.status(400).json({ 
-        message: 'userIds array is required and must contain at least one user ID' 
+        message: 'userIds must be an array' 
+      });
+    }
+
+    // Support clearing all assignees during edit flows.
+    if (userIds.length === 0) {
+      const jobAssignmentRepository = container.get('jobAssignmentRepository');
+      const jobRepository = container.get('jobRepository');
+
+      await jobAssignmentRepository.removeAllAssignmentsForJob(jobId);
+      await jobRepository.assignToUser(jobId, null);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          jobId,
+          assignedCount: 0,
+          totalAssignedUsers: 0,
+          assignedUserIds: [],
+          assignedUserNames: '',
+          message: `Successfully cleared all assignments for job ${jobId}`,
+        },
       });
     }
 

@@ -26,10 +26,6 @@ router.post('/', auth, checkRole('Admin', 'Super Admin', 'Manager', 'Office Exec
   jobController.create(req, res)
 );
 
-router.put('/:id', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
-  jobController.update(req, res)
-);
-
 router.get('/', auth, (req, res) => 
   jobController.getAll(req, res)
 );

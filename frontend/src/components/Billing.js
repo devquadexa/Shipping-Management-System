@@ -627,6 +627,7 @@ function Billing() {
   const generateBillHTML = (bill, job, customer) => {
     const billDate = new Date(bill.billDate || bill.createdDate).toLocaleDateString('en-GB');
     const invoiceNumber = bill.invoiceNumber || bill.billId;
+    const invoiceLogoUrl = `${window.location.origin}/logo2.png`;
     
     console.log('generateBillHTML - bill:', bill);
     console.log('generateBillHTML - job:', job);
@@ -677,226 +678,262 @@ function Billing() {
       <head>
         <title>Invoice - Super Shine Cargo Services</title>
         <style>
-          @page { margin: 20mm; }
-          body {
-            font-family: Arial, sans-serif;
-            font-size: 11pt;
-            line-height: 1.4;
+          @page { 
+            margin: 15mm 20mm; 
+            size: A4;
+          }
+          * {
             margin: 0;
             padding: 0;
           }
-          .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.3;
+            color: #000;
           }
-          .logo-section {
-            display: flex;
+          .page-header {
+            position: relative;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #000;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
             align-items: center;
             gap: 15px;
           }
           .logo {
-            width: 60px;
-            height: 60px;
-            background: #101036;
-            color: white;
+            width: 72px;
+            height: 72px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            font-size: 20px;
             border-radius: 4px;
+            flex-shrink: 0;
+            overflow: hidden;
+            background: #fff;
           }
-          .company-info {
-            flex: 1;
+          .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+          }
+          .company-header {
+            text-align: center;
+            margin-bottom: 0;
           }
           .company-name {
-            font-size: 18pt;
+            font-size: 13pt;
             font-weight: bold;
+            letter-spacing: 1px;
             margin-bottom: 3px;
+            color: #1a1a2e;
           }
           .company-tagline {
-            font-size: 10pt;
-            color: #666;
+            font-size: 8pt;
+            margin: 1px 0;
+            color: #555;
           }
-          .invoice-info {
+          .invoice-header-right {
             text-align: right;
+            font-size: 9pt;
+            line-height: 1.5;
+          }
+          .invoice-header-right strong {
+            display: block;
             font-size: 10pt;
           }
-          .section {
+          .recipient {
             margin: 15px 0;
+            line-height: 1.5;
           }
-          .row {
+          .recipient-line {
+            margin: 2px 0;
+            font-size: 10pt;
+          }
+          .details-section {
+            margin: 12px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #000;
+          }
+          .detail-row {
             display: flex;
             margin: 3px 0;
+            font-size: 10pt;
           }
-          .label {
+          .detail-label {
             font-weight: bold;
-            width: 150px;
+            width: 120px;
+            min-width: 120px;
           }
-          .value {
+          .detail-value {
             flex: 1;
+            word-wrap: break-word;
           }
-          .divider {
+          .items-section {
+            margin: 15px 0;
+          }
+          .item-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+            font-size: 10pt;
+            padding: 2px 0;
+            border-bottom: 1px solid #e0e0e0;
+          }
+          .item-description {
+            flex: 1;
+            padding-right: 20px;
+          }
+          .item-amount {
+            text-align: right;
+            min-width: 100px;
+            padding-right: 5px;
+            font-weight: normal;
+          }
+          .item-row.subtotal {
             border-top: 1px solid #000;
-            margin: 15px 0;
+            border-bottom: none;
+            margin-top: 10px;
+            padding-top: 8px;
+            font-weight: normal;
           }
-          .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
+          .item-row.total {
+            border-top: 2px solid #000;
+            border-bottom: none;
+            margin-top: 8px;
+            padding-top: 10px;
+            padding-bottom: 5px;
+            font-weight: bold;
+            font-size: 11pt;
           }
-          .items-table th,
-          .items-table td {
-            border: 1px solid #000;
-            padding: 8px;
+          .signature-section {
+            margin-top: 40px;
             text-align: left;
           }
-          .items-table th {
-            background-color: #f0f0f0;
+          .signature-space {
+            border-top: 1px solid #000;
+            width: 200px;
+            margin: 50px 0 5px 0;
+            height: 2px;
+          }
+          .signature-label {
+            font-size: 10pt;
             font-weight: bold;
-          }
-          .items-table td.amount {
-            text-align: right;
-          }
-          .total-section {
-            margin-top: 20px;
-            text-align: right;
-          }
-          .total-row {
-            margin: 5px 0;
-            font-size: 12pt;
-          }
-          .grand-total {
-            font-size: 14pt;
-            font-weight: bold;
-            border-top: 2px solid #000;
-            padding-top: 10px;
-            margin-top: 10px;
+            margin-top: 5px;
           }
           .footer {
-            text-align: center;
-            margin-top: 40px;
-            border-top: 1px solid #000;
+            margin-top: 20px;
             padding-top: 10px;
-            font-size: 9pt;
-            color: #666;
+            border-top: 1px solid #000;
+            text-align: center;
+            font-size: 8pt;
+            line-height: 1.3;
+            color: #333;
+          }
+          .footer-line {
+            margin: 2px 0;
           }
           @media print {
-            body { padding: 0; }
-            .no-print { display: none; }
+            body { margin: 0; padding: 0; }
+            .no-print { display: none !important; }
           }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="logo-section">
-            <div class="logo">SS</div>
-            <div class="company-info">
-              <div class="company-name">SUPER SHINE CARGO SERVICES</div>
-              <div class="company-tagline">Freight Forwarding / Clearing & Transporters</div>
-              <div class="company-tagline">Sea freight / Air Freight</div>
-            </div>
+        <div class="page-header">
+          <div class="logo">
+            <img src="${invoiceLogoUrl}" alt="SS Cargo Logo" />
           </div>
-          <div class="invoice-info">
-            <div>Date: ${billDate}</div>
-            <div><strong>INV No: ${invoiceNumber}</strong></div>
+          <div class="company-header">
+            <div class="company-name">SUPER SHINE CARGO SERVICES</div>
+            <div class="company-tagline">Freight Forwarding / Clearing & Transporters</div>
+            <div class="company-tagline">Sea freight / Air Freight</div>
           </div>
-        </div>
-
-        <div class="section">
-          <div class="row">
-            <span class="label">The Director,</span>
-          </div>
-          <div class="row">
-            <span class="label"><strong>${customer.name}</strong></span>
-          </div>
-          <div class="row">
-            <span class="value">${customer.address}</span>
+          <div class="invoice-header-right">
+            ${billDate}<br>
+            <strong>INV No: ${invoiceNumber}</strong>
           </div>
         </div>
 
-        <div class="divider"></div>
-
-        <div class="section">
-          <div class="row">
-            <span class="label">Cusdec No:</span>
-            <span class="value">${job.cusdecNumber || '-'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Exporter:</span>
-            <span class="value">${job.exporter || '-'}</span>
-          </div>
-          <div class="row">
-            <span class="label">LC No:</span>
-            <span class="value">${job.lcNumber || '-'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Container No:</span>
-            <span class="value">${job.containerNumber || '-'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Category:</span>
-            <span class="value">${job.shipmentCategory || '-'}</span>
-          </div>
+        <div class="recipient">
+          <div class="recipient-line">The Director,</div>
+          <div class="recipient-line"><strong>${customer.name}</strong></div>
+          ${customer && (customer.addressNumber || customer.addressStreet1 || customer.addressCity) ? 
+            `<div class="recipient-line">${customer.addressNumber || ''}, ${customer.addressStreet1 || ''}, ${customer.addressStreet2 ? customer.addressStreet2 + ', ' : ''}${customer.addressDistrict || ''}, ${customer.addressCity || ''}, ${customer.addressCountry || 'Sri Lanka'}</div>` 
+            : ''}
         </div>
 
-        <div class="divider"></div>
+        <div class="details-section">
+          <div class="detail-row">
+            <div class="detail-label">Cusdec No</div>
+            <div class="detail-value">: ${job.cusdecNumber || '-'}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Exporter</div>
+            <div class="detail-value">: ${job.exporter || '-'}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">LC No</div>
+            <div class="detail-value">: ${job.lcNumber || '-'}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Container No</div>
+            <div class="detail-value">: ${job.containerNumber || '-'}</div>
+          </div>
+          ${job.shipmentCategory ? `
+          <div class="detail-row">
+            <div class="detail-label">Cargo Description</div>
+            <div class="detail-value">: ${job.shipmentCategory}</div>
+          </div>
+          ` : ''}
+        </div>
 
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th style="text-align: right; width: 150px;">Amount (LKR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${payItemsArray && Array.isArray(payItemsArray) && payItemsArray.length > 0 ? 
-              payItemsArray.map(item => {
-                console.log('Invoice item:', item);
-                const description = item.description || item.name || 'Service Charge';
-                const amount = item.billingAmount || item.amount || 0;
-                return `
-                  <tr>
-                    <td>${description}</td>
-                    <td class="amount">${formatAmount(amount)}</td>
-                  </tr>
-                `;
-              }).join('') : 
-              `<tr>
-                <td>Service Charges</td>
-                <td class="amount">${formatAmount(grossTotal)}</td>
-              </tr>`
-            }
-          </tbody>
-        </table>
-
-        <div class="total-section">
+        <div class="items-section">
+          ${payItemsArray && Array.isArray(payItemsArray) && payItemsArray.length > 0 ? 
+            payItemsArray.map(item => {
+              const description = item.description || item.name || 'Service Charge';
+              const amount = item.billingAmount || item.amount || 0;
+              return `
+                <div class="item-row">
+                  <div class="item-description">${description}</div>
+                  <div class="item-amount">${formatAmount(amount)}</div>
+                </div>
+              `;
+            }).join('') : 
+            `<div class="item-row">
+              <div class="item-description">Service Charges</div>
+              <div class="item-amount">${formatAmount(grossTotal)}</div>
+            </div>`
+          }
+          
+          <div class="item-row subtotal">
+            <div class="item-description">GROSS TOTAL</div>
+            <div class="item-amount">${formatAmount(grossTotal)}</div>
+          </div>
+          
           ${advancePayment > 0 ? `
-            <div class="total-row">
-              <span>GROSS TOTAL: LKR ${formatAmount(grossTotal)}</span>
+            <div class="item-row subtotal">
+              <div class="item-description">LESS: Advance Amount</div>
+              <div class="item-amount">${formatAmount(advancePayment)}</div>
             </div>
-            <div class="total-row">
-              <span>LESS: ADVANCE PAYMENT: LKR ${formatAmount(advancePayment)}</span>
-            </div>
-            <div class="grand-total">
-              <span>NET TOTAL DUE: LKR ${formatAmount(netTotal)}</span>
-            </div>
-          ` : `
-            <div class="grand-total">
-              <span>TOTAL DUE AMOUNT: LKR ${formatAmount(bill.billingAmount)}</span>
-            </div>
-          `}
+          ` : ''}
+          
+          <div class="item-row total">
+            <div class="item-description">Total Due Amount</div>
+            <div class="item-amount">${formatAmount(advancePayment > 0 ? netTotal : grossTotal)}</div>
+          </div>
+        </div>
+
+        <div class="signature-section">
+          <div class="signature-space"></div>
+          <div class="signature-label">SUPER SHINE CARGO SERVICES<br>MANAGER</div>
         </div>
 
         <div class="footer">
-          <p><strong>SUPER SHINE CARGO SERVICES - MANAGER</strong></p>
-          <p>No. 10/A, Ground Floor, Y M B A Building Colombo 01, Sri Lanka</p>
-          <p>Tel: 2435581, 2433983 | Fax: 2433580, 2439697 | Hotline: 0777-698696, 076 6857070</p>
-          <p>E-mail: superallbrooks@gmail.com</p>
+          <div class="footer-line">No. 10/A, Ground Floor, Y.M.B.A Building Colombo 01, Sri Lanka. Tel: 2433581, 2433983</div>
+          <div class="footer-line">Fax No. 2433580, 2439697 Hotline: 0777-898996, 076 6857070 E-mail: superallbrooks@gmail.com</div>
         </div>
       </body>
       </html>
