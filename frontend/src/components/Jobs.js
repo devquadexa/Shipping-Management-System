@@ -6,6 +6,7 @@ import { authService } from '../api/services/authService';
 import { transporterService } from '../api/services/transporterService';
 import apiClient from '../api/client';
 import OfficePayItems from './OfficePayItems';
+import AdvancePayment from './AdvancePayment';
 import '../styles/Jobs.css';
 
 function Jobs() {
@@ -602,6 +603,12 @@ function Jobs() {
                         {/* Office Pay Items Section */}
                         <OfficePayItems 
                           jobId={job.jobId} 
+                          onUpdate={fetchJobs}
+                        />
+                        
+                        {/* Advance Payment Section */}
+                        <AdvancePayment 
+                          job={job} 
                           onUpdate={fetchJobs}
                         />
                       </td>

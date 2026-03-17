@@ -173,15 +173,46 @@ class MSSQLJobRepository extends IJobRepository {
       .input('containerNumber', this.sql.VarChar, job.containerNumber)
       .input('status', this.sql.VarChar, job.status)
       .input('assignedTo', this.sql.VarChar, job.assignedTo)
+      .input('advancePayment', this.sql.Decimal(18,2), job.advancePayment || 0.00)
+      .input('advancePaymentDate', this.sql.DateTime, job.advancePaymentDate)
+      .input('advancePaymentNotes', this.sql.VarChar, job.advancePaymentNotes)
+      .input('advancePaymentRecordedBy', this.sql.VarChar, job.advancePaymentRecordedBy)
       .query(`
         UPDATE Jobs 
         SET BLNumber = @blNumber, CUSDECNumber = @cusdecNumber, OpenDate = @openDate,
             ShipmentCategory = @shipmentCategory, Exporter = @exporter, Transporter = @transporter,
-            LCNumber = @lcNumber, ContainerNumber = @containerNumber, Status = @status, AssignedTo = @assignedTo
+            LCNumber = @lcNumber, ContainerNumber = @containerNumber, Status = @status, AssignedTo = @assignedTo,
+            advancePayment = @advancePayment, advancePaymentDate = @advancePaymentDate,
+            advancePaymentNotes = @advancePaymentNotes, advancePaymentRecordedBy = @advancePaymentRecordedBy
         WHERE JobId = @jobId
       `);
     
     return job;
+  }
+
+  // New method for updating advance payment specifically
+  async updateAdvancePayment(jobId, advancePayment, notes, recordedByUserId) {
+    await this.ensureSchema();
+    const pool = await this.db();
+    
+    const advanceDate = advancePayment > 0 ? new Date() : null;
+    
+    await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .input('advancePayment', this.sql.Decimal(18,2), parseFloat(advancePayment) || 0.00)
+      .input('advancePaymentDate', this.sql.DateTime, advanceDate)
+      .input('advancePaymentNotes', this.sql.VarChar, notes)
+      .input('advancePaymentRecordedBy', this.sql.VarChar, recordedByUserId)
+      .query(`
+        UPDATE Jobs 
+        SET advancePayment = @advancePayment,
+            advancePaymentDate = @advancePaymentDate,
+            advancePaymentNotes = @advancePaymentNotes,
+            advancePaymentRecordedBy = @advancePaymentRecordedBy
+        WHERE JobId = @jobId
+      `);
+    
+    return true;
   }
 
   async updateStatus(jobId, status) {
@@ -252,76 +283,84 @@ class MSSQLJobRepository extends IJobRepository {
   }
 
   async replacePayItems(jobId, payItems, userId) {
+    await this.ensureSchema();
     const pool = await this.db();
-    const transaction = new this.sql.Transaction(pool);
     
     try {
-      await transaction.begin();
+      console.log('=== REPLACE PAY ITEMS START ===');
+      console.log('replacePayItems - jobId:', jobId);
+      console.log('replacePayItems - payItems:', payItems);
+      console.log('replacePayItems - payItems length:', payItems?.length);
+      console.log('replacePayItems - payItems type:', typeof payItems);
+      console.log('replacePayItems - userId:', userId);
       
-      // Delete existing pay items for this job
-      await transaction.request()
+      // Store pay items as JSON in the Jobs table
+      const payItemsJson = JSON.stringify(payItems);
+      console.log('replacePayItems - JSON to store:', payItemsJson);
+      
+      const result = await pool.request()
         .input('jobId', this.sql.VarChar, jobId)
-        .query('DELETE FROM PayItems WHERE JobId = @jobId');
+        .input('payItems', this.sql.NVarChar, payItemsJson)
+        .query(`
+          UPDATE Jobs 
+          SET payItems = @payItems
+          WHERE jobId = @jobId
+        `);
       
-      // Insert new pay items
-      for (const item of payItems) {
-        const payItemId = `PI${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await transaction.request()
-          .input('payItemId', this.sql.VarChar, payItemId)
-          .input('jobId', this.sql.VarChar, jobId)
-          .input('description', this.sql.VarChar, item.description)
-          .input('actualCost', this.sql.Decimal(10, 2), item.amount)
-          .input('billingAmount', this.sql.Decimal(10, 2), item.billingAmount)
-          .input('addedBy', this.sql.VarChar, userId)
-          .query(`
-            INSERT INTO PayItems (PayItemId, JobId, Description, ActualCost, BillingAmount, AddedBy, AddedDate)
-            VALUES (@payItemId, @jobId, @description, @actualCost, @billingAmount, @addedBy, GETDATE())
-          `);
+      console.log('replacePayItems - UPDATE result:', result);
+      console.log('replacePayItems - Rows affected:', result.rowsAffected);
+      console.log('✓ Pay items stored as JSON in Jobs table');
+      
+      // Verify the data was saved by reading it back
+      const verifyResult = await pool.request()
+        .input('jobId', this.sql.VarChar, jobId)
+        .query('SELECT payItems FROM Jobs WHERE jobId = @jobId');
+      
+      console.log('replacePayItems - Verification query result:', verifyResult.recordset);
+      if (verifyResult.recordset.length > 0) {
+        console.log('replacePayItems - Stored payItems:', verifyResult.recordset[0].payItems);
       }
       
-      await transaction.commit();
+      // Also try to store in separate PayItems table if it exists (for backward compatibility)
+      try {
+        const transaction = new this.sql.Transaction(pool);
+        await transaction.begin();
+        
+        // Delete existing pay items for this job
+        await transaction.request()
+          .input('jobId', this.sql.VarChar, jobId)
+          .query('DELETE FROM PayItems WHERE JobId = @jobId');
+        
+        // Insert new pay items
+        for (const item of payItems) {
+          const payItemId = `PI${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          await transaction.request()
+            .input('payItemId', this.sql.VarChar, payItemId)
+            .input('jobId', this.sql.VarChar, jobId)
+            .input('description', this.sql.VarChar, item.description)
+            .input('actualCost', this.sql.Decimal(10, 2), item.amount || item.actualCost || 0)
+            .input('billingAmount', this.sql.Decimal(10, 2), item.billingAmount || item.amount || 0)
+            .input('addedBy', this.sql.VarChar, userId)
+            .query(`
+              INSERT INTO PayItems (PayItemId, JobId, Description, ActualCost, BillingAmount, AddedBy, AddedDate)
+              VALUES (@payItemId, @jobId, @description, @actualCost, @billingAmount, @addedBy, GETDATE())
+            `);
+        }
+        
+        await transaction.commit();
+        console.log('✓ Pay items also stored in PayItems table (if exists)');
+      } catch (tableError) {
+        console.log('⚠ Could not store in PayItems table (table may not exist):', tableError.message);
+      }
+      
+      console.log('=== REPLACE PAY ITEMS END ===');
       return true;
     } catch (error) {
-      await transaction.rollback();
+      console.error('❌ Error in replacePayItems:', error);
       throw error;
     }
   }
 
-  async replacePayItems(jobId, payItems, userId) {
-    const pool = await this.db();
-    const transaction = new this.sql.Transaction(pool);
-
-    try {
-      await transaction.begin();
-
-      // Delete existing pay items for this job
-      await transaction.request()
-        .input('jobId', this.sql.VarChar, jobId)
-        .query('DELETE FROM PayItems WHERE JobId = @jobId');
-
-      // Insert new pay items
-      for (const item of payItems) {
-        const payItemId = `PI${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await transaction.request()
-          .input('payItemId', this.sql.VarChar, payItemId)
-          .input('jobId', this.sql.VarChar, jobId)
-          .input('description', this.sql.VarChar, item.description)
-          .input('actualCost', this.sql.Decimal(10, 2), item.amount)
-          .input('billingAmount', this.sql.Decimal(10, 2), item.billingAmount)
-          .input('addedBy', this.sql.VarChar, userId)
-          .query(`
-            INSERT INTO PayItems (PayItemId, JobId, Description, ActualCost, BillingAmount, AddedBy, AddedDate)
-            VALUES (@payItemId, @jobId, @description, @actualCost, @billingAmount, @addedBy, GETDATE())
-          `);
-      }
-
-      await transaction.commit();
-      return true;
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
-    }
-  }
 
 
   async getPayItems(jobId) {
@@ -329,21 +368,91 @@ class MSSQLJobRepository extends IJobRepository {
     const pool = await this.db();
     
     try {
-      const result = await pool.request()
-        .input('jobId', this.sql.VarChar, jobId)
-        .query('SELECT * FROM PayItems WHERE jobId = @jobId ORDER BY addedDate DESC');
+      console.log('=== GET PAY ITEMS START ===');
+      console.log('getPayItems - jobId:', jobId);
       
-      return result.recordset.map(row => ({
-        id: row.payItemId || row.PayItemId,
-        description: row.description || row.Description,
-        actualCost: row.actualCost || row.ActualCost || row.amount || row.Amount || 0,
-        billingAmount: row.billingAmount || row.BillingAmount || row.amount || row.Amount || 0,
-        amount: row.actualCost || row.ActualCost || row.amount || row.Amount || 0,
-        addedBy: row.addedBy || row.AddedBy,
-        addedDate: row.addedDate || row.AddedDate
-      }));
+      // First try to get from the Jobs table payItems JSON column
+      const jobResult = await pool.request()
+        .input('jobId', this.sql.VarChar, jobId)
+        .query('SELECT payItems FROM Jobs WHERE jobId = @jobId');
+      
+      console.log('getPayItems - Query result:', jobResult.recordset);
+      
+      if (jobResult.recordset.length > 0) {
+        const payItemsData = jobResult.recordset[0].payItems;
+        console.log('getPayItems - Raw payItems data from DB:', payItemsData);
+        console.log('getPayItems - PayItems data type:', typeof payItemsData);
+        console.log('getPayItems - PayItems data length:', payItemsData?.length);
+        
+        if (payItemsData) {
+          try {
+            let payItems;
+            if (typeof payItemsData === 'string') {
+              console.log('getPayItems - Parsing JSON string...');
+              payItems = JSON.parse(payItemsData);
+            } else {
+              console.log('getPayItems - Using data as-is...');
+              payItems = payItemsData;
+            }
+            
+            console.log('getPayItems - Processed pay items:', payItems);
+            console.log('getPayItems - Is array:', Array.isArray(payItems));
+            console.log('getPayItems - Array length:', payItems?.length);
+            
+            if (Array.isArray(payItems) && payItems.length > 0) {
+              console.log('✅ Returning pay items from Jobs table JSON:', payItems);
+              console.log('=== GET PAY ITEMS END (SUCCESS) ===');
+              return payItems;
+            } else {
+              console.log('⚠ Pay items array is empty or invalid');
+            }
+          } catch (parseError) {
+            console.log('❌ Error parsing payItems JSON:', parseError.message);
+            console.log('Raw data that failed to parse:', payItemsData);
+          }
+        } else {
+          console.log('⚠ PayItems data is null/undefined');
+        }
+      } else {
+        console.log('❌ No job found with jobId:', jobId);
+      }
+      
+      // Fallback: try to get from separate PayItems table (if it exists)
+      console.log('getPayItems - Trying PayItems table fallback...');
+      try {
+        const result = await pool.request()
+          .input('jobId', this.sql.VarChar, jobId)
+          .query('SELECT * FROM PayItems WHERE jobId = @jobId ORDER BY addedDate DESC');
+        
+        console.log('getPayItems - PayItems table result:', result.recordset);
+        
+        const payItems = result.recordset.map(row => ({
+          id: row.payItemId || row.PayItemId,
+          description: row.description || row.Description,
+          actualCost: row.actualCost || row.ActualCost || row.amount || row.Amount || 0,
+          billingAmount: row.billingAmount || row.BillingAmount || row.amount || row.Amount || 0,
+          amount: row.actualCost || row.ActualCost || row.amount || row.Amount || 0,
+          addedBy: row.addedBy || row.AddedBy,
+          addedDate: row.addedDate || row.AddedDate
+        }));
+        
+        if (payItems.length > 0) {
+          console.log('✅ Returning pay items from PayItems table:', payItems);
+          console.log('=== GET PAY ITEMS END (FALLBACK SUCCESS) ===');
+          return payItems;
+        } else {
+          console.log('⚠ No pay items found in PayItems table');
+        }
+      } catch (tableError) {
+        console.log('❌ PayItems table does not exist or error accessing it:', tableError.message);
+      }
+      
+      console.log('❌ No pay items found for job:', jobId);
+      console.log('=== GET PAY ITEMS END (NO DATA) ===');
+      return [];
     } catch (error) {
-      console.log('Error fetching pay items:', error.message);
+      console.log('❌ Error fetching pay items:', error.message);
+      console.log('=== GET PAY ITEMS END (ERROR) ===');
       return [];
     }
   }
@@ -438,6 +547,10 @@ class MSSQLJobRepository extends IJobRepository {
       createdDate: row.createdDate || row.CreatedDate,
       completedDate: row.completedDate || row.CompletedDate,
       pettyCashStatus: row.pettyCashStatus,
+      advancePayment: row.advancePayment || 0.00,
+      advancePaymentDate: row.advancePaymentDate,
+      advancePaymentNotes: row.advancePaymentNotes,
+      advancePaymentRecordedBy: row.advancePaymentRecordedBy,
       payItems: payItems || [],
       officePayItems: officePayItems || [] // New field for office pay items
     });

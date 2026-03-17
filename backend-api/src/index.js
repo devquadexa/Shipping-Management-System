@@ -17,6 +17,7 @@ const officePayItemRoutes = require('./presentation/routes/officePayItems');
 const accountingRoutes = require('./presentation/routes/accounting');
 const locationRoutes = require('./presentation/routes/locations');
 const transporterRoutes = require('./presentation/routes/transporters');
+const cashBalanceSettlementRoutes = require('./presentation/routes/cashBalanceSettlements');
 const { getConnection } = require('./config/database');
 const container = require('./infrastructure/di/container');
 const { startOverdueChecker } = require('./infrastructure/scheduler/overdueChecker');
@@ -53,6 +54,7 @@ app.use('/api/office-pay-items', officePayItemRoutes);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/transporters', transporterRoutes);
+app.use('/api/cash-balance-settlements', cashBalanceSettlementRoutes(container));
 
 app.get('/', (req, res) => {
   res.json({ 

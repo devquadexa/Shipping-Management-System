@@ -20,6 +20,7 @@ class CreateBill {
     }
     
     console.log('CreateBill - Found job:', job);
+    console.log('CreateBill - Job advance payment:', job.advancePayment);
     
     // Get customer to fetch credit period
     const customer = await this.customerRepository.findById(job.customerId);
@@ -32,8 +33,9 @@ class CreateBill {
     // Calculate actual cost from pay items
     const actualCost = billData.actualCost || 0;
     const billingAmount = billData.billingAmount || 0;
+    const advancePayment = job.advancePayment || 0;
     
-    console.log('CreateBill - Calculated values:', { actualCost, billingAmount });
+    console.log('CreateBill - Calculated values:', { actualCost, billingAmount, advancePayment });
     
     // Calculate invoice date and due date
     const invoiceDate = new Date();
@@ -46,7 +48,7 @@ class CreateBill {
       creditPeriodDays: customer.creditPeriodDays 
     });
     
-    // Create bill entity
+    // Create bill entity with advance payment
     const bill = new Bill({
       billId: await this.billRepository.generateNextId(),
       jobId: billData.jobId,
@@ -54,6 +56,9 @@ class CreateBill {
       amount: billingAmount,
       actualCost: actualCost,
       billingAmount: billingAmount,
+      advancePayment: advancePayment,
+      grossTotal: billingAmount,
+      netTotal: billingAmount - advancePayment,
       profit: billingAmount - actualCost,
       paymentStatus: 'Unpaid',
       invoiceNumber: billData.invoiceNumber || null,
@@ -62,10 +67,13 @@ class CreateBill {
       isOverdue: false
     });
     
-    console.log('CreateBill - Created bill entity (before tax):', {
+    console.log('CreateBill - Created bill entity (before calculations):', {
       billId: bill.billId,
       actualCost: bill.actualCost,
       billingAmount: bill.billingAmount,
+      advancePayment: bill.advancePayment,
+      grossTotal: bill.grossTotal,
+      netTotal: bill.netTotal,
       profit: bill.profit,
       invoiceDate: bill.invoiceDate,
       dueDate: bill.dueDate
@@ -77,16 +85,19 @@ class CreateBill {
       throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
     }
     
-    // No tax - total equals billing amount
-    bill.calculateTax(0);
+    // Calculate totals with advance payment
+    bill.calculateTotalsWithAdvance(advancePayment);
     
     // Calculate profit
     bill.calculateProfit();
     
-    console.log('CreateBill - Final bill (after tax):', {
+    console.log('CreateBill - Final bill (after calculations):', {
       billId: bill.billId,
       actualCost: bill.actualCost,
       billingAmount: bill.billingAmount,
+      advancePayment: bill.advancePayment,
+      grossTotal: bill.grossTotal,
+      netTotal: bill.netTotal,
       profit: bill.profit,
       tax: bill.tax,
       total: bill.total

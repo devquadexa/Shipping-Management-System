@@ -238,6 +238,41 @@ class JobController {
     }
   }
 
+  // New method for updating advance payment
+  async updateAdvancePayment(req, res) {
+    try {
+      const { jobId } = req.params;
+      const { advancePayment, notes } = req.body;
+      const userId = req.user.userId;
+
+      console.log('Update advance payment request:', { jobId, advancePayment, notes, userId });
+
+      // Validate advance payment amount
+      const amount = parseFloat(advancePayment);
+      if (isNaN(amount) || amount < 0) {
+        return res.status(400).json({ message: 'Valid advance payment amount is required (must be 0 or greater)' });
+      }
+
+      // Get the job repository from the container (imported at module level)
+      const container = require('../../infrastructure/di/container');
+      const jobRepository = container.get('jobRepository');
+      
+      // Update advance payment
+      await jobRepository.updateAdvancePayment(jobId, amount, notes, userId);
+      
+      // Get updated job
+      const updatedJob = await this.getJobById.execute(jobId);
+      
+      res.json({ 
+        message: 'Advance payment updated successfully',
+        job: updatedJob
+      });
+    } catch (error) {
+      console.error('Error updating advance payment:', error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
   async update(req, res) {
     try {
       console.log('JobController.update - START');
