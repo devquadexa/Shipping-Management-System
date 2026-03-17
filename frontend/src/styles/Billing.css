@@ -1465,3 +1465,260 @@ input[type="number"] {
     font-size: 1rem;
   }
 }
+/* Pay Items Actions Column Styles */
+.actions-header {
+  width: 120px;
+  text-align: center;
+}
+
+.actions-cell {
+  width: 120px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+}
+
+.edit-btn {
+  background-color: #f0f9ff;
+  border: 1px solid #0ea5e9;
+}
+
+.edit-btn:hover {
+  background-color: #0ea5e9;
+  transform: scale(1.05);
+}
+
+.remove-btn {
+  background-color: #fef2f2;
+  border: 1px solid #ef4444;
+}
+
+.remove-btn:hover {
+  background-color: #ef4444;
+  transform: scale(1.05);
+}
+
+/* Edit Pay Item Modal Styles */
+.edit-pay-item-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.edit-pay-item-info .info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.edit-pay-item-info .info-row:last-child {
+  border-bottom: none;
+}
+
+.edit-pay-item-info .info-label {
+  font-weight: 600;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.edit-pay-item-info .info-value {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.enterprise-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #0ea5e9;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.enterprise-notice .notice-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.enterprise-notice .notice-content {
+  flex: 1;
+}
+
+.enterprise-notice .notice-content strong {
+  color: #0c4a6e;
+  font-size: 0.9rem;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.enterprise-notice .notice-content p {
+  color: #0369a1;
+  font-size: 0.85rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.helper-text {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* Responsive styles for actions column */
+@media (max-width: 768px) {
+  .actions-header {
+    width: 100px;
+  }
+  
+  .actions-cell {
+    width: 100px;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .action-btn {
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+  }
+  
+  .table-cell.actions-cell::before {
+    content: "Actions";
+  }
+  
+  .table-cell.actions-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .table-cell.actions-cell .action-btn {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .edit-btn::after {
+    content: " Edit";
+    font-size: 0.8rem;
+  }
+  
+  .remove-btn::after {
+    content: " Remove";
+    font-size: 0.8rem;
+  }
+}
+
+/* Enhanced pay items review table grid for actions column */
+.pay-items-review-table .table-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 120px;
+  gap: 1rem;
+}
+
+.pay-items-review-table .table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 120px;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* When no actions column (for non-admin users) */
+.pay-items-review-table.no-actions .table-header {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+.pay-items-review-table.no-actions .table-row {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+  .pay-items-review-table .table-header {
+    grid-template-columns: 1fr;
+  }
+  
+  .pay-items-review-table .table-row {
+    grid-template-columns: 1fr;
+  }
+}
+/* Manager Notice Styles */
+.manager-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.manager-notice .notice-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.manager-notice .notice-text {
+  flex: 1;
+  color: #92400e;
+}
+
+.manager-notice .notice-text strong {
+  color: #78350f;
+  font-weight: 600;
+}
+/* Modal Actions - Professional */
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #e2e8f0;
+}
+
+.modal-actions .btn {
+  min-width: 120px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+  .modal-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .modal-actions .btn {
+    width: 100%;
+    min-width: auto;
+  }
+}

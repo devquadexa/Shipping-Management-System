@@ -768,9 +768,9 @@ function Jobs() {
                 </div>
               </div>
 
-              <div className="action-buttons">
-                <button type="submit" className="btn btn-primary">{isEditing ? 'Update Job' : 'Create Job'}</button>
+              <div className="action-buttons modal-action-buttons">
                 <button type="button" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">{isEditing ? 'Update Job' : 'Create Job'}</button>
               </div>
             </form>
           </div>

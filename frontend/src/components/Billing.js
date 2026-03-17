@@ -26,6 +26,12 @@ function Billing() {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
   const [expandedBillId, setExpandedBillId] = useState(null);
+  
+  // New states for pay item editing
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPayItem, setEditingPayItem] = useState(null);
+  const [editingIndex, setEditingIndex] = useState(-1);
+  const [editBillingAmount, setEditBillingAmount] = useState('');
 
   useEffect(() => {
     fetchBills();
@@ -162,29 +168,51 @@ function Billing() {
         }
       }
       
-      // 3. Set all pay items or show empty state
+      // 3. Smart UI Logic: Only show entry form if no pay items exist in the job
       if (allPayItems.length > 0) {
         setPayItems(allPayItems);
-        setShowPayItemsRow(true);
+        
+        // SMART UI: Only show entry form if the job doesn't have saved pay items
+        // If job already has pay items, show only the review table
+        const hasExistingPayItems = job.payItems && job.payItems.length > 0;
+        setShowPayItemsRow(!hasExistingPayItems);
         
         const officeItemsCount = allPayItems.filter(item => item.isOfficePayItem).length;
         const pettyCashItemsCount = allPayItems.filter(item => item.isPettyCashItem).length;
         
-        let message = `✅ Loaded ${allPayItems.length} items: `;
-        if (officeItemsCount > 0) message += `${officeItemsCount} office payments`;
-        if (pettyCashItemsCount > 0) {
-          if (officeItemsCount > 0) message += `, `;
-          message += `${pettyCashItemsCount} petty cash items`;
+        let message;
+        if (hasExistingPayItems) {
+          message = `📋 Job has ${job.payItems.length} saved pay items. Use "+ Add More Items" to add additional items.`;
+        } else {
+          message = `✅ Loaded ${allPayItems.length} items: `;
+          if (officeItemsCount > 0) message += `${officeItemsCount} office payments`;
+          if (pettyCashItemsCount > 0) {
+            if (officeItemsCount > 0) message += `, `;
+            message += `${pettyCashItemsCount} petty cash items`;
+          }
+          message += '. Please review billing amounts.';
         }
-        message += '. Please review billing amounts.';
         
         setMessage(message);
         setTimeout(() => setMessage(''), 5000);
       } else {
-        // No items found, load templates or show empty
-        if (job?.pettyCashStatus !== 'Settled') {
-          setMessage('Petty cash must be settled before generating invoice');
-          setTimeout(() => setMessage(''), 3000);
+        // No items found from office/petty cash, check if job has existing pay items
+        const hasExistingPayItems = job.payItems && job.payItems.length > 0;
+        
+        if (hasExistingPayItems) {
+          // Job has existing pay items, don't show entry form
+          setShowPayItemsRow(false);
+          setMessage(`📋 Job has ${job.payItems.length} saved pay items. Use "+ Add More Items" to add additional items.`);
+          setTimeout(() => setMessage(''), 5000);
+        } else {
+          // No existing pay items, show entry form or load templates
+          if (job?.pettyCashStatus !== 'Settled') {
+            setMessage('Petty cash must be settled before generating invoice');
+            setTimeout(() => setMessage(''), 3000);
+          } else {
+            // Load templates for first-time entry
+            loadPayItemTemplates(job);
+          }
         }
         setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, paidBy: '', paidByName: '' }]);
       }
@@ -430,6 +458,103 @@ function Billing() {
     });
     
     return { actualCost, billingAmount, profit, grossTotal, advancePayment, netTotal };
+  };
+
+  // Helper function to check if user can edit pay items
+  const canEditPayItems = () => {
+    return user?.role === 'Super Admin' || user?.role === 'Admin';
+  };
+
+  // Open edit modal for a pay item
+  const openEditModal = (payItem, index) => {
+    if (!canEditPayItems()) {
+      setMessage('❌ Only Super Admin and Admin users can edit pay items. Please contact an administrator for changes.');
+      setTimeout(() => setMessage(''), 5000);
+      return;
+    }
+    
+    setEditingPayItem(payItem);
+    setEditingIndex(index);
+    setEditBillingAmount(payItem.billingAmount || payItem.amount || '');
+    setShowEditModal(true);
+  };
+
+  // Save edited pay item
+  const saveEditedPayItem = async () => {
+    if (!editingPayItem || editingIndex === -1) return;
+    
+    const newBillingAmount = parseFloat(editBillingAmount);
+    if (isNaN(newBillingAmount) || newBillingAmount < 0) {
+      setMessage('❌ Please enter a valid billing amount');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    try {
+      // Update the pay item in the selectedJob
+      const updatedPayItems = [...selectedJob.payItems];
+      updatedPayItems[editingIndex] = {
+        ...updatedPayItems[editingIndex],
+        billingAmount: newBillingAmount
+      };
+
+      // Save to backend
+      await jobService.replacePayItems(selectedJob.jobId, updatedPayItems);
+      
+      // Update local state
+      setSelectedJob({
+        ...selectedJob,
+        payItems: updatedPayItems
+      });
+
+      setMessage('✅ Pay item billing amount updated successfully');
+      setShowEditModal(false);
+      setEditingPayItem(null);
+      setEditingIndex(-1);
+      setEditBillingAmount('');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error updating pay item:', error);
+      setMessage('❌ Error updating pay item. Please try again.');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  // Remove a pay item
+  const removePayItem = async (index) => {
+    if (!canEditPayItems()) {
+      setMessage('❌ Only Super Admin and Admin users can remove pay items. Please contact an administrator for changes.');
+      setTimeout(() => setMessage(''), 5000);
+      return;
+    }
+
+    const payItem = selectedJob.payItems[index];
+    const confirmMessage = `Are you sure you want to remove "${payItem.description}" from the invoice?\n\nThis action cannot be undone.`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      // Remove the pay item from the array
+      const updatedPayItems = selectedJob.payItems.filter((_, i) => i !== index);
+
+      // Save to backend
+      await jobService.replacePayItems(selectedJob.jobId, updatedPayItems);
+      
+      // Update local state
+      setSelectedJob({
+        ...selectedJob,
+        payItems: updatedPayItems
+      });
+
+      setMessage('✅ Pay item removed successfully');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error removing pay item:', error);
+      setMessage('❌ Error removing pay item. Please try again.');
+      setTimeout(() => setMessage(''), 3000);
+    }
   };
 
   const generateBill = async () => {
@@ -1164,12 +1289,23 @@ function Billing() {
                     <div className="pay-items-review-header">
                       <h4>📋 Pay Items Review</h4>
                       <p className="review-subtitle">Review all pay items before generating invoice</p>
+                      {user?.role === 'Manager' && (
+                        <div className="manager-notice">
+                          <div className="notice-icon">💼</div>
+                          <div className="notice-text">
+                            <strong>Manager Access:</strong> To modify billing amounts or remove pay items, please contact a Super Admin or Admin for assistance.
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="pay-items-review-table">
+                    <div className={`pay-items-review-table ${!canEditPayItems() ? 'no-actions' : ''}`}>
                       <div className="table-header">
                         <div className="header-cell description-header">Description</div>
                         <div className="header-cell amount-header">Actual Cost (LKR)</div>
                         <div className="header-cell amount-header">Billing Amount (LKR)</div>
+                        {canEditPayItems() && (
+                          <div className="header-cell actions-header">Actions</div>
+                        )}
                       </div>
                       <div className="table-body">
                         {selectedJob.payItems.map((item, idx) => (
@@ -1177,12 +1313,33 @@ function Billing() {
                             <div className="table-cell description-cell">{item.description}</div>
                             <div className="table-cell amount-cell">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</div>
                             <div className="table-cell amount-cell">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</div>
+                            {canEditPayItems() && (
+                              <div className="table-cell actions-cell">
+                                <button
+                                  className="action-btn edit-btn"
+                                  onClick={() => openEditModal(item, idx)}
+                                  title="Edit billing amount"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  className="action-btn remove-btn"
+                                  onClick={() => removePayItem(idx)}
+                                  title="Remove pay item"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                         <div className="table-row total-row">
                           <div className="table-cell description-cell total-label"><strong>Total</strong></div>
                           <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></div>
                           <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                         <div className="table-row profit-row">
                           <div className="table-cell description-cell profit-label"><strong>Profit Margin</strong></div>
@@ -1192,12 +1349,18 @@ function Billing() {
                               {formatAmount(calculateTotals().profit)}
                             </strong>
                           </div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                         {/* Advance Payment Summary */}
                         <div className="table-row advance-summary-row">
                           <div className="table-cell description-cell advance-summary-label"><strong>Invoice Summary</strong></div>
                           <div className="table-cell amount-cell"></div>
                           <div className="table-cell amount-cell"></div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                         <div className="table-row gross-total-row">
                           <div className="table-cell description-cell gross-total-label">Gross Total</div>
@@ -1205,6 +1368,9 @@ function Billing() {
                           <div className="table-cell amount-cell gross-total-amount">
                             <strong>{formatAmount(calculateTotals().grossTotal)}</strong>
                           </div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                         {selectedJob.advancePayment > 0 && (
                           <div className="table-row advance-payment-row">
@@ -1213,6 +1379,9 @@ function Billing() {
                             <div className="table-cell amount-cell advance-payment-amount">
                               <strong className="advance-deduction">({formatAmount(calculateTotals().advancePayment)})</strong>
                             </div>
+                            {canEditPayItems() && (
+                              <div className="table-cell actions-cell"></div>
+                            )}
                           </div>
                         )}
                         <div className="table-row net-total-row">
@@ -1221,6 +1390,9 @@ function Billing() {
                           <div className="table-cell amount-cell net-total-amount">
                             <strong className="final-amount">{formatAmount(calculateTotals().netTotal)}</strong>
                           </div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1374,6 +1546,70 @@ function Billing() {
           </div>
         )}
       </div>
+
+      {/* Edit Pay Item Modal */}
+      {showEditModal && editingPayItem && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal modal-medium" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>✏️ Edit Pay Item</h3>
+              <button className="btn-close" onClick={() => setShowEditModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="edit-pay-item-info">
+                <div className="info-row">
+                  <span className="info-label">Description:</span>
+                  <span className="info-value">{editingPayItem.description}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Actual Cost:</span>
+                  <span className="info-value">LKR {formatAmount(editingPayItem.actualCost || editingPayItem.amount || 0)}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Current Billing Amount:</span>
+                  <span className="info-value">LKR {formatAmount(editingPayItem.billingAmount || editingPayItem.amount || 0)}</span>
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label>New Billing Amount (LKR) <span className="required">*</span></label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editBillingAmount}
+                  onChange={(e) => setEditBillingAmount(e.target.value)}
+                  placeholder="Enter new billing amount"
+                  className="form-control"
+                />
+                <p className="helper-text">
+                  💡 You can only modify the billing amount. The actual cost remains unchanged for accounting purposes.
+                </p>
+              </div>
+              
+              <div className="enterprise-notice">
+                <div className="notice-icon">🏢</div>
+                <div className="notice-content">
+                  <strong>Enterprise Policy:</strong>
+                  <p>Only Super Admin and Admin users can modify billing amounts. This ensures proper financial controls and audit trails in enterprise operations.</p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button onClick={() => setShowEditModal(false)} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button 
+                onClick={saveEditedPayItem} 
+                className="btn btn-primary"
+                disabled={!editBillingAmount || parseFloat(editBillingAmount) < 0}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

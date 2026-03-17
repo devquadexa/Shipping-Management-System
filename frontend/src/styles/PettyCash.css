@@ -80,6 +80,24 @@
   border: 1px solid #6ee7b7;
 }
 
+.status-pending-approval {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.status-balance-returned {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+
+.status-overdue-collected {
+  background: #fce7f3;
+  color: #9d174d;
+  border: 1px solid #fbcfe8;
+}
+
 .balance-positive {
   color: #059669;
   font-weight: 600;
@@ -976,143 +994,207 @@ input[type="number"] {
   margin-bottom: 6px;
 }
 
-/* Settlement Modal Styles */
+/* Modal Content Container */
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(16, 16, 54, 0.3);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  margin: 0;
+  border: none;
+}
+
 .settlement-modal {
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-width: 1100px;
+  width: 95%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(16, 16, 54, 0.3);
+  margin: 0;
+  padding: 0;
+  border: none;
 }
 
 .settlement-modal .modal-header {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: linear-gradient(135deg, #101036 0%, #1a1a4d 100%);
   color: white;
   padding: 20px 24px;
   border-radius: 12px 12px 0 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  flex-shrink: 0;
+  border-bottom: 3px solid #3b82f6;
+  margin: 0;
+  gap: 12px;
+  line-height: 1;
 }
 
 .settlement-modal .modal-header h3 {
   margin: 0;
-  font-size: 1.4rem;
-  font-weight: 600;
+  font-size: 1.35rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
 }
 
 .settlement-modal .modal-close {
-  background: none;
+  background: rgba(255, 255, 255, 0.1);
   border: none;
   color: white;
   font-size: 1.8rem;
   cursor: pointer;
   padding: 4px;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .settlement-modal .modal-close:hover {
   background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
 }
 
 .settlement-modal .modal-body {
   padding: 24px;
   background: white;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0;
+  border-radius: 0 0 12px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  align-items: start;
 }
 
-/* Assignment Info Section */
+/* Custom scrollbar for modal body */
+.settlement-modal .modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settlement-modal .modal-body::-webkit-scrollbar-track {
+  background: #f9fafb;
+  border-radius: 4px;
+}
+
+.settlement-modal .modal-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+  border: 2px solid #f9fafb;
+}
+
+.settlement-modal .modal-body::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Assignment Info Section - Column 1 */
 .assignment-info {
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
-  border-left: 4px solid #2563eb;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 10px;
+  padding: 18px;
+  border-left: 5px solid #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .info-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 4px;
   padding: 8px 0;
 }
 
 .info-row:last-child {
-  margin-bottom: 0;
   padding-bottom: 0;
-  border-top: 1px solid #e5e7eb;
-  padding-top: 12px;
-  margin-top: 8px;
+  border-top: none;
+  margin-top: 0;
+  padding-top: 8px;
 }
 
 .info-label {
-  font-weight: 600;
-  color: #374151;
-  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e40af;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .info-value {
   font-weight: 700;
-  color: #1f2937;
-  font-size: 1rem;
+  color: #101036;
+  font-size: 1.1rem;
+  font-family: 'Courier New', monospace;
 }
 
 .info-value.balance-positive {
   color: #059669;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  font-family: inherit;
 }
 
 .info-value.balance-negative {
   color: #dc2626;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  font-family: inherit;
 }
 
-/* Settlement Form */
+/* Settlement Form - Columns 2 & 3 */
 .settlement-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  grid-column: 2 / 4;
 }
 
 .settlement-form .form-group {
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
 
 .settlement-form .form-group label {
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
-  font-size: 0.95rem;
+  font-weight: 700;
+  color: #101036;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .settlement-form .form-control {
-  padding: 12px 16px;
+  padding: 10px 12px;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
   background: white;
   font-family: inherit;
+  color: #374151;
 }
 
 .settlement-form .form-control:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .settlement-form .form-control.disabled {
@@ -1124,7 +1206,7 @@ input[type="number"] {
 
 .settlement-form textarea.form-control {
   resize: vertical;
-  min-height: 100px;
+  min-height: 70px;
   font-family: inherit;
   line-height: 1.5;
 }
@@ -1134,36 +1216,40 @@ input[type="number"] {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 2px solid #e5e7eb;
+  flex-shrink: 0;
+  grid-column: 2 / 4;
 }
 
 .settlement-modal .btn {
-  padding: 12px 24px;
+  padding: 11px 22px;
   border: none;
   border-radius: 8px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-size: 1rem;
-  min-width: 120px;
+  font-size: 0.9rem;
+  min-width: 110px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .settlement-modal .btn-primary {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: linear-gradient(135deg, #101036 0%, #1a1a4d 100%);
   color: white;
-  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 4px 6px rgba(16, 16, 54, 0.2);
 }
 
 .settlement-modal .btn-primary:hover {
-  background: linear-gradient(135deg, #1d4ed8, #1e40af);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+  background: linear-gradient(135deg, #1a1a4d, #2d3561);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(16, 16, 54, 0.3);
 }
 
 .settlement-modal .btn-secondary {
@@ -1174,14 +1260,38 @@ input[type="number"] {
 
 .settlement-modal .btn-secondary:hover {
   background: #4b5563;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(107, 114, 128, 0.3);
 }
 
 /* Responsive Design for Settlement Modal */
+@media (max-width: 1200px) {
+  .settlement-modal {
+    max-width: 95%;
+  }
+  
+  .settlement-modal .modal-body {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  
+  .assignment-info {
+    grid-column: 1 / 2;
+  }
+  
+  .settlement-form {
+    grid-column: 2 / 3;
+  }
+  
+  .settlement-modal .modal-actions {
+    grid-column: 2 / 3;
+  }
+}
+
 @media (max-width: 768px) {
   .settlement-modal {
     width: 95%;
+    max-height: 90vh;
     margin: 20px auto;
   }
   
@@ -1190,15 +1300,33 @@ input[type="number"] {
   }
   
   .settlement-modal .modal-header h3 {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
   }
   
   .settlement-modal .modal-body {
-    padding: 20px;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+  
+  .assignment-info {
+    grid-column: 1;
+  }
+  
+  .settlement-form {
+    grid-column: 1;
   }
   
   .settlement-modal .modal-actions {
-    flex-direction: column;
+    grid-column: 1;
+    flex-direction: row;
+    gap: 10px;
+  }
+  
+  .settlement-modal .btn {
+    padding: 10px 16px;
+    font-size: 0.85rem;
+    min-width: 100px;
   }
   
   .action-buttons {
@@ -1226,9 +1354,19 @@ input[type="number"] {
 }
 
 .management-settlements .card-header h2 {
-  color: #1e40af;
+  color: #101036;
   margin: 0;
   font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.management-settlements .card-header h2 .header-icon {
+  width: 28px;
+  height: 28px;
+  stroke: #101036;
+  flex-shrink: 0;
 }
 
 /* Settlement Tabs */
@@ -1251,6 +1389,16 @@ input[type="number"] {
   transition: all 0.3s ease;
   color: #6b7280;
   font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-button svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  flex-shrink: 0;
 }
 
 .tab-button:hover {
@@ -1259,9 +1407,13 @@ input[type="number"] {
 }
 
 .tab-button.active {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: linear-gradient(135deg, #101036 0%, #1a1a4d 100%);
   color: white;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 2px 4px rgba(16, 16, 54, 0.2);
+}
+
+.tab-button.active svg {
+  stroke: white;
 }
 
 /* Settlements Content */
@@ -1340,11 +1492,6 @@ input[type="number"] {
   color: #1e40af;
 }
 
-.status-completed {
-  background-color: #d1fae5;
-  color: #065f46;
-}
-
 .status-rejected {
   background-color: #fee2e2;
   color: #991b1b;
@@ -1391,26 +1538,13 @@ input[type="number"] {
   transform: translateY(-1px);
 }
 
-.btn-complete {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-complete:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+.btn-reject:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
   transform: translateY(-1px);
 }
 
 .btn-approve:disabled,
-.btn-reject:disabled,
-.btn-complete:disabled {
+.btn-reject:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
