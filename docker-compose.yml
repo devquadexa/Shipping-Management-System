@@ -48,7 +48,7 @@ services:
     build:
       context: ./frontend
       args:
-        REACT_APP_API_URL: "https://${SERVER_IP}:5000/api"
+        REACT_APP_API_URL: "https://${SERVER_IP}/api"
     container_name: cargo_frontend
     ports:
       - "80:80"
