@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { customerService } from '../api/services/customerService';
 import '../styles/Customers.css';
+import API_BASE from '../api/config';
 
 function Customers() {
   const { user } = useAuth();
@@ -70,7 +71,7 @@ function Customers() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/customers/categories/all', {
+      const response = await fetch(`${API_BASE}/api/customers/categories/all`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -84,7 +85,7 @@ function Customers() {
 
   const fetchDistricts = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/locations/districts', {
+      const response = await fetch(`${API_BASE}/api/locations/districts`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -98,7 +99,7 @@ function Customers() {
 
   const fetchCities = async (districtId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/locations/cities/${districtId}`, {
+      const response = await fetch(`${API_BASE}/api/locations/cities/${districtId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -113,7 +114,7 @@ function Customers() {
 
   const fetchAllCities = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/locations/cities', {
+      const response = await fetch(`${API_BASE}/api/locations/cities`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -1199,3 +1200,5 @@ function Customers() {
 }
 
 export default Customers;
+
+

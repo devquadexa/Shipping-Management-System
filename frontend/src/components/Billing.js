@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { billingService } from '../api/services/billingService';
 import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
+import API_BASE from '../api/config';
 import '../styles/Billing.css';
 
 function Billing() {
@@ -92,7 +93,7 @@ function Billing() {
       
       // 1. Load Office Pay Items (upfront payments by office staff)
       try {
-        const officePayItemsResponse = await fetch(`http://localhost:5000/api/office-pay-items/job/${jobId}`, {
+        const officePayItemsResponse = await fetch(`${API_BASE}/api/office-pay-items/job/${jobId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -126,7 +127,7 @@ function Billing() {
         setLoadingSettlement(true);
         try {
           // Fetch ALL assignments for this job
-          const response = await fetch(`http://localhost:5000/api/petty-cash-assignments/job/${jobId}/all`, {
+          const response = await fetch(`${API_BASE}/api/petty-cash-assignments/job/${jobId}/all`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -228,7 +229,7 @@ function Billing() {
     if (job?.shipmentCategory && (!job.payItems || job.payItems.length === 0)) {
       console.log('Loading pay item templates for category:', job.shipmentCategory);
       try {
-        const response = await fetch(`http://localhost:5000/api/pay-item-templates/category/${encodeURIComponent(job.shipmentCategory)}`, {
+        const response = await fetch(`${API_BASE}/api/pay-item-templates/category/${encodeURIComponent(job.shipmentCategory)}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -322,7 +323,7 @@ function Billing() {
       for (const item of officePayItems) {
         if (item.officePayItemId) {
           try {
-            const response = await fetch(`http://localhost:5000/api/office-pay-items/${item.officePayItemId}`, {
+            const response = await fetch(`${API_BASE}/api/office-pay-items/${item.officePayItemId}`, {
               method: 'PUT',
               headers: {
                 'Content-Type': 'application/json',
@@ -679,7 +680,7 @@ function Billing() {
       console.log('printBill - bill.jobId:', bill.jobId);
       
       // Fetch complete job details including pay items
-      const response = await fetch(`http://localhost:5000/api/jobs/${bill.jobId}`, {
+      const response = await fetch(`${API_BASE}/api/jobs/${bill.jobId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -1652,3 +1653,4 @@ function Billing() {
 }
 
 export default Billing;
+
