@@ -40,11 +40,12 @@ let pool = null;
 
 const getConnection = async () => {
   try {
-    if (pool) {
-      return pool;
+    if (!pool) {
+      pool = await sql.connect(config);
+      console.log('✅ Connected to MSSQL database');
+      // Run migrations on every fresh connection
+      await runMigrations(pool);
     }
-    pool = await sql.connect(config);
-    console.log('✅ Connected to MSSQL database');
     return pool;
   } catch (err) {
     console.error('❌ Database connection failed:', err);
@@ -53,6 +54,51 @@ const getConnection = async () => {
     console.error('  2. Database credentials are correct in .env file');
     console.error('  3. Database exists and is accessible');
     throw err;
+  }
+};
+
+const runMigrations = async (pool) => {
+  try {
+    // Add hasBill column to PettyCashSettlementItems if not exists
+    await pool.request().query(`
+      IF NOT EXISTS (
+        SELECT * FROM sys.columns 
+        WHERE object_id = OBJECT_ID('PettyCashSettlementItems') 
+        AND name = 'hasBill'
+      )
+      BEGIN
+        ALTER TABLE PettyCashSettlementItems
+        ADD hasBill BIT NOT NULL DEFAULT 0;
+        PRINT 'Migration: Added hasBill column to PettyCashSettlementItems';
+      END
+    `);
+    // Verify column exists after migration
+    const check = await pool.request().query(`
+      SELECT COUNT(*) as cnt FROM sys.columns 
+      WHERE object_id = OBJECT_ID('PettyCashSettlementItems') AND name = 'hasBill'
+    `);
+    const exists = check.recordset[0].cnt === 1;
+    console.log('✅ Database migrations applied. hasBill column exists:', exists);
+    if (!exists) {
+      console.error('❌ CRITICAL: hasBill column does not exist after migration attempt!');
+      console.error('   Please run manually in SQL Server Management Studio:');
+      console.error('   ALTER TABLE PettyCashSettlementItems ADD hasBill BIT NOT NULL DEFAULT 0;');
+    } else {
+      // Check for triggers that might interfere
+      const triggerCheck = await pool.request().query(`
+        SELECT t.name as triggerName
+        FROM sys.triggers t
+        INNER JOIN sys.tables tbl ON t.parent_id = tbl.object_id
+        WHERE tbl.name = 'PettyCashSettlementItems'
+      `);
+      if (triggerCheck.recordset.length > 0) {
+        console.warn('⚠️  Triggers found on PettyCashSettlementItems:', triggerCheck.recordset.map(r => r.triggerName));
+      }
+    }
+  } catch (err) {
+    console.error('❌ Migration FAILED:', err.message);
+    console.error('   Please run manually in SQL Server Management Studio:');
+    console.error('   ALTER TABLE PettyCashSettlementItems ADD hasBill BIT NOT NULL DEFAULT 0;');
   }
 };
 

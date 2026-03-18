@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/AdvancePayment.css';
+import API_BASE from '../api/config';
 
 function AdvancePayment({ job, onUpdate }) {
   const { user } = useAuth();
@@ -73,7 +74,7 @@ function AdvancePayment({ job, onUpdate }) {
         }
       }
 
-      const response = await fetch(`http://localhost:5000/api/jobs/${job.jobId}/advance-payment`, {
+      const response = await fetch(`${API_BASE}/api/jobs/${job.jobId}/advance-payment`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -304,3 +305,4 @@ function AdvancePayment({ job, onUpdate }) {
 }
 
 export default AdvancePayment;
+

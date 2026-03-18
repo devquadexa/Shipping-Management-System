@@ -215,24 +215,52 @@
 }
 
 .settlement-info {
-  background: #f9fafb;
-  padding: 1.5rem;
+  background: #f0f4ff;
   border-radius: 8px;
-  margin: 1.5rem 2rem;
-  border: 1px solid #e5e7eb;
+  margin: 1.5rem 2rem 0 2rem;
+  border: 1px solid #dbe4ff;
+  overflow: hidden;
 }
 
-.info-row {
+.settlement-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+
+.settlement-info-item {
   display: flex;
-  justify-content: space-between;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #e5e7eb;
+  flex-direction: column;
+  gap: 6px;
+  padding: 1.25rem 1.5rem;
+  border-right: 1px solid #dbe4ff;
 }
 
-.info-row:last-child {
-  border-bottom: none;
+.settlement-info-item:last-child {
+  border-right: none;
 }
 
+.settlement-info-item .info-label {
+  font-weight: 700;
+  color: #3b5bdb;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.settlement-info-item .info-value {
+  font-weight: 700;
+  color: #101036;
+  font-size: 1rem;
+}
+
+.settlement-info-item .info-value.balance-positive {
+  color: #059669;
+}
+
+.settlement-info-item .info-value.balance-negative {
+  color: #dc2626;
+}
 .info-label {
   font-weight: 600;
   color: #6b7280;
@@ -260,7 +288,7 @@
 
 .settlement-item-row {
   display: grid;
-  grid-template-columns: 40px 1fr 200px 40px;
+  grid-template-columns: 40px 1fr 200px 80px 40px;
   gap: 1rem;
   align-items: center;
   margin-bottom: 1rem;
@@ -268,6 +296,11 @@
   background: #f9fafb;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
+}
+
+.settlement-item-row.has-bill-row {
+  background: #f0fdf4;
+  border-color: #86efac;
 }
 
 .item-number {
@@ -354,7 +387,8 @@
 }
 
 .settlement-items-view {
-  padding: 2rem;
+  padding: 0 2rem 2rem 2rem;
+  width: 100%;
 }
 
 .settlement-items-view h3 {
@@ -372,7 +406,7 @@
 
 .settlement-items-table th,
 .settlement-items-table td {
-  padding: 1rem;
+  padding: 0.875rem 1rem;
   text-align: left;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -382,8 +416,38 @@
   font-weight: 700;
   color: #374151;
   text-transform: uppercase;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   letter-spacing: 0.5px;
+}
+
+/* Column alignment: Item Name | Amount | Type | Bill | Paid By */
+.settlement-items-table th:nth-child(1),
+.settlement-items-table td:nth-child(1) {
+  width: 35%;
+}
+
+.settlement-items-table th:nth-child(2),
+.settlement-items-table td:nth-child(2) {
+  width: 18%;
+  text-align: right;
+}
+
+.settlement-items-table th:nth-child(3),
+.settlement-items-table td:nth-child(3) {
+  width: 13%;
+  text-align: center;
+}
+
+.settlement-items-table th:nth-child(4),
+.settlement-items-table td:nth-child(4) {
+  width: 12%;
+  text-align: center;
+}
+
+.settlement-items-table th:nth-child(5),
+.settlement-items-table td:nth-child(5) {
+  width: 22%;
+  text-align: center;
 }
 
 .settlement-items-table td.amount {
@@ -394,6 +458,16 @@
 .settlement-items-table .total-row {
   background: #f9fafb;
   font-weight: 700;
+  box-shadow: inset 0 2px 0 #101036;
+}
+
+.settlement-items-table .total-row td {
+  border-bottom: none;
+  padding-top: 1.25rem;
+}
+
+.settlement-items-table .total-row td:nth-child(2) {
+  text-align: right;
 }
 
 .item-type-badge {
@@ -439,9 +513,36 @@
     grid-template-columns: 1fr;
     gap: 0.75rem;
   }
+
+  .settlement-info-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .settlement-info-item {
+    border-bottom: 1px solid #dbe4ff;
+  }
+
+  .settlement-info-item:nth-child(odd) {
+    border-right: 1px solid #dbe4ff;
+  }
+
+  .settlement-info-item:nth-child(even) {
+    border-right: none;
+  }
   
   .item-number {
     justify-self: start;
+  }
+
+  .has-bill-check {
+    flex-direction: row;
+    justify-self: start;
+    gap: 8px;
+  }
+
+  .has-bill-check label {
+    flex-direction: row;
+    font-size: 0.8rem;
   }
 
   .btn-remove-item {
@@ -855,13 +956,6 @@
   font-weight: 600;
   border: 1px solid #bfdbfe;
 }
-
-/* Settlement Items Table - Paid By Column */
-.settlement-items-table th:last-child,
-.settlement-items-table td:last-child {
-  text-align: center;
-}
-
 
 /* Paid Item Row Styling */
 .settlement-item-row.paid-item-row {
@@ -1347,6 +1441,97 @@ input[type="number"] {
 
 .settlement-pending {
   display: none;
+}
+
+/* Has Bill Checkbox */
+.has-bill-check {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.has-bill-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #101036;
+  cursor: pointer;
+  margin: 0;
+}
+
+.has-bill-check label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+
+.has-bill-check input[type="checkbox"]:checked + label {
+  color: #059669;
+}
+
+.has-bill-check label svg {
+  stroke: currentColor;
+}
+
+/* Bill indicator on read-only items */
+.bill-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #059669;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Bill badges in view mode */
+.bill-cell {
+  text-align: center;
+}
+
+.bill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.no-bill-badge {
+  display: inline-block;
+  background: #f3f4f6;
+  color: #9ca3af;
+  border: 1px solid #e5e7eb;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Highlight rows with bills in view mode */
+.has-bill-row-view {
+  background: #f0fdf4;
+}
+
+.has-bill-row-view td {
+  border-bottom-color: #bbf7d0;
 }
 /* Management Settlement Section */
 .management-settlements {
