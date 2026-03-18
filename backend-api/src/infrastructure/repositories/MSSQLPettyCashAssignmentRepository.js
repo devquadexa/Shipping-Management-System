@@ -193,46 +193,24 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
     try {
       const pool = await this.getConnection();
       
-      // Check if paidBy column exists
-      const columnCheck = await pool.request()
+      const result = await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
         .query(`
-          SELECT COUNT(*) as columnExists
-          FROM sys.columns 
-          WHERE object_id = OBJECT_ID('PettyCashSettlementItems') 
-          AND name = 'paidBy'
-        `);
-      
-      const hasPaidByColumn = columnCheck.recordset[0].columnExists > 0;
-      
-      let query;
-      if (hasPaidByColumn) {
-        // New query with paidBy column
-        query = `
           SELECT 
-            si.*,
+            si.settlementItemId,
+            si.assignmentId,
+            si.itemName,
+            si.actualCost,
+            si.isCustomItem,
+            ISNULL(si.hasBill, 0) as hasBill,
+            si.paidBy,
             u.fullName as paidByName,
             u.email as paidByEmail
           FROM PettyCashSettlementItems si
           LEFT JOIN Users u ON si.paidBy = u.userId
           WHERE si.assignmentId = @assignmentId
           ORDER BY si.settlementItemId
-        `;
-      } else {
-        // Fallback query without paidBy column
-        query = `
-          SELECT 
-            si.*,
-            NULL as paidByName,
-            NULL as paidByEmail
-          FROM PettyCashSettlementItems si
-          WHERE si.assignmentId = @assignmentId
-          ORDER BY si.settlementItemId
-        `;
-      }
-      
-      const result = await pool.request()
-        .input('assignmentId', this.sql.Int, assignmentId)
-        .query(query);
+        `);
       
       return result.recordset;
     } catch (error) {
@@ -257,17 +235,20 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         const assignment = await this.getById(assignmentId);
         console.log('settle - fetched assignment:', assignment);
         
-        // Check if paidBy column exists
-        const columnCheck = await transaction.request()
-          .query(`
-            SELECT COUNT(*) as columnExists
-            FROM sys.columns 
-            WHERE object_id = OBJECT_ID('PettyCashSettlementItems') 
-            AND name = 'paidBy'
+        // Verify hasBill column exists before inserting
+        const colCheck = await transaction.request().query(`
+          SELECT COUNT(*) as cnt FROM sys.columns 
+          WHERE object_id = OBJECT_ID('PettyCashSettlementItems') AND name = 'hasBill'
+        `);
+        const hasBillColExists = colCheck.recordset[0].cnt === 1;
+        console.log('settle - hasBill column exists in DB:', hasBillColExists);
+        if (!hasBillColExists) {
+          console.error('settle - ERROR: hasBill column missing! Running emergency migration...');
+          await transaction.request().query(`
+            ALTER TABLE PettyCashSettlementItems ADD hasBill BIT NOT NULL DEFAULT 0;
           `);
-        
-        const hasPaidByColumn = columnCheck.recordset[0].columnExists > 0;
-        console.log('settle - hasPaidByColumn:', hasPaidByColumn);
+          console.log('settle - Emergency migration applied: hasBill column added');
+        }
         
         // Insert settlement items with validation for predefined items
         for (const item of settlementData.items) {
@@ -307,33 +288,24 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
             }
           }
           
-          console.log('settle - inserting item:', item);
-          if (hasPaidByColumn) {
-            // New version with paidBy column
-            const result = await transaction.request()
-              .input('assignmentId', this.sql.Int, assignmentId)
-              .input('itemName', this.sql.NVarChar, item.itemName)
-              .input('actualCost', this.sql.Decimal(18, 2), item.actualCost)
-              .input('isCustomItem', this.sql.Bit, item.isCustomItem || false)
-              .input('paidBy', this.sql.VarChar, item.paidBy || assignment.assignedTo)
-              .query(`
-                INSERT INTO PettyCashSettlementItems (assignmentId, itemName, actualCost, isCustomItem, paidBy)
-                VALUES (@assignmentId, @itemName, @actualCost, @isCustomItem, @paidBy)
-              `);
-            console.log('settle - item inserted, rowsAffected:', result.rowsAffected);
-          } else {
-            // Fallback version without paidBy column
-            const result = await transaction.request()
-              .input('assignmentId', this.sql.Int, assignmentId)
-              .input('itemName', this.sql.NVarChar, item.itemName)
-              .input('actualCost', this.sql.Decimal(18, 2), item.actualCost)
-              .input('isCustomItem', this.sql.Bit, item.isCustomItem || false)
-              .query(`
-                INSERT INTO PettyCashSettlementItems (assignmentId, itemName, actualCost, isCustomItem)
-                VALUES (@assignmentId, @itemName, @actualCost, @isCustomItem)
-              `);
-            console.log('settle - item inserted (no paidBy), rowsAffected:', result.rowsAffected);
-          }
+          console.log('settle - inserting item:', item.itemName, '| hasBill:', item.hasBill);
+          const hasBillValue = (item.hasBill === true || item.hasBill === 1 || item.hasBill === 'true') ? 1 : 0;
+          console.log('settle - hasBillValue resolved to:', hasBillValue, '(type:', typeof hasBillValue, ')');
+
+          const insertReq = transaction.request()
+            .input('assignmentId', this.sql.Int, assignmentId)
+            .input('itemName', this.sql.NVarChar, item.itemName)
+            .input('actualCost', this.sql.Decimal(18, 2), item.actualCost)
+            .input('isCustomItem', this.sql.Bit, item.isCustomItem ? 1 : 0)
+            .input('paidBy', this.sql.VarChar, item.paidBy || assignment.assignedTo)
+            .input('hasBill', this.sql.Bit, hasBillValue);
+
+          const result = await insertReq.query(`
+            INSERT INTO PettyCashSettlementItems (assignmentId, itemName, actualCost, isCustomItem, paidBy, hasBill)
+            OUTPUT INSERTED.settlementItemId, INSERTED.hasBill
+            VALUES (@assignmentId, @itemName, @actualCost, @isCustomItem, @paidBy, @hasBill)
+          `);
+          console.log('settle - item inserted, OUTPUT hasBill:', result.recordset[0]?.hasBill, '| rowsAffected:', result.rowsAffected);
         }
         
         // ALWAYS calculate totals and mark as settled
@@ -378,7 +350,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           .query(`
             SELECT COUNT(*) as unsettledCount
             FROM PettyCashAssignments
-            WHERE jobId = @jobId AND status != 'Settled'
+            WHERE jobId = @jobId AND status NOT IN ('Settled', 'Settled/Approved', 'Settled/Rejected', 'Balance Returned', 'Overdue Collected')
           `);
         
         console.log('settle - unsettledCount:', unsettledCount.recordset[0].unsettledCount);

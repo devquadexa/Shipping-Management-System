@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { billingService } from '../api/services/billingService';
 import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
+import API_BASE from '../api/config';
 import '../styles/Billing.css';
 
 function Billing() {
@@ -26,6 +27,12 @@ function Billing() {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
   const [expandedBillId, setExpandedBillId] = useState(null);
+  
+  // New states for pay item editing
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPayItem, setEditingPayItem] = useState(null);
+  const [editingIndex, setEditingIndex] = useState(-1);
+  const [editBillingAmount, setEditBillingAmount] = useState('');
 
   useEffect(() => {
     fetchBills();
@@ -86,7 +93,7 @@ function Billing() {
       
       // 1. Load Office Pay Items (upfront payments by office staff)
       try {
-        const officePayItemsResponse = await fetch(`http://localhost:5000/api/office-pay-items/job/${jobId}`, {
+        const officePayItemsResponse = await fetch(`${API_BASE}/api/office-pay-items/job/${jobId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -120,7 +127,7 @@ function Billing() {
         setLoadingSettlement(true);
         try {
           // Fetch ALL assignments for this job
-          const response = await fetch(`http://localhost:5000/api/petty-cash-assignments/job/${jobId}/all`, {
+          const response = await fetch(`${API_BASE}/api/petty-cash-assignments/job/${jobId}/all`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -162,29 +169,51 @@ function Billing() {
         }
       }
       
-      // 3. Set all pay items or show empty state
+      // 3. Smart UI Logic: Only show entry form if no pay items exist in the job
       if (allPayItems.length > 0) {
         setPayItems(allPayItems);
-        setShowPayItemsRow(true);
+        
+        // SMART UI: Only show entry form if the job doesn't have saved pay items
+        // If job already has pay items, show only the review table
+        const hasExistingPayItems = job.payItems && job.payItems.length > 0;
+        setShowPayItemsRow(!hasExistingPayItems);
         
         const officeItemsCount = allPayItems.filter(item => item.isOfficePayItem).length;
         const pettyCashItemsCount = allPayItems.filter(item => item.isPettyCashItem).length;
         
-        let message = `✅ Loaded ${allPayItems.length} items: `;
-        if (officeItemsCount > 0) message += `${officeItemsCount} office payments`;
-        if (pettyCashItemsCount > 0) {
-          if (officeItemsCount > 0) message += `, `;
-          message += `${pettyCashItemsCount} petty cash items`;
+        let message;
+        if (hasExistingPayItems) {
+          message = `📋 Job has ${job.payItems.length} saved pay items. Use "+ Add More Items" to add additional items.`;
+        } else {
+          message = `✅ Loaded ${allPayItems.length} items: `;
+          if (officeItemsCount > 0) message += `${officeItemsCount} office payments`;
+          if (pettyCashItemsCount > 0) {
+            if (officeItemsCount > 0) message += `, `;
+            message += `${pettyCashItemsCount} petty cash items`;
+          }
+          message += '. Please review billing amounts.';
         }
-        message += '. Please review billing amounts.';
         
         setMessage(message);
         setTimeout(() => setMessage(''), 5000);
       } else {
-        // No items found, load templates or show empty
-        if (job?.pettyCashStatus !== 'Settled') {
-          setMessage('Petty cash must be settled before generating invoice');
-          setTimeout(() => setMessage(''), 3000);
+        // No items found from office/petty cash, check if job has existing pay items
+        const hasExistingPayItems = job.payItems && job.payItems.length > 0;
+        
+        if (hasExistingPayItems) {
+          // Job has existing pay items, don't show entry form
+          setShowPayItemsRow(false);
+          setMessage(`📋 Job has ${job.payItems.length} saved pay items. Use "+ Add More Items" to add additional items.`);
+          setTimeout(() => setMessage(''), 5000);
+        } else {
+          // No existing pay items, show entry form or load templates
+          if (job?.pettyCashStatus !== 'Settled') {
+            setMessage('Petty cash must be settled before generating invoice');
+            setTimeout(() => setMessage(''), 3000);
+          } else {
+            // Load templates for first-time entry
+            loadPayItemTemplates(job);
+          }
         }
         setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, paidBy: '', paidByName: '' }]);
       }
@@ -200,7 +229,7 @@ function Billing() {
     if (job?.shipmentCategory && (!job.payItems || job.payItems.length === 0)) {
       console.log('Loading pay item templates for category:', job.shipmentCategory);
       try {
-        const response = await fetch(`http://localhost:5000/api/pay-item-templates/category/${encodeURIComponent(job.shipmentCategory)}`, {
+        const response = await fetch(`${API_BASE}/api/pay-item-templates/category/${encodeURIComponent(job.shipmentCategory)}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -294,7 +323,7 @@ function Billing() {
       for (const item of officePayItems) {
         if (item.officePayItemId) {
           try {
-            const response = await fetch(`http://localhost:5000/api/office-pay-items/${item.officePayItemId}`, {
+            const response = await fetch(`${API_BASE}/api/office-pay-items/${item.officePayItemId}`, {
               method: 'PUT',
               headers: {
                 'Content-Type': 'application/json',
@@ -367,8 +396,22 @@ function Billing() {
       const updatedJob = updatedJobs.find(j => j.jobId === selectedJob.jobId);
       
       console.log('Updated selected job with pay items:', updatedJob);
+      console.log('Updated job payItems:', updatedJob?.payItems);
+      console.log('Updated job payItems length:', updatedJob?.payItems?.length);
       
-      setSelectedJob(updatedJob);
+      if (updatedJob) {
+        setSelectedJob(updatedJob);
+        console.log('✓ Selected job updated successfully');
+      } else {
+        console.error('❌ Could not find updated job');
+        // Fallback: just update the current selectedJob with new pay items
+        setSelectedJob({
+          ...selectedJob,
+          payItems: allPayItemsData
+        });
+      }
+      
+      // Reset the pay items form
       setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
       
       setTimeout(() => setMessage(''), 5000);
@@ -416,6 +459,103 @@ function Billing() {
     });
     
     return { actualCost, billingAmount, profit, grossTotal, advancePayment, netTotal };
+  };
+
+  // Helper function to check if user can edit pay items
+  const canEditPayItems = () => {
+    return user?.role === 'Super Admin' || user?.role === 'Admin';
+  };
+
+  // Open edit modal for a pay item
+  const openEditModal = (payItem, index) => {
+    if (!canEditPayItems()) {
+      setMessage('❌ Only Super Admin and Admin users can edit pay items. Please contact an administrator for changes.');
+      setTimeout(() => setMessage(''), 5000);
+      return;
+    }
+    
+    setEditingPayItem(payItem);
+    setEditingIndex(index);
+    setEditBillingAmount(payItem.billingAmount || payItem.amount || '');
+    setShowEditModal(true);
+  };
+
+  // Save edited pay item
+  const saveEditedPayItem = async () => {
+    if (!editingPayItem || editingIndex === -1) return;
+    
+    const newBillingAmount = parseFloat(editBillingAmount);
+    if (isNaN(newBillingAmount) || newBillingAmount < 0) {
+      setMessage('❌ Please enter a valid billing amount');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    try {
+      // Update the pay item in the selectedJob
+      const updatedPayItems = [...selectedJob.payItems];
+      updatedPayItems[editingIndex] = {
+        ...updatedPayItems[editingIndex],
+        billingAmount: newBillingAmount
+      };
+
+      // Save to backend
+      await jobService.replacePayItems(selectedJob.jobId, updatedPayItems);
+      
+      // Update local state
+      setSelectedJob({
+        ...selectedJob,
+        payItems: updatedPayItems
+      });
+
+      setMessage('✅ Pay item billing amount updated successfully');
+      setShowEditModal(false);
+      setEditingPayItem(null);
+      setEditingIndex(-1);
+      setEditBillingAmount('');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error updating pay item:', error);
+      setMessage('❌ Error updating pay item. Please try again.');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  // Remove a pay item
+  const removePayItem = async (index) => {
+    if (!canEditPayItems()) {
+      setMessage('❌ Only Super Admin and Admin users can remove pay items. Please contact an administrator for changes.');
+      setTimeout(() => setMessage(''), 5000);
+      return;
+    }
+
+    const payItem = selectedJob.payItems[index];
+    const confirmMessage = `Are you sure you want to remove "${payItem.description}" from the invoice?\n\nThis action cannot be undone.`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      // Remove the pay item from the array
+      const updatedPayItems = selectedJob.payItems.filter((_, i) => i !== index);
+
+      // Save to backend
+      await jobService.replacePayItems(selectedJob.jobId, updatedPayItems);
+      
+      // Update local state
+      setSelectedJob({
+        ...selectedJob,
+        payItems: updatedPayItems
+      });
+
+      setMessage('✅ Pay item removed successfully');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error removing pay item:', error);
+      setMessage('❌ Error removing pay item. Please try again.');
+      setTimeout(() => setMessage(''), 3000);
+    }
   };
 
   const generateBill = async () => {
@@ -540,7 +680,7 @@ function Billing() {
       console.log('printBill - bill.jobId:', bill.jobId);
       
       // Fetch complete job details including pay items
-      const response = await fetch(`http://localhost:5000/api/jobs/${bill.jobId}`, {
+      const response = await fetch(`${API_BASE}/api/jobs/${bill.jobId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -613,6 +753,7 @@ function Billing() {
   const generateBillHTML = (bill, job, customer) => {
     const billDate = new Date(bill.billDate || bill.createdDate).toLocaleDateString('en-GB');
     const invoiceNumber = bill.invoiceNumber || bill.billId;
+    const invoiceLogoUrl = `${window.location.origin}/logo2.png`;
     
     console.log('generateBillHTML - bill:', bill);
     console.log('generateBillHTML - job:', job);
@@ -663,226 +804,262 @@ function Billing() {
       <head>
         <title>Invoice - Super Shine Cargo Services</title>
         <style>
-          @page { margin: 20mm; }
-          body {
-            font-family: Arial, sans-serif;
-            font-size: 11pt;
-            line-height: 1.4;
+          @page { 
+            margin: 15mm 20mm; 
+            size: A4;
+          }
+          * {
             margin: 0;
             padding: 0;
           }
-          .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.3;
+            color: #000;
           }
-          .logo-section {
-            display: flex;
+          .page-header {
+            position: relative;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #000;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
             align-items: center;
             gap: 15px;
           }
           .logo {
-            width: 60px;
-            height: 60px;
-            background: #101036;
-            color: white;
+            width: 72px;
+            height: 72px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            font-size: 20px;
             border-radius: 4px;
+            flex-shrink: 0;
+            overflow: hidden;
+            background: #fff;
           }
-          .company-info {
-            flex: 1;
+          .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+          }
+          .company-header {
+            text-align: center;
+            margin-bottom: 0;
           }
           .company-name {
-            font-size: 18pt;
+            font-size: 13pt;
             font-weight: bold;
+            letter-spacing: 1px;
             margin-bottom: 3px;
+            color: #1a1a2e;
           }
           .company-tagline {
-            font-size: 10pt;
-            color: #666;
+            font-size: 8pt;
+            margin: 1px 0;
+            color: #555;
           }
-          .invoice-info {
+          .invoice-header-right {
             text-align: right;
+            font-size: 9pt;
+            line-height: 1.5;
+          }
+          .invoice-header-right strong {
+            display: block;
             font-size: 10pt;
           }
-          .section {
+          .recipient {
             margin: 15px 0;
+            line-height: 1.5;
           }
-          .row {
+          .recipient-line {
+            margin: 2px 0;
+            font-size: 10pt;
+          }
+          .details-section {
+            margin: 12px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #000;
+          }
+          .detail-row {
             display: flex;
             margin: 3px 0;
+            font-size: 10pt;
           }
-          .label {
+          .detail-label {
             font-weight: bold;
-            width: 150px;
+            width: 120px;
+            min-width: 120px;
           }
-          .value {
+          .detail-value {
             flex: 1;
+            word-wrap: break-word;
           }
-          .divider {
+          .items-section {
+            margin: 15px 0;
+          }
+          .item-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+            font-size: 10pt;
+            padding: 2px 0;
+            border-bottom: 1px solid #e0e0e0;
+          }
+          .item-description {
+            flex: 1;
+            padding-right: 20px;
+          }
+          .item-amount {
+            text-align: right;
+            min-width: 100px;
+            padding-right: 5px;
+            font-weight: normal;
+          }
+          .item-row.subtotal {
             border-top: 1px solid #000;
-            margin: 15px 0;
+            border-bottom: none;
+            margin-top: 10px;
+            padding-top: 8px;
+            font-weight: normal;
           }
-          .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
+          .item-row.total {
+            border-top: 2px solid #000;
+            border-bottom: none;
+            margin-top: 8px;
+            padding-top: 10px;
+            padding-bottom: 5px;
+            font-weight: bold;
+            font-size: 11pt;
           }
-          .items-table th,
-          .items-table td {
-            border: 1px solid #000;
-            padding: 8px;
+          .signature-section {
+            margin-top: 40px;
             text-align: left;
           }
-          .items-table th {
-            background-color: #f0f0f0;
+          .signature-space {
+            border-top: 1px solid #000;
+            width: 200px;
+            margin: 50px 0 5px 0;
+            height: 2px;
+          }
+          .signature-label {
+            font-size: 10pt;
             font-weight: bold;
-          }
-          .items-table td.amount {
-            text-align: right;
-          }
-          .total-section {
-            margin-top: 20px;
-            text-align: right;
-          }
-          .total-row {
-            margin: 5px 0;
-            font-size: 12pt;
-          }
-          .grand-total {
-            font-size: 14pt;
-            font-weight: bold;
-            border-top: 2px solid #000;
-            padding-top: 10px;
-            margin-top: 10px;
+            margin-top: 5px;
           }
           .footer {
-            text-align: center;
-            margin-top: 40px;
-            border-top: 1px solid #000;
+            margin-top: 20px;
             padding-top: 10px;
-            font-size: 9pt;
-            color: #666;
+            border-top: 1px solid #000;
+            text-align: center;
+            font-size: 8pt;
+            line-height: 1.3;
+            color: #333;
+          }
+          .footer-line {
+            margin: 2px 0;
           }
           @media print {
-            body { padding: 0; }
-            .no-print { display: none; }
+            body { margin: 0; padding: 0; }
+            .no-print { display: none !important; }
           }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="logo-section">
-            <div class="logo">SS</div>
-            <div class="company-info">
-              <div class="company-name">SUPER SHINE CARGO SERVICES</div>
-              <div class="company-tagline">Freight Forwarding / Clearing & Transporters</div>
-              <div class="company-tagline">Sea freight / Air Freight</div>
-            </div>
+        <div class="page-header">
+          <div class="logo">
+            <img src="${invoiceLogoUrl}" alt="SS Cargo Logo" />
           </div>
-          <div class="invoice-info">
-            <div>Date: ${billDate}</div>
-            <div><strong>INV No: ${invoiceNumber}</strong></div>
+          <div class="company-header">
+            <div class="company-name">SUPER SHINE CARGO SERVICES</div>
+            <div class="company-tagline">Freight Forwarding / Clearing & Transporters</div>
+            <div class="company-tagline">Sea freight / Air Freight</div>
           </div>
-        </div>
-
-        <div class="section">
-          <div class="row">
-            <span class="label">The Director,</span>
-          </div>
-          <div class="row">
-            <span class="label"><strong>${customer.name}</strong></span>
-          </div>
-          <div class="row">
-            <span class="value">${customer.address}</span>
+          <div class="invoice-header-right">
+            ${billDate}<br>
+            <strong>INV No: ${invoiceNumber}</strong>
           </div>
         </div>
 
-        <div class="divider"></div>
-
-        <div class="section">
-          <div class="row">
-            <span class="label">Cusdec No:</span>
-            <span class="value">${job.cusdecNumber || '-'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Exporter:</span>
-            <span class="value">${job.exporter || '-'}</span>
-          </div>
-          <div class="row">
-            <span class="label">LC No:</span>
-            <span class="value">${job.lcNumber || '-'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Container No:</span>
-            <span class="value">${job.containerNumber || '-'}</span>
-          </div>
-          <div class="row">
-            <span class="label">Category:</span>
-            <span class="value">${job.shipmentCategory || '-'}</span>
-          </div>
+        <div class="recipient">
+          <div class="recipient-line">The Director,</div>
+          <div class="recipient-line"><strong>${customer.name}</strong></div>
+          ${customer && (customer.addressNumber || customer.addressStreet1 || customer.addressCity) ? 
+            `<div class="recipient-line">${customer.addressNumber || ''}, ${customer.addressStreet1 || ''}, ${customer.addressStreet2 ? customer.addressStreet2 + ', ' : ''}${customer.addressDistrict || ''}, ${customer.addressCity || ''}, ${customer.addressCountry || 'Sri Lanka'}</div>` 
+            : ''}
         </div>
 
-        <div class="divider"></div>
+        <div class="details-section">
+          <div class="detail-row">
+            <div class="detail-label">Cusdec No</div>
+            <div class="detail-value">: ${job.cusdecNumber || '-'}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Exporter</div>
+            <div class="detail-value">: ${job.exporter || '-'}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">LC No</div>
+            <div class="detail-value">: ${job.lcNumber || '-'}</div>
+          </div>
+          <div class="detail-row">
+            <div class="detail-label">Container No</div>
+            <div class="detail-value">: ${job.containerNumber || '-'}</div>
+          </div>
+          ${job.shipmentCategory ? `
+          <div class="detail-row">
+            <div class="detail-label">Cargo Description</div>
+            <div class="detail-value">: ${job.shipmentCategory}</div>
+          </div>
+          ` : ''}
+        </div>
 
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th style="text-align: right; width: 150px;">Amount (LKR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${payItemsArray && Array.isArray(payItemsArray) && payItemsArray.length > 0 ? 
-              payItemsArray.map(item => {
-                console.log('Invoice item:', item);
-                const description = item.description || item.name || 'Service Charge';
-                const amount = item.billingAmount || item.amount || 0;
-                return `
-                  <tr>
-                    <td>${description}</td>
-                    <td class="amount">${formatAmount(amount)}</td>
-                  </tr>
-                `;
-              }).join('') : 
-              `<tr>
-                <td>Service Charges</td>
-                <td class="amount">${formatAmount(grossTotal)}</td>
-              </tr>`
-            }
-          </tbody>
-        </table>
-
-        <div class="total-section">
+        <div class="items-section">
+          ${payItemsArray && Array.isArray(payItemsArray) && payItemsArray.length > 0 ? 
+            payItemsArray.map(item => {
+              const description = item.description || item.name || 'Service Charge';
+              const amount = item.billingAmount || item.amount || 0;
+              return `
+                <div class="item-row">
+                  <div class="item-description">${description}</div>
+                  <div class="item-amount">${formatAmount(amount)}</div>
+                </div>
+              `;
+            }).join('') : 
+            `<div class="item-row">
+              <div class="item-description">Service Charges</div>
+              <div class="item-amount">${formatAmount(grossTotal)}</div>
+            </div>`
+          }
+          
+          <div class="item-row subtotal">
+            <div class="item-description">GROSS TOTAL</div>
+            <div class="item-amount">${formatAmount(grossTotal)}</div>
+          </div>
+          
           ${advancePayment > 0 ? `
-            <div class="total-row">
-              <span>GROSS TOTAL: LKR ${formatAmount(grossTotal)}</span>
+            <div class="item-row subtotal">
+              <div class="item-description">LESS: Advance Amount</div>
+              <div class="item-amount">${formatAmount(advancePayment)}</div>
             </div>
-            <div class="total-row">
-              <span>LESS: ADVANCE PAYMENT: LKR ${formatAmount(advancePayment)}</span>
-            </div>
-            <div class="grand-total">
-              <span>NET TOTAL DUE: LKR ${formatAmount(netTotal)}</span>
-            </div>
-          ` : `
-            <div class="grand-total">
-              <span>TOTAL DUE AMOUNT: LKR ${formatAmount(bill.billingAmount)}</span>
-            </div>
-          `}
+          ` : ''}
+          
+          <div class="item-row total">
+            <div class="item-description">Total Due Amount</div>
+            <div class="item-amount">${formatAmount(advancePayment > 0 ? netTotal : grossTotal)}</div>
+          </div>
+        </div>
+
+        <div class="signature-section">
+          <div class="signature-space"></div>
+          <div class="signature-label">SUPER SHINE CARGO SERVICES<br>MANAGER</div>
         </div>
 
         <div class="footer">
-          <p><strong>SUPER SHINE CARGO SERVICES - MANAGER</strong></p>
-          <p>No. 10/A, Ground Floor, Y M B A Building Colombo 01, Sri Lanka</p>
-          <p>Tel: 2435581, 2433983 | Fax: 2433580, 2439697 | Hotline: 0777-698696, 076 6857070</p>
-          <p>E-mail: superallbrooks@gmail.com</p>
+          <div class="footer-line">No. 10/A, Ground Floor, Y.M.B.A Building Colombo 01, Sri Lanka. Tel: 2433581, 2433983</div>
+          <div class="footer-line">Fax No. 2433580, 2439697 Hotline: 0777-898996, 076 6857070 E-mail: superallbrooks@gmail.com</div>
         </div>
       </body>
       </html>
@@ -1150,12 +1327,23 @@ function Billing() {
                     <div className="pay-items-review-header">
                       <h4>📋 Pay Items Review</h4>
                       <p className="review-subtitle">Review all pay items before generating invoice</p>
+                      {user?.role === 'Manager' && (
+                        <div className="manager-notice">
+                          <div className="notice-icon">💼</div>
+                          <div className="notice-text">
+                            <strong>Manager Access:</strong> To modify billing amounts or remove pay items, please contact a Super Admin or Admin for assistance.
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="pay-items-review-table">
+                    <div className={`pay-items-review-table ${!canEditPayItems() ? 'no-actions' : ''}`}>
                       <div className="table-header">
                         <div className="header-cell description-header">Description</div>
                         <div className="header-cell amount-header">Actual Cost (LKR)</div>
                         <div className="header-cell amount-header">Billing Amount (LKR)</div>
+                        {canEditPayItems() && (
+                          <div className="header-cell actions-header">Actions</div>
+                        )}
                       </div>
                       <div className="table-body">
                         {selectedJob.payItems.map((item, idx) => (
@@ -1163,12 +1351,33 @@ function Billing() {
                             <div className="table-cell description-cell">{item.description}</div>
                             <div className="table-cell amount-cell">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</div>
                             <div className="table-cell amount-cell">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</div>
+                            {canEditPayItems() && (
+                              <div className="table-cell actions-cell">
+                                <button
+                                  className="action-btn edit-btn"
+                                  onClick={() => openEditModal(item, idx)}
+                                  title="Edit billing amount"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  className="action-btn remove-btn"
+                                  onClick={() => removePayItem(idx)}
+                                  title="Remove pay item"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                         <div className="table-row total-row">
                           <div className="table-cell description-cell total-label"><strong>Total</strong></div>
                           <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></div>
                           <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                         <div className="table-row profit-row">
                           <div className="table-cell description-cell profit-label"><strong>Profit Margin</strong></div>
@@ -1178,12 +1387,18 @@ function Billing() {
                               {formatAmount(calculateTotals().profit)}
                             </strong>
                           </div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                         {/* Advance Payment Summary */}
                         <div className="table-row advance-summary-row">
                           <div className="table-cell description-cell advance-summary-label"><strong>Invoice Summary</strong></div>
                           <div className="table-cell amount-cell"></div>
                           <div className="table-cell amount-cell"></div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                         <div className="table-row gross-total-row">
                           <div className="table-cell description-cell gross-total-label">Gross Total</div>
@@ -1191,6 +1406,9 @@ function Billing() {
                           <div className="table-cell amount-cell gross-total-amount">
                             <strong>{formatAmount(calculateTotals().grossTotal)}</strong>
                           </div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                         {selectedJob.advancePayment > 0 && (
                           <div className="table-row advance-payment-row">
@@ -1199,6 +1417,9 @@ function Billing() {
                             <div className="table-cell amount-cell advance-payment-amount">
                               <strong className="advance-deduction">({formatAmount(calculateTotals().advancePayment)})</strong>
                             </div>
+                            {canEditPayItems() && (
+                              <div className="table-cell actions-cell"></div>
+                            )}
                           </div>
                         )}
                         <div className="table-row net-total-row">
@@ -1207,6 +1428,9 @@ function Billing() {
                           <div className="table-cell amount-cell net-total-amount">
                             <strong className="final-amount">{formatAmount(calculateTotals().netTotal)}</strong>
                           </div>
+                          {canEditPayItems() && (
+                            <div className="table-cell actions-cell"></div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1360,8 +1584,73 @@ function Billing() {
           </div>
         )}
       </div>
+
+      {/* Edit Pay Item Modal */}
+      {showEditModal && editingPayItem && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal modal-medium" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>✏️ Edit Pay Item</h3>
+              <button className="btn-close" onClick={() => setShowEditModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="edit-pay-item-info">
+                <div className="info-row">
+                  <span className="info-label">Description:</span>
+                  <span className="info-value">{editingPayItem.description}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Actual Cost:</span>
+                  <span className="info-value">LKR {formatAmount(editingPayItem.actualCost || editingPayItem.amount || 0)}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Current Billing Amount:</span>
+                  <span className="info-value">LKR {formatAmount(editingPayItem.billingAmount || editingPayItem.amount || 0)}</span>
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label>New Billing Amount (LKR) <span className="required">*</span></label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editBillingAmount}
+                  onChange={(e) => setEditBillingAmount(e.target.value)}
+                  placeholder="Enter new billing amount"
+                  className="form-control"
+                />
+                <p className="helper-text">
+                  💡 You can only modify the billing amount. The actual cost remains unchanged for accounting purposes.
+                </p>
+              </div>
+              
+              <div className="enterprise-notice">
+                <div className="notice-icon">🏢</div>
+                <div className="notice-content">
+                  <strong>Enterprise Policy:</strong>
+                  <p>Only Super Admin and Admin users can modify billing amounts. This ensures proper financial controls and audit trails in enterprise operations.</p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button onClick={() => setShowEditModal(false)} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button 
+                onClick={saveEditedPayItem} 
+                className="btn btn-primary"
+                disabled={!editBillingAmount || parseFloat(editBillingAmount) < 0}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default Billing;
+

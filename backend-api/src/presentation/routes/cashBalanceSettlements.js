@@ -36,6 +36,13 @@ module.exports = (container) => {
     (req, res) => cashBalanceSettlementController.getApprovedSettlements(req, res)
   );
 
+  // Get rejected settlements (Management only)
+  router.get('/rejected', 
+    auth, 
+    checkRole('Super Admin', 'Admin', 'Manager'), 
+    (req, res) => cashBalanceSettlementController.getRejectedSettlements(req, res)
+  );
+
   // Get specific settlement by ID
   router.get('/:settlementId', 
     auth, 

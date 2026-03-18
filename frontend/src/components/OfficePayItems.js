@@ -11,7 +11,7 @@ const columnStyles = `
   }
   .billing-table th.col-actual,
   .billing-table td.col-actual {
-    padding-right: 1rem !important;
+    padding-left: 1rem !important;
   }
   .billing-table th.col-paidby,
   .billing-table td.col-paidby {

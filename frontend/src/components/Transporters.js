@@ -33,15 +33,25 @@ function Transporters() {
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState('');
 
-  const canManageTransporters = user && (user.role === 'Admin' || user.role === 'Super Admin');
+  const canViewTransporters = user && (
+    user.role === 'Admin' ||
+    user.role === 'Super Admin' ||
+    user.role === 'Manager' ||
+    user.role === 'Office Executive'
+  );
+  const canManageTransporters = user && (
+    user.role === 'Admin' ||
+    user.role === 'Super Admin' ||
+    user.role === 'Manager'
+  );
 
   useEffect(() => {
-    if (canManageTransporters) {
+    if (canViewTransporters) {
       fetchTransporters();
       fetchDistricts();
       fetchAllCities();
     }
-  }, [canManageTransporters]);
+  }, [canViewTransporters]);
 
   useEffect(() => {
     if (showModal) {
@@ -297,6 +307,14 @@ function Transporters() {
   };
 
   const filteredTransporters = transporters.filter((transporter) => {
+    const isActive = transporter.isActive === undefined || transporter.isActive === null
+      ? true
+      : Boolean(transporter.isActive);
+
+    if (!isActive) {
+      return false;
+    }
+
     const haystack = [
       transporter.transporterId,
       transporter.name,
@@ -312,10 +330,10 @@ function Transporters() {
     return haystack.includes(searchTerm.toLowerCase());
   });
 
-  if (!canManageTransporters) {
+  if (!canViewTransporters) {
     return (
       <div className="container">
-        <div className="alert alert-error">Access Denied: Admin or Super Admin only</div>
+        <div className="alert alert-error">Access Denied</div>
       </div>
     );
   }
@@ -327,9 +345,11 @@ function Transporters() {
           <h1>Transporters</h1>
           <p>Manage transporter details and contact information</p>
         </div>
-        <button onClick={openCreateModal} className="btn btn-primary">
-          + New Transporter
-        </button>
+        {canManageTransporters && (
+          <button onClick={openCreateModal} className="btn btn-primary">
+            + New Transporter
+          </button>
+        )}
       </div>
 
       {message && (
@@ -393,14 +413,16 @@ function Transporters() {
                       </td>
                       <td data-label="Actions">
                         <div className="row-actions transporter-actions">
-                          <button
-                            type="button"
-                            className="btn-action btn-edit"
-                            onClick={() => openEditModal(transporter)}
-                            title="Edit Transporter"
-                          >
-                            Edit
-                          </button>
+                          {canManageTransporters && (
+                            <button
+                              type="button"
+                              className="btn-action btn-edit"
+                              onClick={() => openEditModal(transporter)}
+                              title="Edit Transporter"
+                            >
+                              Edit
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="btn-action btn-view"
@@ -494,17 +516,19 @@ function Transporters() {
                               )}
                             </div>
 
-                            <div className="detail-section">
-                              <div className="detail-actions">
-                                <button
-                                  className="btn btn-danger"
-                                  onClick={() => handleDeactivate(transporter.transporterId)}
-                                  title="Deactivate Transporter"
-                                >
-                                  Deactivate Transporter
-                                </button>
+                            {canManageTransporters && (
+                              <div className="detail-section">
+                                <div className="detail-actions">
+                                  <button
+                                    className="btn btn-danger"
+                                    onClick={() => handleDeactivate(transporter.transporterId)}
+                                    title="Deactivate Transporter"
+                                  >
+                                    Deactivate Transporter
+                                  </button>
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         </td>
                       </tr>

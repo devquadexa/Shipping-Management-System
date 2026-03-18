@@ -3,8 +3,9 @@
  * Handles rejection of settlement requests by Management
  */
 class RejectCashBalanceSettlement {
-  constructor(cashBalanceSettlementRepository) {
+  constructor(cashBalanceSettlementRepository, pettyCashAssignmentRepository) {
     this.cashBalanceSettlementRepository = cashBalanceSettlementRepository;
+    this.pettyCashAssignmentRepository = pettyCashAssignmentRepository;
   }
 
   async execute(settlementId, managerId, managerName, managerNotes) {
@@ -18,7 +19,7 @@ class RejectCashBalanceSettlement {
     settlement.reject(managerId, managerName, managerNotes);
 
     // Update in database
-    return await this.cashBalanceSettlementRepository.update(settlementId, {
+    const rejectedSettlement = await this.cashBalanceSettlementRepository.update(settlementId, {
       status: settlement.status,
       managerId: settlement.managerId,
       managerName: settlement.managerName,
@@ -26,6 +27,20 @@ class RejectCashBalanceSettlement {
       updatedBy: settlement.updatedBy,
       updatedDate: settlement.updatedDate
     });
+
+    // Mark related assignment statuses as rejected to make manager decision explicit to clerks.
+    if (settlement.relatedAssignments && settlement.relatedAssignments.length > 0) {
+      for (const assignmentId of settlement.relatedAssignments) {
+        try {
+          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, 'Settled/Rejected');
+        } catch (error) {
+          console.error(`Failed to update assignment ${assignmentId} status:`, error);
+          // Don't throw - settlement was rejected successfully, just log the error
+        }
+      }
+    }
+
+    return rejectedSettlement;
   }
 }
 

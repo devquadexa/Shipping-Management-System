@@ -3,8 +3,9 @@
  * Handles approval of settlement requests by Management
  */
 class ApproveCashBalanceSettlement {
-  constructor(cashBalanceSettlementRepository) {
+  constructor(cashBalanceSettlementRepository, pettyCashAssignmentRepository) {
     this.cashBalanceSettlementRepository = cashBalanceSettlementRepository;
+    this.pettyCashAssignmentRepository = pettyCashAssignmentRepository;
   }
 
   async execute(settlementId, managerId, managerName, managerNotes = null) {
@@ -18,7 +19,7 @@ class ApproveCashBalanceSettlement {
     settlement.approve(managerId, managerName, managerNotes);
 
     // Update in database
-    return await this.cashBalanceSettlementRepository.update(settlementId, {
+    const approvedSettlement = await this.cashBalanceSettlementRepository.update(settlementId, {
       status: settlement.status,
       managerId: settlement.managerId,
       managerName: settlement.managerName,
@@ -27,6 +28,22 @@ class ApproveCashBalanceSettlement {
       updatedBy: settlement.updatedBy,
       updatedDate: settlement.updatedDate
     });
+
+    // Update related assignment statuses after management approval
+    // Clerk-facing status should clearly show both settlement and decision state.
+    if (settlement.relatedAssignments && settlement.relatedAssignments.length > 0) {
+      const finalStatus = 'Settled/Approved';
+
+      for (const assignmentId of settlement.relatedAssignments) {
+        try {
+          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, finalStatus);
+        } catch (error) {
+          console.error(`Failed to update assignment ${assignmentId} status:`, error);
+        }
+      }
+    }
+
+    return approvedSettlement;
   }
 }
 

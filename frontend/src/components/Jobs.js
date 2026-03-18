@@ -288,20 +288,18 @@ function Jobs() {
     try {
       await jobService.update(selectedJob.jobId, formData);
       
-      // Update user assignments if changed
-      if (selectedUsers.length > 0) {
-        try {
-          const response = await apiClient.post(`/job-assignments/jobs/${selectedJob.jobId}/assign-users`, {
-            userIds: selectedUsers,
-            notes: 'Updated assignment from job edit'
-          });
-          
-          if (!response.data.success) {
-            console.error('Failed to update user assignments');
-          }
-        } catch (assignmentError) {
-          console.error('Failed to update user assignments:', assignmentError);
+      // Always synchronize assignments on edit, including clearing all assignees.
+      try {
+        const response = await apiClient.post(`/job-assignments/jobs/${selectedJob.jobId}/assign-users`, {
+          userIds: selectedUsers,
+          notes: 'Updated assignment from job edit'
+        });
+        
+        if (!response.data.success) {
+          console.error('Failed to update user assignments');
         }
+      } catch (assignmentError) {
+        console.error('Failed to update user assignments:', assignmentError);
       }
       
       setMessage('Job updated successfully!');
@@ -768,9 +766,9 @@ function Jobs() {
                 </div>
               </div>
 
-              <div className="action-buttons">
-                <button type="submit" className="btn btn-primary">{isEditing ? 'Update Job' : 'Create Job'}</button>
+              <div className="action-buttons modal-action-buttons">
                 <button type="button" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">{isEditing ? 'Update Job' : 'Create Job'}</button>
               </div>
             </form>
           </div>

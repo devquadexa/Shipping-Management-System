@@ -116,6 +116,20 @@
   border-bottom: 2px solid #e5e7eb;
 }
 
+/* Keep Office Pay Items header stable even when shared table styles or hover states apply. */
+.office-pay-items-section .billing-table thead,
+.office-pay-items-section .billing-table thead tr,
+.office-pay-items-section .billing-table thead th {
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%) !important;
+  color: #ffffff !important;
+}
+
+.office-pay-items-section .billing-table thead tr:hover,
+.office-pay-items-section .billing-table thead th:hover {
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%) !important;
+  color: #ffffff !important;
+}
+
 .billing-table th {
   padding: 1.25rem 0.5rem;
   text-align: left;
@@ -137,9 +151,8 @@
 }
 .billing-table th.col-actual { 
   width: 16.66%; 
-  text-align: right; 
-  padding-right: 1rem !important;
-  padding-left: 0.5rem;
+  text-align: left; 
+  padding-left: 1rem !important;
 }
 .billing-table th.col-billing { 
   width: 16.66%; 
@@ -167,10 +180,22 @@
 .billing-table tbody tr {
   border-bottom: 1px solid #f0f0f0;
   transition: background-color 0.2s ease;
+  background-color: #eef4ff;
 }
 
 .billing-table tbody tr:hover {
   background-color: #f9fafb;
+}
+
+/* Prevent cross-page .billing-table style conflicts and keep row hover visible (including first row). */
+.office-pay-items-section .billing-table tbody tr:hover,
+.office-pay-items-section .billing-table tbody tr:first-child:hover {
+  background-color: #eef4ff !important;
+}
+
+.office-pay-items-section .billing-table tbody tr:hover td,
+.office-pay-items-section .billing-table tbody tr:first-child:hover td {
+  background-color: #eef4ff !important;
 }
 
 .billing-table tbody tr:last-child {
@@ -197,9 +222,8 @@
 }
 .billing-table td.col-actual { 
   width: 16.66%; 
-  text-align: right; 
-  padding-right: 1rem !important;
-  padding-left: 0.5rem;
+  text-align: left; 
+  padding-left: 1rem !important;
 }
 .billing-table td.col-billing { 
   width: 16.66%; 
@@ -374,6 +398,13 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.office-pay-items-section .empty-state .btn-empty-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem !important;
 }
 
 .btn-empty-state:hover:not(:disabled) {

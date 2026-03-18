@@ -110,12 +110,29 @@
     margin-bottom: 0.5rem;
   }
 
-  .action-buttons {
+  /* Action buttons - exclude modal forms from column layout */
+  .action-buttons:not(.modal .action-buttons):not(.job-form .action-buttons):not(.modal-action-buttons) {
     flex-direction: column;
   }
 
-  .action-buttons .btn {
+  .action-buttons:not(.modal .action-buttons):not(.job-form .action-buttons):not(.modal-action-buttons) .btn {
     width: 100%;
+  }
+
+  /* Keep modal action buttons horizontal and right-aligned */
+  .modal .action-buttons,
+  .job-form .action-buttons,
+  .modal-action-buttons {
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    gap: 1rem !important;
+  }
+
+  .modal .action-buttons .btn,
+  .job-form .action-buttons .btn,
+  .modal-action-buttons .btn {
+    width: auto !important;
+    min-width: 120px !important;
   }
 
   /* Modal */

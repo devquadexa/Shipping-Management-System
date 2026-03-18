@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Settings.css';
+import API_BASE from '../api/config';
 
 function Settings() {
   const { user } = useAuth();
@@ -22,7 +23,7 @@ function Settings() {
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/pay-item-templates/all', {
+      const response = await fetch(`${API_BASE}/api/pay-item-templates/all`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -42,7 +43,7 @@ function Settings() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/pay-item-templates', {
+      const response = await fetch(`${API_BASE}/api/pay-item-templates`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,7 +77,7 @@ function Settings() {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/pay-item-templates/${templateId}`, {
+      const response = await fetch(`${API_BASE}/api/pay-item-templates/${templateId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +108,7 @@ function Settings() {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/pay-item-templates/${templateId}`, {
+      const response = await fetch(`${API_BASE}/api/pay-item-templates/${templateId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -316,11 +317,11 @@ function Settings() {
                 />
               </div>
               <div className="modal-actions">
-                <button className="btn btn-primary" onClick={handleAddItem}>
-                  Add Item
-                </button>
                 <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                   Cancel
+                </button>
+                <button className="btn btn-primary" onClick={handleAddItem}>
+                  Add Item
                 </button>
               </div>
             </div>
@@ -332,3 +333,5 @@ function Settings() {
 }
 
 export default Settings;
+
+

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/ManagementSettlement.css';
+import API_BASE from '../api/config';
 
 const ManagementSettlement = ({ user }) => {
   const [pendingSettlements, setPendingSettlements] = useState([]);
@@ -20,21 +21,21 @@ const ManagementSettlement = ({ user }) => {
     setLoading(true);
     try {
       // Fetch pending settlements
-      const pendingResponse = await fetch('http://localhost:5000/api/cash-balance-settlements/pending', {
+      const pendingResponse = await fetch(`${API_BASE}/api/cash-balance-settlements/pending`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
 
       // Fetch approved settlements
-      const approvedResponse = await fetch('http://localhost:5000/api/cash-balance-settlements/approved', {
+      const approvedResponse = await fetch(`${API_BASE}/api/cash-balance-settlements/approved`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
 
       // Fetch all settlements
-      const allResponse = await fetch('http://localhost:5000/api/cash-balance-settlements', {
+      const allResponse = await fetch(`${API_BASE}/api/cash-balance-settlements`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -65,7 +66,7 @@ const ManagementSettlement = ({ user }) => {
   const handleApprove = async (settlementId, managerNotes = '') => {
     setActionLoading(prev => ({ ...prev, [settlementId]: 'approving' }));
     try {
-      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/approve`, {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements/${settlementId}/approve`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -93,7 +94,7 @@ const ManagementSettlement = ({ user }) => {
   const handleComplete = async (settlementId, managerNotes = '') => {
     setActionLoading(prev => ({ ...prev, [settlementId]: 'completing' }));
     try {
-      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/complete`, {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements/${settlementId}/complete`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -126,7 +127,7 @@ const ManagementSettlement = ({ user }) => {
 
     setActionLoading(prev => ({ ...prev, [settlementId]: 'rejecting' }));
     try {
-      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/reject`, {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements/${settlementId}/reject`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -448,3 +449,5 @@ const SettlementActions = ({ settlement, onApprove, onComplete, onReject, loadin
 };
 
 export default ManagementSettlement;
+
+

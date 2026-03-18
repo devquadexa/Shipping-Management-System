@@ -4,6 +4,7 @@ import { jobService } from '../api/services/jobService';
 import { authService } from '../api/services/authService';
 import { customerService } from '../api/services/customerService';
 import '../styles/PettyCash.css';
+import API_BASE from '../api/config';
 
 function PettyCash() {
   const { user } = useAuth();
@@ -51,8 +52,8 @@ function PettyCash() {
   const fetchAssignments = async () => {
     try {
       const endpoint = user?.role === 'Waff Clerk' 
-        ? 'http://localhost:5000/api/petty-cash-assignments/my'
-        : 'http://localhost:5000/api/petty-cash-assignments';
+        ? `${API_BASE}/api/petty-cash-assignments/my`
+        : `${API_BASE}/api/petty-cash-assignments`;
       
       const response = await fetch(endpoint, {
         headers: {
@@ -89,7 +90,7 @@ function PettyCash() {
 
   const fetchUserBalances = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/petty-cash-assignments/user-balances', {
+      const response = await fetch(`${API_BASE}/api/petty-cash-assignments/user-balances`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -113,7 +114,7 @@ function PettyCash() {
 
   const fetchOverallBalance = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/petty-cash/balance', {
+      const response = await fetch(`${API_BASE}/api/petty-cash/balance`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -251,7 +252,7 @@ function PettyCash() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/petty-cash-assignments', {
+      const response = await fetch(`${API_BASE}/api/petty-cash-assignments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -290,7 +291,7 @@ function PettyCash() {
     let existingItems = [];
     try {
       const existingResponse = await fetch(
-        `http://localhost:5000/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
+        `${API_BASE}/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -312,7 +313,7 @@ function PettyCash() {
       const job = jobs.find(j => j.jobId === assignment.jobId);
       if (job) {
         const assignmentResponse = await fetch(
-          `http://localhost:5000/api/petty-cash-assignments/job/${assignment.jobId}`,
+          `${API_BASE}/api/petty-cash-assignments/job/${assignment.jobId}`,
           {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -344,7 +345,7 @@ function PettyCash() {
       if (job && job.shipmentCategory) {
         console.log('Fetching templates for category:', job.shipmentCategory);
         const response = await fetch(
-          `http://localhost:5000/api/pay-item-templates/category/${encodeURIComponent(job.shipmentCategory)}`,
+          `${API_BASE}/api/pay-item-templates/category/${encodeURIComponent(job.shipmentCategory)}`,
           {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -373,6 +374,7 @@ function PettyCash() {
                   isCustomItem: false,
                   paidBy: existingItem.paidBy,
                   paidByName: existingItem.paidByName,
+                  hasBill: existingItem.hasBill ? true : false,
                   alreadyPaid: true
                 };
               } else if (paidByOther) {
@@ -383,6 +385,7 @@ function PettyCash() {
                   isCustomItem: false,
                   paidBy: paidByOther.paidBy,
                   paidByName: paidByOther.paidByName,
+                  hasBill: paidByOther.hasBill ? true : false,
                   alreadyPaid: true,
                   paidByOther: true
                 };
@@ -391,6 +394,7 @@ function PettyCash() {
                 itemName: template.itemName,
                 actualCost: '',
                 isCustomItem: false,
+                hasBill: false,
                 alreadyPaid: false
               };
             });
@@ -404,6 +408,7 @@ function PettyCash() {
                 isCustomItem: true,
                 paidBy: ei.paidBy,
                 paidByName: ei.paidByName,
+                hasBill: ei.hasBill ? true : false,
                 alreadyPaid: true
               }));
             
@@ -425,13 +430,14 @@ function PettyCash() {
   };
 
   const handleSettlementItemChange = (index, field, value) => {
-    const newItems = [...settlementItems];
-    newItems[index][field] = value;
+    const newItems = settlementItems.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    );
     setSettlementItems(newItems);
   };
 
   const addSettlementItem = () => {
-    setSettlementItems([...settlementItems, { itemName: '', actualCost: '', isCustomItem: true }]);
+    setSettlementItems([...settlementItems, { itemName: '', actualCost: '', isCustomItem: true, hasBill: false }]);
   };
 
   const removeSettlementItem = (index) => {
@@ -465,8 +471,9 @@ function PettyCash() {
     }
 
     try {
+      console.log('Submitting settlement items with hasBill:', validItems.map(i => ({ name: i.itemName, hasBill: i.hasBill })));
       const response = await fetch(
-        `http://localhost:5000/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settle`,
+        `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settle`,
         {
           method: 'POST',
           headers: {
@@ -477,7 +484,8 @@ function PettyCash() {
             items: validItems.map(item => ({
               itemName: item.itemName,
               actualCost: parseFloat(item.actualCost),
-              isCustomItem: item.isCustomItem
+              isCustomItem: item.isCustomItem,
+              hasBill: item.hasBill ? true : false
             }))
             // Removed partialSettlement flag - each assignment should be fully settled
           })
@@ -527,7 +535,7 @@ function PettyCash() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/cash-balance-settlements', {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -573,8 +581,13 @@ function PettyCash() {
     switch (status) {
       case 'Assigned': return 'status-assigned';
       case 'Settled': return 'status-settled';
+      case 'Settled/Approved': return 'status-approved';
+      case 'Settled/Rejected': return 'status-rejected';
       case 'Returned': return 'status-returned';
       case 'Paid': return 'status-paid';
+      case 'Pending Approval': return 'status-pending-approval';
+      case 'Balance Returned': return 'status-balance-returned';
+      case 'Overdue Collected': return 'status-overdue-collected';
       default: return 'status-assigned';
     }
   };
@@ -696,7 +709,7 @@ function PettyCash() {
                 <div className="balance-detail-row">
                   <span>Settled Assignments:</span>
                   <span className="balance-value">
-                    {assignments.filter(a => a.status === 'Settled').length}
+                    {assignments.filter(a => a.status === 'Settled' || a.status === 'Settled/Approved' || a.status === 'Settled/Rejected').length}
                   </span>
                 </div>
               </div>
@@ -800,7 +813,7 @@ function PettyCash() {
                           )}
                           
                           {/* Settlement buttons for Waff Clerks with balance/over amounts */}
-                          {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
+                          {(assignment.status === 'Settled' || assignment.status === 'Settled/Rejected') && user?.role === 'Waff Clerk' && (
                             <>
                               {assignment.balanceAmount > 0 && (
                                 <button
@@ -823,7 +836,7 @@ function PettyCash() {
                             </>
                           )}
                           
-                          {assignment.status === 'Settled' && (
+                          {(assignment.status === 'Settled' || assignment.status === 'Pending Approval' || assignment.status === 'Settled/Approved' || assignment.status === 'Settled/Rejected' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') && (
                             <button
                               className="btn-action btn-view"
                               onClick={async () => {
@@ -833,7 +846,7 @@ function PettyCash() {
                                 // Load settlement items from API
                                 try {
                                   const response = await fetch(
-                                    `http://localhost:5000/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
+                                    `${API_BASE}/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
                                     {
                                       headers: {
                                         'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -942,10 +955,10 @@ function PettyCash() {
               </div>
 
               <div className="modal-actions">
-                <button type="submit" className="btn btn-primary">Assign Petty Cash</button>
                 <button type="button" onClick={() => setShowAssignModal(false)} className="btn btn-secondary">
                   Cancel
                 </button>
+                <button type="submit" className="btn btn-primary">Assign Petty Cash</button>
               </div>
             </form>
           </div>
@@ -963,7 +976,7 @@ function PettyCash() {
         }}>
           <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{selectedAssignment.status === 'Settled' ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
+              <h2>{(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
               <button className="btn-close" onClick={() => {
                 setShowSettleModal(false);
                 setSelectedAssignment(null);
@@ -974,41 +987,37 @@ function PettyCash() {
             <div className="modal-body-scrollable">
 
             <div className="settlement-info">
-              <div className="info-row">
-                <span className="info-label">Job ID:</span>
-                <span className="info-value">{selectedAssignment.jobId}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Assigned Amount:</span>
-                <span className="info-value">LKR {formatAmount(selectedAssignment.assignedAmount)}</span>
-              </div>
-              {selectedAssignment.status === 'Settled' && (
-                <>
-                  <div className="info-row">
+              <div className="settlement-info-grid">
+                <div className="settlement-info-item">
+                  <span className="info-label">Job ID:</span>
+                  <span className="info-value">{selectedAssignment.jobId}</span>
+                </div>
+                <div className="settlement-info-item">
+                  <span className="info-label">Assigned Amount:</span>
+                  <span className="info-value">LKR {formatAmount(selectedAssignment.assignedAmount)}</span>
+                </div>
+                {(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') && (
+                  <div className="settlement-info-item">
                     <span className="info-label">Actual Spent:</span>
                     <span className="info-value">LKR {formatAmount(selectedAssignment.actualSpent)}</span>
                   </div>
-                  {selectedAssignment.balanceAmount > 0 && (
-                    <div className="info-row">
-                      <span className="info-label">Balance to Return:</span>
-                      <span className="info-value balance-positive">
-                        LKR {formatAmount(selectedAssignment.balanceAmount)}
-                      </span>
-                    </div>
-                  )}
-                  {selectedAssignment.overAmount > 0 && (
-                    <div className="info-row">
-                      <span className="info-label">Over Amount:</span>
-                      <span className="info-value balance-negative">
-                        LKR {formatAmount(selectedAssignment.overAmount)}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
+                )}
+                {selectedAssignment.balanceAmount > 0 && (
+                  <div className="settlement-info-item">
+                    <span className="info-label">Balance to Return:</span>
+                    <span className="info-value balance-positive">LKR {formatAmount(selectedAssignment.balanceAmount)}</span>
+                  </div>
+                )}
+                {selectedAssignment.overAmount > 0 && (
+                  <div className="settlement-info-item">
+                    <span className="info-label">Over Amount:</span>
+                    <span className="info-value balance-negative">LKR {formatAmount(selectedAssignment.overAmount)}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {selectedAssignment.status === 'Settled' ? (
+            {(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? (
               <div className="settlement-items-view">
                 <h3>Settlement Items</h3>
                 <table className="settlement-items-table">
@@ -1017,18 +1026,34 @@ function PettyCash() {
                       <th>Item Name</th>
                       <th>Actual Cost (LKR)</th>
                       <th>Type</th>
+                      <th>Bill</th>
                       <th>Paid By</th>
                     </tr>
                   </thead>
                   <tbody>
                     {settlementItems.map((item, index) => (
-                      <tr key={index}>
+                      <tr key={index} className={item.hasBill ? 'has-bill-row-view' : ''}>
                         <td>{item.itemName}</td>
                         <td className="amount">LKR {formatAmount(item.actualCost)}</td>
                         <td>
                           <span className={`item-type-badge ${item.isCustomItem ? 'custom' : 'template'}`}>
                             {item.isCustomItem ? 'Custom' : 'Template'}
                           </span>
+                        </td>
+                        <td className="bill-cell">
+                          {item.hasBill ? (
+                            <span className="bill-badge">
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                              </svg>
+                              Bill
+                            </span>
+                          ) : (
+                            <span className="no-bill-badge">No Bill</span>
+                          )}
                         </td>
                         <td>
                           <span className="paid-by-badge">
@@ -1042,6 +1067,7 @@ function PettyCash() {
                       <td className="amount"><strong>LKR {formatAmount(selectedAssignment.actualSpent)}</strong></td>
                       <td></td>
                       <td></td>
+                      <td></td>
                     </tr>
                   </tbody>
                 </table>
@@ -1049,10 +1075,10 @@ function PettyCash() {
             ) : (
               <form onSubmit={handleSettleSubmit} className="settlement-form">
                 <h3>Settlement Items</h3>
-                <p className="helper-text info">Fill in only the items you paid for. Items already paid by others are shown as read-only.</p>
+                <p className="helper-text info">Fill in only the items you paid for. Tick the "Bill" checkbox if you have a proof receipt for that item. Items already paid by others are shown as read-only.</p>
                 <div className="settlement-items-list">
                   {settlementItems.map((item, index) => (
-                    <div key={index} className={`settlement-item-row ${item.alreadyPaid ? 'paid-item-row' : ''}`}>
+                    <div key={index} className={`settlement-item-row ${item.alreadyPaid ? 'paid-item-row' : ''} ${item.hasBill ? 'has-bill-row' : ''}`}>
                       <div className="item-number">{index + 1}</div>
                       <div className="form-group">
                         <input
@@ -1075,6 +1101,37 @@ function PettyCash() {
                           className={item.alreadyPaid ? 'paid-input' : ''}
                         />
                       </div>
+                      {/* Has Bill Checkbox */}
+                      {!item.alreadyPaid && (
+                        <div className="has-bill-check">
+                          <input
+                            type="checkbox"
+                            id={`hasBill-${index}`}
+                            checked={!!item.hasBill}
+                            onChange={(e) => handleSettlementItemChange(index, 'hasBill', e.target.checked)}
+                            title="Check if you have a proof bill/receipt for this item"
+                          />
+                          <label htmlFor={`hasBill-${index}`} title="Has proof bill/receipt">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                              <polyline points="14 2 14 8 20 8"></polyline>
+                              <line x1="16" y1="13" x2="8" y2="13"></line>
+                              <line x1="16" y1="17" x2="8" y2="17"></line>
+                              <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            Bill
+                          </label>
+                        </div>
+                      )}
+                      {item.alreadyPaid && item.hasBill && (
+                        <div className="bill-indicator" title="This item has a proof bill">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                          </svg>
+                          Bill
+                        </div>
+                      )}
                       {item.alreadyPaid && (
                         <div className="paid-by-indicator">
                           <span className="paid-by-badge">
@@ -1137,7 +1194,6 @@ function PettyCash() {
                 </div>
 
                 <div className="modal-actions">
-                  <button type="submit" className="btn btn-success">Settle Petty Cash</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1149,6 +1205,7 @@ function PettyCash() {
                   >
                     Cancel
                   </button>
+                  <button type="submit" className="btn btn-success">Settle Petty Cash</button>
                 </div>
               </form>
             )}
@@ -1163,7 +1220,7 @@ function PettyCash() {
           <div className="modal-content settlement-modal">
             <div className="modal-header">
               <h3>
-                {settlementFormData.settlementType === 'BALANCE_RETURN' ? '💰 Return Balance Cash' : '📋 Collect Overdue Cash'}
+                {settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Return Balance Cash' : 'Collect Overdue Cash'}
               </h3>
               <button
                 className="modal-close"
@@ -1233,9 +1290,6 @@ function PettyCash() {
                 </div>
 
                 <div className="modal-actions">
-                  <button type="submit" className="btn btn-primary">
-                    {settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Request Balance Return' : 'Request Overdue Collection'}
-                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1246,6 +1300,9 @@ function PettyCash() {
                     className="btn btn-secondary"
                   >
                     Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    {settlementFormData.settlementType === 'BALANCE_RETURN' ? 'Request Balance Return' : 'Request Overdue Collection'}
                   </button>
                 </div>
               </form>
@@ -1267,16 +1324,18 @@ const ManagementSettlementSection = ({ user }) => {
 
   useEffect(() => {
     fetchSettlements();
-  }, [activeTab]);
+  }, []);
 
   const fetchSettlements = async () => {
     setLoading(true);
     try {
-      let endpoint = 'http://localhost:5000/api/cash-balance-settlements';
+      let endpoint = `${API_BASE}/api/cash-balance-settlements`;
       if (activeTab === 'pending') {
-        endpoint += '/pending';
+        endpoint += '?status=PENDING';
       } else if (activeTab === 'approved') {
-        endpoint += '/approved';
+        endpoint += '?status=APPROVED';
+      } else if (activeTab === 'rejected') {
+        endpoint += '?status=REJECTED';
       }
 
       const response = await fetch(endpoint, {
@@ -1301,10 +1360,21 @@ const ManagementSettlementSection = ({ user }) => {
     }
   };
 
+  const pendingCount = settlements.filter(settlement => settlement.status === 'PENDING').length;
+  const approvedCount = settlements.filter(settlement => settlement.status === 'APPROVED').length;
+  const rejectedCount = settlements.filter(settlement => settlement.status === 'REJECTED').length;
+
+  const filteredSettlements = settlements.filter(settlement => {
+    if (activeTab === 'pending') return settlement.status === 'PENDING';
+    if (activeTab === 'approved') return settlement.status === 'APPROVED';
+    if (activeTab === 'rejected') return settlement.status === 'REJECTED';
+    return true;
+  });
+
   const handleApprove = async (settlementId, managerNotes = '') => {
     setActionLoading(prev => ({ ...prev, [settlementId]: 'approving' }));
     try {
-      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/approve`, {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements/${settlementId}/approve`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1331,36 +1401,6 @@ const ManagementSettlementSection = ({ user }) => {
     }
   };
 
-  const handleComplete = async (settlementId, managerNotes = '') => {
-    setActionLoading(prev => ({ ...prev, [settlementId]: 'completing' }));
-    try {
-      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/complete`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ managerNotes })
-      });
-
-      if (response.ok) {
-        setMessage('Settlement completed successfully');
-        fetchSettlements();
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        const data = await response.json();
-        setMessage(data.message || 'Failed to complete settlement');
-        setTimeout(() => setMessage(''), 3000);
-      }
-    } catch (error) {
-      console.error('Error completing settlement:', error);
-      setMessage('Error completing settlement');
-      setTimeout(() => setMessage(''), 3000);
-    } finally {
-      setActionLoading(prev => ({ ...prev, [settlementId]: null }));
-    }
-  };
-
   const handleReject = async (settlementId, managerNotes) => {
     if (!managerNotes.trim()) {
       setMessage('Please provide a reason for rejection');
@@ -1370,7 +1410,7 @@ const ManagementSettlementSection = ({ user }) => {
 
     setActionLoading(prev => ({ ...prev, [settlementId]: 'rejecting' }));
     try {
-      const response = await fetch(`http://localhost:5000/api/cash-balance-settlements/${settlementId}/reject`, {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements/${settlementId}/reject`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1401,7 +1441,6 @@ const ManagementSettlementSection = ({ user }) => {
     switch (status) {
       case 'PENDING': return 'status-pending';
       case 'APPROVED': return 'status-approved';
-      case 'COMPLETED': return 'status-completed';
       case 'REJECTED': return 'status-rejected';
       default: return 'status-assigned';
     }
@@ -1410,7 +1449,12 @@ const ManagementSettlementSection = ({ user }) => {
   return (
     <div className="card management-settlements">
       <div className="card-header">
-        <h2>🏢 Cash Balance Settlement Management</h2>
+        <h2>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="header-icon">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>
+          </svg>
+          Cash Balance Settlement Management
+        </h2>
       </div>
 
       {message && (
@@ -1423,33 +1467,59 @@ const ManagementSettlementSection = ({ user }) => {
         <button 
           className={`tab-button ${activeTab === 'pending' ? 'active' : ''}`}
           onClick={() => setActiveTab('pending')}
+          title="View pending settlements"
         >
-          ⏳ Pending ({settlements.length})
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          Pending ({pendingCount})
         </button>
         <button 
           className={`tab-button ${activeTab === 'approved' ? 'active' : ''}`}
           onClick={() => setActiveTab('approved')}
+          title="View approved settlements"
         >
-          ✅ Approved ({settlements.length})
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Approved ({approvedCount})
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'rejected' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rejected')}
+          title="View rejected settlements"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+          </svg>
+          Rejected ({rejectedCount})
         </button>
         <button 
           className={`tab-button ${activeTab === 'all' ? 'active' : ''}`}
           onClick={() => setActiveTab('all')}
+          title="View all settlements"
         >
-          📋 All Settlements
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          All Settlements
         </button>
       </div>
 
       <div className="settlements-content">
         {loading && <div className="loading">Loading settlements...</div>}
         
-        {!loading && settlements.length === 0 && (
+        {!loading && filteredSettlements.length === 0 && (
           <div className="empty-state">
             <p>No {activeTab} settlements found.</p>
           </div>
         )}
 
-        {!loading && settlements.length > 0 && (
+        {!loading && filteredSettlements.length > 0 && (
           <div className="settlements-table-wrapper">
             <table className="settlements-table">
               <thead>
@@ -1464,7 +1534,7 @@ const ManagementSettlementSection = ({ user }) => {
                 </tr>
               </thead>
               <tbody>
-                {settlements.map(settlement => (
+                {filteredSettlements.map(settlement => (
                   <tr key={settlement.settlementId}>
                     <td data-label="Settlement ID">
                       <strong>{settlement.settlementId}</strong>
@@ -1495,7 +1565,7 @@ const ManagementSettlementSection = ({ user }) => {
                               onClick={() => handleApprove(settlement.settlementId)}
                               disabled={actionLoading[settlement.settlementId]}
                             >
-                              {actionLoading[settlement.settlementId] === 'approving' ? 'Approving...' : '✅ Approve'}
+                              {actionLoading[settlement.settlementId] === 'approving' ? 'Approving...' : 'Approve'}
                             </button>
                             <button
                               className="btn-action btn-reject"
@@ -1505,18 +1575,9 @@ const ManagementSettlementSection = ({ user }) => {
                               }}
                               disabled={actionLoading[settlement.settlementId]}
                             >
-                              {actionLoading[settlement.settlementId] === 'rejecting' ? 'Rejecting...' : '❌ Reject'}
+                              {actionLoading[settlement.settlementId] === 'rejecting' ? 'Rejecting...' : 'Reject'}
                             </button>
                           </>
-                        )}
-                        {settlement.status === 'APPROVED' && (
-                          <button
-                            className="btn-action btn-complete"
-                            onClick={() => handleComplete(settlement.settlementId)}
-                            disabled={actionLoading[settlement.settlementId]}
-                          >
-                            {actionLoading[settlement.settlementId] === 'completing' ? 'Completing...' : '🏁 Complete'}
-                          </button>
                         )}
                       </div>
                     </td>
@@ -1532,3 +1593,5 @@ const ManagementSettlementSection = ({ user }) => {
 };
 
 export default PettyCash;
+
+

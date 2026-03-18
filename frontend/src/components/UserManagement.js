@@ -236,8 +236,8 @@ function UserManagement() {
               </div>
               
               <div className="form-actions">
-                <button type="submit" className="btn btn-primary">Create User</button>
                 <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn btn-primary">Create User</button>
               </div>
             </form>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/CashBalanceSettlement.css';
+import API_BASE from '../api/config';
 
 const CashBalanceSettlement = ({ user }) => {
   const [settlements, setSettlements] = useState([]);
@@ -21,7 +22,7 @@ const CashBalanceSettlement = ({ user }) => {
   const fetchSettlements = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/cash-balance-settlements', {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -51,7 +52,7 @@ const CashBalanceSettlement = ({ user }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/cash-balance-settlements', {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,3 +276,5 @@ const CashBalanceSettlement = ({ user }) => {
 };
 
 export default CashBalanceSettlement;
+
+

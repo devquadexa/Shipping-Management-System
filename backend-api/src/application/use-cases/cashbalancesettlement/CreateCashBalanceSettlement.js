@@ -5,8 +5,9 @@
 const CashBalanceSettlement = require('../../../domain/entities/CashBalanceSettlement');
 
 class CreateCashBalanceSettlement {
-  constructor(cashBalanceSettlementRepository) {
+  constructor(cashBalanceSettlementRepository, pettyCashAssignmentRepository) {
     this.cashBalanceSettlementRepository = cashBalanceSettlementRepository;
+    this.pettyCashAssignmentRepository = pettyCashAssignmentRepository;
   }
 
   async execute({
@@ -41,7 +42,21 @@ class CreateCashBalanceSettlement {
     }
 
     // Save to database
-    return await this.cashBalanceSettlementRepository.create(settlement);
+    const createdSettlement = await this.cashBalanceSettlementRepository.create(settlement);
+
+    // Update related assignment statuses to "Pending Approval"
+    if (relatedAssignments && relatedAssignments.length > 0) {
+      for (const assignmentId of relatedAssignments) {
+        try {
+          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, 'Pending Approval');
+        } catch (error) {
+          console.error(`Failed to update assignment ${assignmentId} status:`, error);
+          // Don't throw - settlement was created successfully, just log the error
+        }
+      }
+    }
+
+    return createdSettlement;
   }
 }
 

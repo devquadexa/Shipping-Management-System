@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/AdvancePayment.css';
+import API_BASE from '../api/config';
 
 function AdvancePayment({ job, onUpdate }) {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     advancePayment: '',
+    paymentMadeDate: '',
+    paymentType: 'cash',
+    checkNo: '',
     notes: ''
   });
   const [message, setMessage] = useState('');
@@ -25,6 +29,9 @@ function AdvancePayment({ job, onUpdate }) {
     if (job) {
       setFormData({
         advancePayment: job.advancePayment || '',
+        paymentMadeDate: job.advancePaymentDate ? new Date(job.advancePaymentDate).toISOString().split('T')[0] : '',
+        paymentType: job.advancePaymentType || 'cash',
+        checkNo: job.advancePaymentCheckNo || '',
         notes: job.advancePaymentNotes || ''
       });
     }
@@ -44,7 +51,30 @@ function AdvancePayment({ job, onUpdate }) {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/api/jobs/${job.jobId}/advance-payment`, {
+      if (amount > 0) {
+        if (!formData.paymentMadeDate) {
+          setMessage('Payment made date is required');
+          setTimeout(() => setMessage(''), 3000);
+          setLoading(false);
+          return;
+        }
+
+        if (!formData.paymentType) {
+          setMessage('Payment type is required');
+          setTimeout(() => setMessage(''), 3000);
+          setLoading(false);
+          return;
+        }
+
+        if (formData.paymentType === 'check' && !formData.checkNo.trim()) {
+          setMessage('Check number is required for check payments');
+          setTimeout(() => setMessage(''), 3000);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const response = await fetch(`${API_BASE}/api/jobs/${job.jobId}/advance-payment`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -52,6 +82,9 @@ function AdvancePayment({ job, onUpdate }) {
         },
         body: JSON.stringify({
           advancePayment: amount,
+          paymentMadeDate: formData.paymentMadeDate || null,
+          paymentType: amount > 0 ? formData.paymentType : null,
+          checkNo: amount > 0 && formData.paymentType === 'check' ? formData.checkNo.trim() : null,
           notes: formData.notes
         })
       });
@@ -83,6 +116,9 @@ function AdvancePayment({ job, onUpdate }) {
   const handleCancel = () => {
     setFormData({
       advancePayment: job.advancePayment || '',
+      paymentMadeDate: job.advancePaymentDate ? new Date(job.advancePaymentDate).toISOString().split('T')[0] : '',
+      paymentType: job.advancePaymentType || 'cash',
+      checkNo: job.advancePaymentCheckNo || '',
       notes: job.advancePaymentNotes || ''
     });
     setIsEditing(false);
@@ -93,14 +129,14 @@ function AdvancePayment({ job, onUpdate }) {
   return (
     <div className="advance-payment-section">
       <div className="section-header">
-        <h4 className="section-title">💰 Advance Payment</h4>
+        <h4 className="section-title">Advance Payment</h4>
         {canEdit && !isEditing && (
           <button 
             className="btn btn-edit-advance"
             onClick={() => setIsEditing(true)}
-            title="Edit Advance Payment"
+            title="Add Advance Payment"
           >
-            ✏️ Edit
+            Add
           </button>
         )}
       </div>
@@ -124,11 +160,23 @@ function AdvancePayment({ job, onUpdate }) {
             {job.advancePayment > 0 && (
               <>
                 <div className="advance-detail">
-                  <span className="detail-label">Date Received:</span>
+                  <span className="detail-label">Payment Made Date:</span>
                   <span className="detail-value">
                     {job.advancePaymentDate ? new Date(job.advancePaymentDate).toLocaleDateString() : '-'}
                   </span>
                 </div>
+
+                <div className="advance-detail">
+                  <span className="detail-label">Payment Type:</span>
+                  <span className="detail-value">{job.advancePaymentType || '-'}</span>
+                </div>
+
+                {job.advancePaymentType === 'check' && (
+                  <div className="advance-detail">
+                    <span className="detail-label">Check No:</span>
+                    <span className="detail-value">{job.advancePaymentCheckNo || '-'}</span>
+                  </div>
+                )}
                 
                 {job.advancePaymentNotes && (
                   <div className="advance-detail">
@@ -148,7 +196,7 @@ function AdvancePayment({ job, onUpdate }) {
               <div className="no-advance-message">
                 <span className="no-advance-text">No advance payment received</span>
                 {canEdit && (
-                  <span className="no-advance-hint">Click "Edit" to record an advance payment</span>
+                  <span className="no-advance-hint">Click "Add" to record an advance payment</span>
                 )}
               </div>
             )}
@@ -172,6 +220,52 @@ function AdvancePayment({ job, onUpdate }) {
               />
             </div>
           </div>
+
+          <div className="form-row form-row-two">
+            <div className="form-group">
+              <label htmlFor="paymentMadeDate">Payment Made Date *</label>
+              <input
+                type="date"
+                id="paymentMadeDate"
+                value={formData.paymentMadeDate}
+                onChange={(e) => setFormData({ ...formData, paymentMadeDate: e.target.value })}
+                className="form-control"
+                required={parseFloat(formData.advancePayment) > 0}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="paymentType">Payment Type *</label>
+              <select
+                id="paymentType"
+                value={formData.paymentType}
+                onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
+                className="form-control"
+                required={parseFloat(formData.advancePayment) > 0}
+              >
+                <option value="cash">Cash</option>
+                <option value="check">Check</option>
+                <option value="bank transfer">Bank Transfer</option>
+              </select>
+            </div>
+          </div>
+
+          {formData.paymentType === 'check' && (
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="checkNo">Check No *</label>
+                <input
+                  type="text"
+                  id="checkNo"
+                  value={formData.checkNo}
+                  onChange={(e) => setFormData({ ...formData, checkNo: e.target.value })}
+                  placeholder="Enter check number"
+                  className="form-control"
+                  required={parseFloat(formData.advancePayment) > 0}
+                />
+              </div>
+            </div>
+          )}
           
           <div className="form-row">
             <div className="form-group">
@@ -211,3 +305,4 @@ function AdvancePayment({ job, onUpdate }) {
 }
 
 export default AdvancePayment;
+
