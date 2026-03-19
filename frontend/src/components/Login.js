@@ -89,10 +89,6 @@ function Login() {
           <button type="submit" className="btn btn-primary btn-block">
             Sign In
           </button>
-          
-          <div className="login-footer">
-            <p>Default credentials: superadmin / admin123</p>
-          </div>
         </form>
       </div>
     </div>
