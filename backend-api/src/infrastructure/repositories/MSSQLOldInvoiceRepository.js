@@ -168,13 +168,19 @@ class MSSQLOldInvoiceRepository extends IOldInvoiceRepository {
           .input('paymentMethod', this.sql.NVarChar, paymentData.paymentMethod)
           .input('receivedDate', this.sql.Date, paymentData.receivedDate)
           .input('notes', this.sql.NVarChar, paymentData.notes || null)
+          .input('chequeNumber', this.sql.NVarChar, paymentData.chequeNumber || null)
+          .input('chequeDate', this.sql.Date, paymentData.chequeDate || null)
+          .input('chequeAmount', this.sql.Decimal(18, 2), paymentData.chequeAmount || null)
+          .input('bankName', this.sql.NVarChar, paymentData.bankName || null)
           .input('createdBy', this.sql.VarChar, paymentData.createdBy)
           .query(`
             INSERT INTO OldInvoicePayments (
-              oldInvoiceId, paymentAmount, paymentMethod, receivedDate, notes, createdBy
+              oldInvoiceId, paymentAmount, paymentMethod, receivedDate, notes, 
+              chequeNumber, chequeDate, chequeAmount, bankName, createdBy
             )
             VALUES (
-              @oldInvoiceId, @paymentAmount, @paymentMethod, @receivedDate, @notes, @createdBy
+              @oldInvoiceId, @paymentAmount, @paymentMethod, @receivedDate, @notes,
+              @chequeNumber, @chequeDate, @chequeAmount, @bankName, @createdBy
             )
           `);
         
