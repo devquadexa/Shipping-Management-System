@@ -82,6 +82,21 @@ class MSSQLJobRepository extends IJobRepository {
       
       IF COL_LENGTH('Jobs', 'metadata') IS NULL
         ALTER TABLE Jobs ADD metadata NVARCHAR(MAX) NULL;
+
+      IF OBJECT_ID('JobAdvancePayments', 'U') IS NULL
+      BEGIN
+        CREATE TABLE JobAdvancePayments (
+          advancePaymentId INT IDENTITY(1,1) PRIMARY KEY,
+          jobId VARCHAR(50) NOT NULL,
+          amount DECIMAL(18,2) NOT NULL,
+          paymentMadeDate DATETIME NOT NULL,
+          paymentType NVARCHAR(50) NULL,
+          checkNo NVARCHAR(100) NULL,
+          notes NVARCHAR(MAX) NULL,
+          recordedBy VARCHAR(50) NULL,
+          recordedDate DATETIME NOT NULL DEFAULT GETDATE()
+        );
+      END
     `);
 
     this.schemaEnsured = true;
@@ -223,25 +238,42 @@ class MSSQLJobRepository extends IJobRepository {
     return job;
   }
 
-  // New method for updating advance payment specifically
-  async updateAdvancePayment(jobId, advancePayment, paymentDate, paymentType, checkNo, notes, recordedByUserId) {
-    await this.ensureSchema();
+  async syncAdvancePaymentAggregate(jobId) {
     const pool = await this.db();
-    
-    const advanceDate = advancePayment > 0 ? (paymentDate ? new Date(paymentDate) : new Date()) : null;
-    const finalPaymentType = advancePayment > 0 ? paymentType : null;
-    const finalCheckNo = advancePayment > 0 && paymentType === 'check' ? checkNo : null;
-    
+
+    const aggregateResult = await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .query(`
+        SELECT
+          ISNULL(SUM(amount), 0) AS totalAdvancePayment,
+          MAX(paymentMadeDate) AS latestPaymentDate
+        FROM JobAdvancePayments
+        WHERE jobId = @jobId
+      `);
+
+    const latestPaymentResult = await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .query(`
+        SELECT TOP 1 paymentType, checkNo, notes, recordedBy
+        FROM JobAdvancePayments
+        WHERE jobId = @jobId
+        ORDER BY paymentMadeDate DESC, advancePaymentId DESC
+      `);
+
+    const totalAdvancePayment = parseFloat(aggregateResult.recordset[0].totalAdvancePayment || 0);
+    const latestPaymentDate = aggregateResult.recordset[0].latestPaymentDate || null;
+    const latestPayment = latestPaymentResult.recordset[0] || {};
+
     await pool.request()
       .input('jobId', this.sql.VarChar, jobId)
-      .input('advancePayment', this.sql.Decimal(18,2), parseFloat(advancePayment) || 0.00)
-      .input('advancePaymentDate', this.sql.DateTime, advanceDate)
-      .input('advancePaymentType', this.sql.VarChar, finalPaymentType)
-      .input('advancePaymentCheckNo', this.sql.VarChar, finalCheckNo)
-      .input('advancePaymentNotes', this.sql.VarChar, notes)
-      .input('advancePaymentRecordedBy', this.sql.VarChar, recordedByUserId)
+      .input('advancePayment', this.sql.Decimal(18,2), totalAdvancePayment)
+      .input('advancePaymentDate', this.sql.DateTime, latestPaymentDate)
+      .input('advancePaymentType', this.sql.VarChar, latestPayment.paymentType || null)
+      .input('advancePaymentCheckNo', this.sql.VarChar, latestPayment.checkNo || null)
+      .input('advancePaymentNotes', this.sql.VarChar, latestPayment.notes || null)
+      .input('advancePaymentRecordedBy', this.sql.VarChar, latestPayment.recordedBy || null)
       .query(`
-        UPDATE Jobs 
+        UPDATE Jobs
         SET advancePayment = @advancePayment,
             advancePaymentDate = @advancePaymentDate,
             advancePaymentNotes = @advancePaymentNotes,
@@ -260,8 +292,259 @@ class MSSQLJobRepository extends IJobRepository {
         IF COL_LENGTH('Jobs', 'AdvancePaymentCheckNo') IS NOT NULL
           UPDATE Jobs SET AdvancePaymentCheckNo = @advancePaymentCheckNo WHERE JobId = @jobId
       `);
-    
+
+    return {
+      totalAdvancePayment,
+      latestPaymentDate,
+      latestPaymentType: latestPayment.paymentType || null,
+      latestCheckNo: latestPayment.checkNo || null,
+      latestNotes: latestPayment.notes || null,
+      latestRecordedBy: latestPayment.recordedBy || null,
+    };
+  }
+
+  async addAdvancePayment(jobId, advancePayment, paymentDate, paymentType, checkNo, notes, recordedByUserId) {
+    await this.ensureSchema();
+    const pool = await this.db();
+
+    const amount = parseFloat(advancePayment) || 0;
+    const advanceDate = paymentDate ? new Date(paymentDate) : new Date();
+    const finalPaymentType = paymentType || null;
+    const finalCheckNo = paymentType === 'check' ? checkNo : null;
+
+    if (amount <= 0) {
+      throw new Error('Advance payment amount must be greater than 0');
+    }
+
+    // Backward compatibility: if old aggregate exists but no payment rows yet, preserve it as a legacy entry.
+    const existingPaymentCountResult = await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .query('SELECT COUNT(*) AS paymentCount FROM JobAdvancePayments WHERE jobId = @jobId');
+
+    const existingPaymentCount = existingPaymentCountResult.recordset[0].paymentCount || 0;
+
+    if (existingPaymentCount === 0) {
+      const legacyResult = await pool.request()
+        .input('jobId', this.sql.VarChar, jobId)
+        .query(`
+          SELECT
+            advancePayment,
+            advancePaymentDate,
+            advancePaymentType,
+            advancePaymentCheckNo,
+            advancePaymentNotes,
+            advancePaymentRecordedBy
+          FROM Jobs
+          WHERE JobId = @jobId
+        `);
+
+      const legacyPayment = legacyResult.recordset[0];
+      const legacyAmount = parseFloat(legacyPayment?.advancePayment || 0);
+      if (legacyAmount > 0) {
+        await pool.request()
+          .input('jobId', this.sql.VarChar, jobId)
+          .input('amount', this.sql.Decimal(18,2), legacyAmount)
+          .input('paymentMadeDate', this.sql.DateTime, legacyPayment.advancePaymentDate || new Date())
+          .input('paymentType', this.sql.VarChar, legacyPayment.advancePaymentType || null)
+          .input('checkNo', this.sql.VarChar, legacyPayment.advancePaymentCheckNo || null)
+          .input('notes', this.sql.VarChar, legacyPayment.advancePaymentNotes || 'Legacy advance payment')
+          .input('recordedBy', this.sql.VarChar, legacyPayment.advancePaymentRecordedBy || null)
+          .query(`
+            INSERT INTO JobAdvancePayments (
+              jobId, amount, paymentMadeDate, paymentType, checkNo, notes, recordedBy
+            )
+            VALUES (
+              @jobId, @amount, @paymentMadeDate, @paymentType, @checkNo, @notes, @recordedBy
+            )
+          `);
+      }
+    }
+
+    await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .input('amount', this.sql.Decimal(18,2), amount)
+      .input('paymentMadeDate', this.sql.DateTime, advanceDate)
+      .input('paymentType', this.sql.VarChar, finalPaymentType)
+      .input('checkNo', this.sql.VarChar, finalCheckNo)
+      .input('notes', this.sql.VarChar, notes || null)
+      .input('recordedBy', this.sql.VarChar, recordedByUserId)
+      .query(`
+        INSERT INTO JobAdvancePayments (
+          jobId, amount, paymentMadeDate, paymentType, checkNo, notes, recordedBy
+        )
+        VALUES (
+          @jobId, @amount, @paymentMadeDate, @paymentType, @checkNo, @notes, @recordedBy
+        )
+      `);
+
+    await this.syncAdvancePaymentAggregate(jobId);
+
+    const createdPaymentResult = await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .query(`
+        SELECT TOP 1 *
+        FROM JobAdvancePayments
+        WHERE jobId = @jobId
+        ORDER BY advancePaymentId DESC
+      `);
+
+    const createdPayment = createdPaymentResult.recordset[0];
+    return {
+      advancePaymentId: createdPayment.advancePaymentId,
+      jobId: createdPayment.jobId,
+      amount: parseFloat(createdPayment.amount),
+      paymentMadeDate: createdPayment.paymentMadeDate,
+      paymentType: createdPayment.paymentType,
+      checkNo: createdPayment.checkNo,
+      notes: createdPayment.notes,
+      recordedBy: createdPayment.recordedBy,
+      recordedDate: createdPayment.recordedDate,
+    };
+  }
+
+  async getAdvancePaymentsByJob(jobId) {
+    await this.ensureSchema();
+    const pool = await this.db();
+
+    const result = await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .query(`
+        SELECT
+          jap.advancePaymentId,
+          jap.jobId,
+          jap.amount,
+          jap.paymentMadeDate,
+          jap.paymentType,
+          jap.checkNo,
+          jap.notes,
+          jap.recordedBy,
+          jap.recordedDate,
+          u.fullName AS recordedByName
+        FROM JobAdvancePayments jap
+        LEFT JOIN Users u ON jap.recordedBy = u.userId
+        WHERE jap.jobId = @jobId
+        ORDER BY jap.paymentMadeDate DESC, jap.advancePaymentId DESC
+      `);
+
+    return result.recordset.map((row) => ({
+      advancePaymentId: row.advancePaymentId,
+      jobId: row.jobId,
+      amount: parseFloat(row.amount),
+      paymentMadeDate: row.paymentMadeDate,
+      paymentType: row.paymentType,
+      checkNo: row.checkNo,
+      notes: row.notes,
+      recordedBy: row.recordedBy,
+      recordedByName: row.recordedByName,
+      recordedDate: row.recordedDate,
+    }));
+  }
+
+  async updateAdvancePaymentEntry(jobId, paymentId, amount, paymentDate, paymentType, checkNo, notes) {
+    await this.ensureSchema();
+    const pool = await this.db();
+
+    const parsedAmount = parseFloat(amount) || 0;
+    if (parsedAmount <= 0) {
+      throw new Error('Advance payment amount must be greater than 0');
+    }
+
+    const paymentIdInt = parseInt(paymentId, 10);
+    if (Number.isNaN(paymentIdInt)) {
+      throw new Error('Invalid advance payment record id');
+    }
+
+    const normalizedDate = paymentDate ? new Date(paymentDate) : new Date();
+    const normalizedType = paymentType || null;
+    const normalizedCheckNo = paymentType === 'check' ? (checkNo || null) : null;
+
+    const updateResult = await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .input('paymentId', this.sql.Int, paymentIdInt)
+      .input('amount', this.sql.Decimal(18,2), parsedAmount)
+      .input('paymentMadeDate', this.sql.DateTime, normalizedDate)
+      .input('paymentType', this.sql.VarChar, normalizedType)
+      .input('checkNo', this.sql.VarChar, normalizedCheckNo)
+      .input('notes', this.sql.VarChar, notes || null)
+      .query(`
+        UPDATE JobAdvancePayments
+        SET amount = @amount,
+            paymentMadeDate = @paymentMadeDate,
+            paymentType = @paymentType,
+            checkNo = @checkNo,
+            notes = @notes
+        WHERE advancePaymentId = @paymentId AND jobId = @jobId
+      `);
+
+    if (!updateResult.rowsAffected || updateResult.rowsAffected[0] === 0) {
+      throw new Error('Advance payment record not found for this job');
+    }
+
+    await this.syncAdvancePaymentAggregate(jobId);
+
+    const updatedResult = await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .input('paymentId', this.sql.Int, paymentIdInt)
+      .query(`
+        SELECT
+          jap.advancePaymentId,
+          jap.jobId,
+          jap.amount,
+          jap.paymentMadeDate,
+          jap.paymentType,
+          jap.checkNo,
+          jap.notes,
+          jap.recordedBy,
+          jap.recordedDate,
+          u.fullName AS recordedByName
+        FROM JobAdvancePayments jap
+        LEFT JOIN Users u ON jap.recordedBy = u.userId
+        WHERE jap.advancePaymentId = @paymentId AND jap.jobId = @jobId
+      `);
+
+    const row = updatedResult.recordset[0];
+    return {
+      advancePaymentId: row.advancePaymentId,
+      jobId: row.jobId,
+      amount: parseFloat(row.amount),
+      paymentMadeDate: row.paymentMadeDate,
+      paymentType: row.paymentType,
+      checkNo: row.checkNo,
+      notes: row.notes,
+      recordedBy: row.recordedBy,
+      recordedByName: row.recordedByName,
+      recordedDate: row.recordedDate,
+    };
+  }
+
+  async deleteAdvancePaymentEntry(jobId, paymentId) {
+    await this.ensureSchema();
+    const pool = await this.db();
+
+    const paymentIdInt = parseInt(paymentId, 10);
+    if (Number.isNaN(paymentIdInt)) {
+      throw new Error('Invalid advance payment record id');
+    }
+
+    const deleteResult = await pool.request()
+      .input('jobId', this.sql.VarChar, jobId)
+      .input('paymentId', this.sql.Int, paymentIdInt)
+      .query(`
+        DELETE FROM JobAdvancePayments
+        WHERE advancePaymentId = @paymentId AND jobId = @jobId
+      `);
+
+    if (!deleteResult.rowsAffected || deleteResult.rowsAffected[0] === 0) {
+      throw new Error('Advance payment record not found for this job');
+    }
+
+    await this.syncAdvancePaymentAggregate(jobId);
     return true;
+  }
+
+  // Legacy support: old update endpoint now appends a payment entry.
+  async updateAdvancePayment(jobId, advancePayment, paymentDate, paymentType, checkNo, notes, recordedByUserId) {
+    return this.addAdvancePayment(jobId, advancePayment, paymentDate, paymentType, checkNo, notes, recordedByUserId);
   }
 
   async updateStatus(jobId, status) {

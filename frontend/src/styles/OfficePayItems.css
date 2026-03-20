@@ -120,13 +120,13 @@
 .office-pay-items-section .billing-table thead,
 .office-pay-items-section .billing-table thead tr,
 .office-pay-items-section .billing-table thead th {
-  background: linear-gradient(135deg, #101036 0%, #1e40af 100%) !important;
+  background: #3b82f6 !important;
   color: #ffffff !important;
 }
 
 .office-pay-items-section .billing-table thead tr:hover,
 .office-pay-items-section .billing-table thead th:hover {
-  background: linear-gradient(135deg, #101036 0%, #1e40af 100%) !important;
+  background: #3b82f6 !important;
   color: #ffffff !important;
 }
 
@@ -307,6 +307,23 @@
 .edit-btn:hover:not(:disabled) {
   background: #dbeafe;
   color: #2563eb;
+}
+
+/* Prevent global Billing.css .edit-btn styles from leaking here */
+.office-pay-items-section .icon-btn.edit-btn {
+  background: transparent;
+  border: none;
+  transform: none;
+}
+
+.office-pay-items-section .icon-btn.edit-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  border: none;
+  transform: none;
+}
+
+.office-pay-items-section .icon-btn.edit-btn::after {
+  content: none !important;
 }
 
 .delete-btn:hover:not(:disabled) {

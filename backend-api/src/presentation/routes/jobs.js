@@ -58,6 +58,22 @@ router.put('/:id/pay-items', auth, checkRole('Admin', 'Super Admin', 'Manager', 
 );
 
 // New route for advance payment
+router.get('/:jobId/advance-payments', auth, (req, res) =>
+  jobController.getAdvancePayments(req, res)
+);
+
+router.post('/:jobId/advance-payments', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) =>
+  jobController.addAdvancePayment(req, res)
+);
+
+router.put('/:jobId/advance-payments/:paymentId', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) =>
+  jobController.updateAdvancePaymentEntry(req, res)
+);
+
+router.delete('/:jobId/advance-payments/:paymentId', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) =>
+  jobController.deleteAdvancePaymentEntry(req, res)
+);
+
 router.put('/:jobId/advance-payment', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
   jobController.updateAdvancePayment(req, res)
 );
