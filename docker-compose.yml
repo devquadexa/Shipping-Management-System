@@ -8,6 +8,8 @@ services:
       SA_PASSWORD: "${DB_PASSWORD}"
       ACCEPT_EULA: "Y"
       MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
     volumes:
       - mssql_data:/var/opt/mssql
     restart: unless-stopped
@@ -46,10 +48,13 @@ services:
     build:
       context: ./frontend
       args:
-        REACT_APP_API_URL: "http://${SERVER_IP}:5000/api"
+        REACT_APP_API_URL: "https://${SERVER_IP}/api"
     container_name: cargo_frontend
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
     restart: unless-stopped
