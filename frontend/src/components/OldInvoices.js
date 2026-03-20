@@ -25,7 +25,11 @@ function OldInvoices() {
     paymentAmount: '',
     paymentMethod: 'Cash',
     receivedDate: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    chequeNumber: '',
+    chequeDate: '',
+    chequeAmount: '',
+    bankName: ''
   });
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState('');
@@ -103,10 +107,20 @@ function OldInvoices() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Handle amount fields with comma formatting
+    if (name === 'totalAmount') {
+      const numericValue = parseFormattedNumber(value);
+      setFormData(prev => ({
+        ...prev,
+        [name]: numericValue
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
     
     if (formErrors[name]) {
       setFormErrors(prev => ({ ...prev, [name]: '' }));
@@ -115,10 +129,20 @@ function OldInvoices() {
 
   const handlePaymentInputChange = (e) => {
     const { name, value } = e.target;
-    setPaymentData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Handle amount fields with comma formatting
+    if (name === 'paymentAmount' || name === 'chequeAmount') {
+      const numericValue = parseFormattedNumber(value);
+      setPaymentData(prev => ({
+        ...prev,
+        [name]: numericValue
+      }));
+    } else {
+      setPaymentData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const validateForm = () => {
@@ -199,19 +223,57 @@ function OldInvoices() {
       return;
     }
 
+    // Validate cheque fields if payment method is Cheque
+    if (paymentData.paymentMethod === 'Cheque') {
+      if (!paymentData.chequeNumber) {
+        setMessage('Cheque number is required for cheque payments');
+        return;
+      }
+      if (!paymentData.chequeDate) {
+        setMessage('Cheque date is required for cheque payments');
+        return;
+      }
+      if (!paymentData.chequeAmount || parseFloat(paymentData.chequeAmount) <= 0) {
+        setMessage('Cheque amount must be greater than 0');
+        return;
+      }
+    }
+
+    // Validate bank name if payment method is Bank Transfer
+    if (paymentData.paymentMethod === 'Bank Transfer') {
+      if (!paymentData.bankName) {
+        setMessage('Bank name is required for bank transfer payments');
+        return;
+      }
+    }
+
     try {
+      const payload = {
+        paymentAmount: parseFloat(paymentData.paymentAmount),
+        paymentMethod: paymentData.paymentMethod,
+        receivedDate: paymentData.receivedDate,
+        notes: paymentData.notes
+      };
+
+      // Add cheque fields if payment method is Cheque
+      if (paymentData.paymentMethod === 'Cheque') {
+        payload.chequeNumber = paymentData.chequeNumber;
+        payload.chequeDate = paymentData.chequeDate;
+        payload.chequeAmount = parseFloat(paymentData.chequeAmount);
+      }
+
+      // Add bank name if payment method is Bank Transfer
+      if (paymentData.paymentMethod === 'Bank Transfer') {
+        payload.bankName = paymentData.bankName;
+      }
+
       const response = await fetch(`${API_BASE}/api/old-invoices/${selectedInvoice.oldInvoiceId}/payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          paymentAmount: parseFloat(paymentData.paymentAmount),
-          paymentMethod: paymentData.paymentMethod,
-          receivedDate: paymentData.receivedDate,
-          notes: paymentData.notes
-        })
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
@@ -312,7 +374,11 @@ function OldInvoices() {
       paymentAmount: '',
       paymentMethod: 'Cash',
       receivedDate: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      chequeNumber: '',
+      chequeDate: '',
+      chequeAmount: '',
+      bankName: ''
     });
     setShowPaymentModal(true);
   };
@@ -339,7 +405,11 @@ function OldInvoices() {
       paymentAmount: '',
       paymentMethod: 'Cash',
       receivedDate: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      chequeNumber: '',
+      chequeDate: '',
+      chequeAmount: '',
+      bankName: ''
     });
   };
 
@@ -348,11 +418,25 @@ function OldInvoices() {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 2
+    if (!amount && amount !== 0) return 'LKR 0.00';
+    return 'LKR ' + new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(amount);
+  };
+
+  const formatNumberWithCommas = (value) => {
+    if (!value) return '';
+    // Remove any existing commas
+    const number = value.toString().replace(/,/g, '');
+    // Add commas as thousand separators
+    return number.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  const parseFormattedNumber = (value) => {
+    if (!value) return '';
+    // Remove commas and return the number
+    return value.toString().replace(/,/g, '');
   };
 
   const formatDate = (dateString) => {
@@ -527,6 +611,7 @@ function OldInvoices() {
                                     <th>Date</th>
                                     <th>Amount</th>
                                     <th>Method</th>
+                                    <th>Details</th>
                                     <th>Notes</th>
                                     {isAdminOrManager() && <th>Actions</th>}
                                   </tr>
@@ -537,6 +622,19 @@ function OldInvoices() {
                                       <td>{formatDate(payment.receivedDate)}</td>
                                       <td className="amount">{formatCurrency(payment.paymentAmount)}</td>
                                       <td>{payment.paymentMethod}</td>
+                                      <td>
+                                        {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? (
+                                          <div className="cheque-details">
+                                            <div><strong>No:</strong> {payment.chequeNumber}</div>
+                                            <div><strong>Date:</strong> {formatDate(payment.chequeDate)}</div>
+                                            <div><strong>Amount:</strong> {formatCurrency(payment.chequeAmount)}</div>
+                                          </div>
+                                        ) : payment.paymentMethod === 'Bank Transfer' && payment.bankName ? (
+                                          <div className="bank-details">
+                                            <strong>Bank:</strong> {payment.bankName}
+                                          </div>
+                                        ) : '-'}
+                                      </td>
                                       <td>{payment.notes || '-'}</td>
                                       {isAdminOrManager() && (
                                         <td>
@@ -665,13 +763,11 @@ function OldInvoices() {
                 <div className="form-group">
                   <label>Total Amount (LKR) *</label>
                   <input
-                    type="number"
+                    type="text"
                     name="totalAmount"
-                    value={formData.totalAmount}
+                    value={formatNumberWithCommas(formData.totalAmount)}
                     onChange={handleInputChange}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
                     className={formErrors.totalAmount ? 'error' : ''}
                     required
                   />
@@ -720,14 +816,11 @@ function OldInvoices() {
               <div className="form-group">
                 <label>Payment Amount (LKR) *</label>
                 <input
-                  type="number"
+                  type="text"
                   name="paymentAmount"
-                  value={paymentData.paymentAmount}
+                  value={formatNumberWithCommas(paymentData.paymentAmount)}
                   onChange={handlePaymentInputChange}
                   placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  max={selectedInvoice.balance}
                   required
                 />
               </div>
@@ -745,6 +838,63 @@ function OldInvoices() {
                   <option value="Bank Transfer">Bank Transfer</option>
                 </select>
               </div>
+
+              {/* Conditional Cheque Fields */}
+              {paymentData.paymentMethod === 'Cheque' && (
+                <>
+                  <div className="form-group">
+                    <label>Cheque Number *</label>
+                    <input
+                      type="text"
+                      name="chequeNumber"
+                      value={paymentData.chequeNumber}
+                      onChange={handlePaymentInputChange}
+                      placeholder="Enter cheque number"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Cheque Date *</label>
+                    <input
+                      type="date"
+                      name="chequeDate"
+                      value={paymentData.chequeDate}
+                      onChange={handlePaymentInputChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Cheque Amount (LKR) *</label>
+                    <input
+                      type="text"
+                      name="chequeAmount"
+                      value={formatNumberWithCommas(paymentData.chequeAmount)}
+                      onChange={handlePaymentInputChange}
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Conditional Bank Transfer Fields */}
+              {paymentData.paymentMethod === 'Bank Transfer' && (
+                <div className="form-group">
+                  <label>Bank Name *</label>
+                  <select
+                    name="bankName"
+                    value={paymentData.bankName}
+                    onChange={handlePaymentInputChange}
+                    required
+                  >
+                    <option value="">Select Bank</option>
+                    <option value="Commercial Bank">Commercial Bank</option>
+                    <option value="Peoples Bank">Peoples Bank</option>
+                  </select>
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Received Date *</label>

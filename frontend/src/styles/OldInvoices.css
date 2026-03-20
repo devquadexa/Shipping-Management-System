@@ -180,6 +180,30 @@
   font-size: 0.85rem;
 }
 
+.cheque-details {
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.cheque-details div {
+  margin: 2px 0;
+}
+
+.cheque-details strong {
+  color: #101036;
+  margin-right: 5px;
+}
+
+.bank-details {
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.bank-details strong {
+  color: #101036;
+  margin-right: 5px;
+}
+
 .amount {
   text-align: right;
   font-weight: 500;
