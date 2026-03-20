@@ -12,6 +12,7 @@ import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
 import Accounting from './components/Accounting';
 import Transporters from './components/Transporters';
+import OldInvoices from './components/OldInvoices';
 import Navbar from './components/Navbar';
 
 function PrivateRoute({ children }) {
@@ -48,6 +49,7 @@ function AppContent() {
             }
           />
           <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
+          <Route path="/old-invoices" element={<PrivateRoute><OldInvoices /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
           <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
         </Routes>
