@@ -1329,14 +1329,7 @@ const ManagementSettlementSection = ({ user }) => {
   const fetchSettlements = async () => {
     setLoading(true);
     try {
-      let endpoint = `${API_BASE}/api/cash-balance-settlements`;
-      if (activeTab === 'pending') {
-        endpoint += '?status=PENDING';
-      } else if (activeTab === 'approved') {
-        endpoint += '?status=APPROVED';
-      } else if (activeTab === 'rejected') {
-        endpoint += '?status=REJECTED';
-      }
+      const endpoint = `${API_BASE}/api/cash-balance-settlements`;
 
       const response = await fetch(endpoint, {
         headers: {

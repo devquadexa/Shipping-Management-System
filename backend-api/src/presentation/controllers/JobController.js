@@ -249,54 +249,151 @@ class JobController {
     }
   }
 
-  // New method for updating advance payment
-  async updateAdvancePayment(req, res) {
+  validateAdvancePaymentPayload(reqBody) {
+    const { advancePayment, paymentMadeDate, paymentType, checkNo } = reqBody;
+    const amount = parseFloat(advancePayment);
+
+    if (isNaN(amount) || amount <= 0) {
+      return { error: 'Valid advance payment amount is required (must be greater than 0)' };
+    }
+
+    const validPaymentTypes = ['cash', 'check', 'bank transfer'];
+    if (!paymentType || !validPaymentTypes.includes(paymentType)) {
+      return { error: 'Payment type is required (cash, check, or bank transfer)' };
+    }
+
+    if (!paymentMadeDate) {
+      return { error: 'Payment made date is required' };
+    }
+
+    if (paymentType === 'check' && (!checkNo || !String(checkNo).trim())) {
+      return { error: 'Check number is required for check payments' };
+    }
+
+    return { amount };
+  }
+
+  async getAdvancePayments(req, res) {
     try {
       const { jobId } = req.params;
-      const { advancePayment, paymentMadeDate, paymentType, checkNo, notes } = req.body;
-      const userId = req.user.userId;
-
-      console.log('Update advance payment request:', { jobId, advancePayment, paymentMadeDate, paymentType, checkNo, notes, userId });
-
-      // Validate advance payment amount
-      const amount = parseFloat(advancePayment);
-      if (isNaN(amount) || amount < 0) {
-        return res.status(400).json({ message: 'Valid advance payment amount is required (must be 0 or greater)' });
-      }
-
-      if (amount > 0) {
-        const validPaymentTypes = ['cash', 'check', 'bank transfer'];
-        if (!paymentType || !validPaymentTypes.includes(paymentType)) {
-          return res.status(400).json({ message: 'Payment type is required (cash, check, or bank transfer)' });
-        }
-
-        if (!paymentMadeDate) {
-          return res.status(400).json({ message: 'Payment made date is required' });
-        }
-
-        if (paymentType === 'check' && (!checkNo || !String(checkNo).trim())) {
-          return res.status(400).json({ message: 'Check number is required for check payments' });
-        }
-      }
-
-      // Get the job repository from the container (imported at module level)
       const container = require('../../infrastructure/di/container');
       const jobRepository = container.get('jobRepository');
-      
-      // Update advance payment
-      await jobRepository.updateAdvancePayment(jobId, amount, paymentMadeDate, paymentType, checkNo, notes, userId);
-      
-      // Get updated job
+
+      const payments = await jobRepository.getAdvancePaymentsByJob(jobId);
+      res.json({ success: true, data: payments });
+    } catch (error) {
+      console.error('Error fetching advance payments:', error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  async addAdvancePayment(req, res) {
+    try {
+      const { jobId } = req.params;
+      const { paymentMadeDate, paymentType, checkNo, notes } = req.body;
+      const userId = req.user.userId;
+
+      console.log('Add advance payment request:', { jobId, ...req.body, userId });
+
+      const validation = this.validateAdvancePaymentPayload(req.body);
+      if (validation.error) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const container = require('../../infrastructure/di/container');
+      const jobRepository = container.get('jobRepository');
+
+      const createdPayment = await jobRepository.addAdvancePayment(
+        jobId,
+        validation.amount,
+        paymentMadeDate,
+        paymentType,
+        checkNo,
+        notes,
+        userId
+      );
+
       const updatedJob = await this.getJobById.execute(jobId);
-      
-      res.json({ 
-        message: 'Advance payment updated successfully',
+      const payments = await jobRepository.getAdvancePaymentsByJob(jobId);
+
+      res.json({
+        message: 'Advance payment added successfully',
+        payment: createdPayment,
+        payments,
         job: updatedJob
       });
     } catch (error) {
-      console.error('Error updating advance payment:', error);
+      console.error('Error adding advance payment:', error);
       res.status(500).json({ message: error.message });
     }
+  }
+
+  async updateAdvancePaymentEntry(req, res) {
+    try {
+      const { jobId, paymentId } = req.params;
+      const { paymentMadeDate, paymentType, checkNo, notes } = req.body;
+
+      const validation = this.validateAdvancePaymentPayload(req.body);
+      if (validation.error) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const container = require('../../infrastructure/di/container');
+      const jobRepository = container.get('jobRepository');
+
+      const updatedPayment = await jobRepository.updateAdvancePaymentEntry(
+        jobId,
+        paymentId,
+        validation.amount,
+        paymentMadeDate,
+        paymentType,
+        checkNo,
+        notes
+      );
+
+      const updatedJob = await this.getJobById.execute(jobId);
+      const payments = await jobRepository.getAdvancePaymentsByJob(jobId);
+
+      res.json({
+        message: 'Advance payment updated successfully',
+        payment: updatedPayment,
+        payments,
+        job: updatedJob
+      });
+    } catch (error) {
+      console.error('Error updating advance payment entry:', error);
+      const statusCode = error.message.includes('not found') ? 404 : 500;
+      res.status(statusCode).json({ message: error.message });
+    }
+  }
+
+  async deleteAdvancePaymentEntry(req, res) {
+    try {
+      const { jobId, paymentId } = req.params;
+
+      const container = require('../../infrastructure/di/container');
+      const jobRepository = container.get('jobRepository');
+
+      await jobRepository.deleteAdvancePaymentEntry(jobId, paymentId);
+
+      const updatedJob = await this.getJobById.execute(jobId);
+      const payments = await jobRepository.getAdvancePaymentsByJob(jobId);
+
+      res.json({
+        message: 'Advance payment deleted successfully',
+        payments,
+        job: updatedJob
+      });
+    } catch (error) {
+      console.error('Error deleting advance payment entry:', error);
+      const statusCode = error.message.includes('not found') ? 404 : 500;
+      res.status(statusCode).json({ message: error.message });
+    }
+  }
+
+  // Legacy endpoint support: treat update as adding a new payment entry.
+  async updateAdvancePayment(req, res) {
+    return this.addAdvancePayment(req, res);
   }
 
   async update(req, res) {

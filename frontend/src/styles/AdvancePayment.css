@@ -1,29 +1,32 @@
 /* Advance Payment Component Styles */
 .advance-payment-section {
-  background: #ffffff;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-top: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.section-header {
+.advance-payment-section .section-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.25rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 2px solid #f0f4ff;
+  justify-content: flex-start;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
-.section-title {
+.advance-payment-section .header-content h3 {
+  color: #1a1a2e;
+  font-size: 1.75rem;
+  margin: 0 0 0.5rem 0;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.advance-payment-section .section-description {
+  color: #666;
   margin: 0;
-  color: #101036;
-  font-size: 1.1rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .btn-edit-advance {
@@ -67,69 +70,303 @@
   border: 1px solid #ef9a9a;
 }
 
-/* Display Mode Styles */
+/* Display Mode Styles - Match Office Pay Items */
 .advance-payment-display {
-  background: linear-gradient(135deg, #f8f9fa 0%, #f0f4ff 100%);
+  background: transparent;
   border-radius: 8px;
-  padding: 1.25rem;
+  padding: 0;
 }
 
-.advance-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.billing-table-wrapper {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.advance-amount-display {
+.table-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  background: white;
-  border-radius: 8px;
-  border-left: 4px solid #101036;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 0;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f1f3 100%);
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.advance-label {
+.table-title {
+  font-size: 1.1rem;
   font-weight: 600;
-  color: #374151;
-  font-size: 1rem;
+  color: #1a1a2e;
 }
 
-.advance-value {
-  font-family: 'Courier New', monospace;
-  font-size: 1.25rem;
+.btn-add-payment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.35rem;
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-add-payment:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 16, 54, 0.28);
+}
+
+.btn-icon {
+  font-size: 1.05rem;
+  line-height: 1;
   font-weight: 700;
 }
 
-.advance-value.has-advance {
-  color: #059669;
+.billing-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-.advance-value.no-advance {
-  color: #6b7280;
+.advance-billing-table thead,
+.advance-billing-table thead tr,
+.advance-billing-table thead th {
+  background: #3b82f6;
+  color: #ffffff;
 }
 
-.advance-detail {
+.advance-billing-table thead th {
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.billing-table th {
+  padding: 1.15rem 0.75rem;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.billing-table th:last-child {
+  border-right: none;
+}
+
+.billing-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  background: #eef4ff;
+}
+
+.billing-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.billing-table td {
+  padding: 1.1rem 0.75rem;
+  color: #1f2937;
+  font-size: 0.94rem;
+  vertical-align: middle;
+  border-right: 1px solid #d9e5fb;
+}
+
+.billing-table td:last-child {
+  border-right: none;
+}
+
+.billing-table .col-description,
+.billing-table .col-actual,
+.billing-table .col-paidby,
+.billing-table .col-date,
+.billing-table .col-notes {
+  width: 20%;
+}
+
+.billing-table .col-actions {
+  width: 12%;
+  text-align: center;
+}
+
+.advance-billing-table.has-actions .col-description,
+.advance-billing-table.has-actions .col-actual,
+.advance-billing-table.has-actions .col-paidby,
+.advance-billing-table.has-actions .col-date,
+.advance-billing-table.has-actions .col-notes {
+  width: 17.6%;
+}
+
+.billing-table .col-description {
+  padding-left: 1.5rem;
+}
+
+.cell-content {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell-content.currency {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.action-icons {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: #666;
+  padding: 0;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+  color: #1a1a2e;
+}
+
+.icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.edit-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+/* Prevent global Billing.css .edit-btn styles from leaking here */
+.advance-payment-section .icon-btn.edit-btn {
+  background: transparent;
+  border: none;
+  transform: none;
+}
+
+.advance-payment-section .icon-btn.edit-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  border: none;
+  transform: none;
+}
+
+.advance-payment-section .icon-btn.edit-btn::after {
+  content: none !important;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.totals-section {
+  margin-top: 0;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f1f3 100%);
+  border-top: 2px solid #e5e7eb;
+}
+
+.total-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 6px;
+  padding: 0.75rem 0;
+  border-top: 2px solid #101036;
+  border-bottom: 2px solid #101036;
 }
 
-.advance-detail .detail-label {
-  font-weight: 600;
-  color: #4b5563;
-  font-size: 0.9rem;
+.total-label {
+  color: #1a1a2e;
+  font-weight: 700;
+  font-size: 1.03rem;
 }
 
-.advance-detail .detail-value {
-  color: #101036;
-  font-weight: 500;
-  font-size: 0.9rem;
+.total-value {
+  color: #1a1a2e;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  font-size: 1.03rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #666;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.empty-icon {
+  font-size: 2.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.empty-state h4 {
+  color: #1a1a2e;
+  font-size: 1.2rem;
+  margin: 0 0 0.4rem;
+}
+
+.empty-state p {
+  margin: 0 0 1rem;
+  color: #6b7280;
+}
+
+.btn-empty-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 2.2rem 1rem;
+  color: #666;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 0.75rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .no-advance-message {
@@ -155,38 +392,94 @@
   font-style: italic;
 }
 
-/* Form Mode Styles */
-.advance-payment-form {
-  background: linear-gradient(135deg, #f8f9fa 0%, #f0f4ff 100%);
+/* Form Mode Styles - Match Office Pay Items add window */
+.advance-payment-section .add-form-container {
+  background: #f8f9fa;
+  padding: 1.5rem;
   border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.advance-payment-section .form-card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.advance-payment-section .form-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f1f3 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.advance-payment-section .form-header h4 {
+  margin: 0;
+  color: #1a1a2e;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.advance-payment-section .btn-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.advance-payment-section .btn-close:hover {
+  background: #e5e7eb;
+  color: #1a1a2e;
+}
+
+.advance-payment-section .advance-payment-form {
+  background: white;
+  border-radius: 0;
   padding: 1.5rem;
 }
 
-.form-row {
+.advance-payment-section .form-row {
   margin-bottom: 1.25rem;
 }
 
-.form-row-two {
+.advance-payment-section .form-row-two {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
 }
 
-.form-group {
+.advance-payment-section .form-group {
   display: flex;
   flex-direction: column;
 }
 
-.form-group label {
-  font-weight: 600;
-  color: #374151;
+.advance-payment-section .form-group label {
+  font-weight: 500;
+  color: #1a1a2e;
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
-.form-control {
+.advance-payment-section .required {
+  color: #dc2626;
+}
+
+.advance-payment-section .form-control {
   padding: 0.75rem;
   border: 2px solid #e5e7eb;
   border-radius: 6px;
@@ -195,24 +488,24 @@
   background: white;
 }
 
-.form-control:focus {
+.advance-payment-section .form-control:focus {
   outline: none;
-  border-color: #101036;
-  box-shadow: 0 0 0 3px rgba(16, 16, 54, 0.1);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.form-control[type="number"] {
+.advance-payment-section .form-control[type="number"] {
   font-family: 'Courier New', monospace;
   font-weight: 600;
 }
 
-textarea.form-control {
+.advance-payment-section textarea.form-control {
   resize: vertical;
   min-height: 80px;
   font-family: inherit;
 }
 
-.form-actions {
+.advance-payment-section .form-actions {
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
@@ -262,32 +555,89 @@ textarea.form-control {
 @media (max-width: 768px) {
   .advance-payment-section {
     padding: 1rem;
-    margin-top: 1rem;
   }
 
-  .section-header {
+  .advance-payment-section .header-content h3 {
+    font-size: 1.35rem;
+  }
+
+  .table-header-bar {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
   }
 
-  .advance-amount-display {
-    flex-direction: column;
+  .billing-table {
+    table-layout: auto;
+  }
+
+  .billing-table thead {
+    display: none;
+  }
+
+  .billing-table tbody tr {
+    display: block;
+    border-bottom: 1px solid #dbe4ff;
+  }
+
+  .billing-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    border-right: none;
+    padding: 0.65rem 0.9rem;
+  }
+
+  .billing-table td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+  }
+
+  .billing-table .col-description {
+    padding-left: 0.9rem;
+  }
+
+  .advance-payments-table {
+    min-width: 100%;
+  }
+
+  .advance-payments-table thead {
+    display: none;
+  }
+
+  .advance-payments-table tbody tr {
+    display: block;
+    border-bottom: 1px solid #edf2fb;
+  }
+
+  .advance-payments-table tbody td {
+    display: flex;
+    justify-content: space-between;
     align-items: flex-start;
     gap: 0.5rem;
+    border-bottom: none;
+    padding: 0.55rem 0.75rem;
   }
 
-  .advance-detail {
+  .advance-payments-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+  }
+
+  .advance-payment-section .form-actions {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
   }
 
-  .form-actions {
-    flex-direction: column;
-  }
-
-  .form-row-two {
+  .advance-payment-section .form-row-two {
     grid-template-columns: 1fr;
     gap: 0;
   }
@@ -297,29 +647,3 @@ textarea.form-control {
   }
 }
 
-/* Professional Enhancements */
-.advance-payment-section:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.advance-amount-display:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Animation for smooth transitions */
-.advance-payment-form,
-.advance-payment-display {
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
