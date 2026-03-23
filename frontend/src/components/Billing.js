@@ -771,6 +771,12 @@ function Billing() {
     
     // Use job's advance payment if bill doesn't have it
     const advancePayment = parseFloat(bill.advancePayment || job.advancePayment || 0);
+    const rawAdvancePaymentDate = bill.advancePaymentDate || bill.paymentMadeDate || job.advancePaymentDate || job.paymentMadeDate;
+    const parsedAdvancePaymentDate = rawAdvancePaymentDate ? new Date(rawAdvancePaymentDate) : null;
+    const advancePaymentDateText = parsedAdvancePaymentDate && !Number.isNaN(parsedAdvancePaymentDate.getTime())
+      ? parsedAdvancePaymentDate.toLocaleDateString('en-GB')
+      : '-';
+    const advancePaymentLabel = `Advance payment (${advancePaymentDateText})`;
     const grossTotal = parseFloat(bill.grossTotal || bill.billingAmount || 0);
     const netTotal = grossTotal - advancePayment; // Always calculate, don't use bill.netTotal
     
@@ -1087,7 +1093,7 @@ function Billing() {
           
           ${advancePayment > 0 ? `
             <div class="item-row subtotal">
-              <div class="item-description">LESS: Advance Amount</div>
+              <div class="item-description">${advancePaymentLabel}</div>
               <div class="item-amount">${formatAmount(advancePayment)}</div>
             </div>
           ` : ''}
