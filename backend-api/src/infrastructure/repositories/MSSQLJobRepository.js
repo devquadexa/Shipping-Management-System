@@ -115,6 +115,7 @@ class MSSQLJobRepository extends IJobRepository {
       .input('cusdecNumber', this.sql.VarChar, job.cusdecNumber)
       .input('openDate', this.sql.Date, job.openDate)
       .input('shipmentCategory', this.sql.VarChar, job.shipmentCategory)
+      .input('chassisNumber', this.sql.VarChar, job.chassisNumber)
       .input('exporter', this.sql.VarChar, job.exporter)
       .input('transporter', this.sql.VarChar, job.transporter)
       .input('lcNumber', this.sql.VarChar, job.lcNumber)
@@ -123,8 +124,8 @@ class MSSQLJobRepository extends IJobRepository {
       .input('assignedTo', this.sql.VarChar, job.assignedTo)
       .input('createdDate', this.sql.DateTime, job.createdDate)
       .query(`
-        INSERT INTO Jobs (JobId, CustomerId, BLNumber, CUSDECNumber, OpenDate, ShipmentCategory, Exporter, Transporter, LCNumber, ContainerNumber, Status, AssignedTo, CreatedDate)
-        VALUES (@jobId, @customerId, @blNumber, @cusdecNumber, @openDate, @shipmentCategory, @exporter, @transporter, @lcNumber, @containerNumber, @status, @assignedTo, @createdDate)
+        INSERT INTO Jobs (JobId, CustomerId, BLNumber, CUSDECNumber, OpenDate, ShipmentCategory, chassisNumber, Exporter, Transporter, LCNumber, ContainerNumber, Status, AssignedTo, CreatedDate)
+        VALUES (@jobId, @customerId, @blNumber, @cusdecNumber, @openDate, @shipmentCategory, @chassisNumber, @exporter, @transporter, @lcNumber, @containerNumber, @status, @assignedTo, @createdDate)
       `);
     
     console.log('MSSQLJobRepository.create - job created successfully');
@@ -221,6 +222,7 @@ class MSSQLJobRepository extends IJobRepository {
       .input('cusdecNumber', this.sql.VarChar, job.cusdecNumber)
       .input('openDate', this.sql.Date, job.openDate)
       .input('shipmentCategory', this.sql.VarChar, job.shipmentCategory)
+      .input('chassisNumber', this.sql.VarChar, job.chassisNumber)
       .input('exporter', this.sql.VarChar, job.exporter)
       .input('transporter', this.sql.VarChar, job.transporter)
       .input('lcNumber', this.sql.VarChar, job.lcNumber)
@@ -230,7 +232,7 @@ class MSSQLJobRepository extends IJobRepository {
       .query(`
         UPDATE Jobs 
         SET BLNumber = @blNumber, CUSDECNumber = @cusdecNumber, OpenDate = @openDate,
-            ShipmentCategory = @shipmentCategory, Exporter = @exporter, Transporter = @transporter,
+          ShipmentCategory = @shipmentCategory, chassisNumber = @chassisNumber, Exporter = @exporter, Transporter = @transporter,
             LCNumber = @lcNumber, ContainerNumber = @containerNumber, Status = @status, AssignedTo = @assignedTo
         WHERE JobId = @jobId
       `);
@@ -933,6 +935,7 @@ class MSSQLJobRepository extends IJobRepository {
       cusdecNumber: row.CUSDECNumber,
       openDate: row.openDate || row.OpenDate,
       shipmentCategory: row.shipmentCategory || row.ShipmentCategory,
+      chassisNumber: row.chassisNumber || row.ChassisNumber,
       exporter: row.Exporter,
       transporter: row.Transporter,
       lcNumber: row.LCNumber,

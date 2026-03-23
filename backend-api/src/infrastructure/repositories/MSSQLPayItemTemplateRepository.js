@@ -19,6 +19,23 @@ class MSSQLPayItemTemplateRepository extends IPayItemTemplateRepository {
           WHERE shipmentCategory = @shipmentCategory AND isActive = 1
           ORDER BY itemOrder ASC
         `);
+
+      // Backward compatibility: if templates were previously stored under "Vehicle"
+      // and the caller asks for one of the new vehicle categories, fall back.
+      const isNewVehicleCategory = shipmentCategory === 'Vehicle - Personal' || shipmentCategory === 'Vehicle - Company';
+      if (result.recordset.length === 0 && isNewVehicleCategory) {
+        const fallbackResult = await pool.request()
+          .input('legacyVehicleCategory', this.sql.NVarChar, 'Vehicle')
+          .query(`
+            SELECT templateId, shipmentCategory, itemName, itemOrder, isActive, createdDate
+            FROM PayItemTemplates
+            WHERE shipmentCategory = @legacyVehicleCategory AND isActive = 1
+            ORDER BY itemOrder ASC
+          `);
+
+        return fallbackResult.recordset;
+      }
+
       return result.recordset;
     } catch (error) {
       console.error('Error fetching pay item templates by category:', error);
