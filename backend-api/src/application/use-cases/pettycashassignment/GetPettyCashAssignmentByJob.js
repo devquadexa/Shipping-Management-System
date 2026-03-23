@@ -3,10 +3,10 @@ class GetPettyCashAssignmentByJob {
     this.pettyCashAssignmentRepository = pettyCashAssignmentRepository;
   }
 
-  async execute(jobId, userId, userRole) {
+  async execute(jobId, userId, userRole, assignmentId = null) {
     // For Waff Clerk, get only their assignment for this job
     if (userRole === 'Waff Clerk') {
-      return await this.pettyCashAssignmentRepository.getByJobAndUser(jobId, userId);
+      return await this.pettyCashAssignmentRepository.getByJobAndUser(jobId, userId, assignmentId);
     }
     
     // For Manager/Admin/Super Admin, get all assignments for this job

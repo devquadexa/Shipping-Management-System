@@ -56,6 +56,7 @@ class UpdateJob {
         cusdecNumber: jobData.cusdecNumber !== undefined ? (jobData.cusdecNumber || null) : existingJob.cusdecNumber,
         openDate: jobData.openDate !== undefined ? processedOpenDate : existingJob.openDate,
         shipmentCategory: jobData.shipmentCategory !== undefined ? jobData.shipmentCategory : existingJob.shipmentCategory,
+        chassisNumber: jobData.chassisNumber !== undefined ? (jobData.chassisNumber || null) : existingJob.chassisNumber,
         exporter: jobData.exporter !== undefined ? (jobData.exporter || null) : existingJob.exporter,
         lcNumber: jobData.lcNumber !== undefined ? (jobData.lcNumber || null) : existingJob.lcNumber,
         containerNumber: jobData.containerNumber !== undefined ? (jobData.containerNumber || null) : existingJob.containerNumber,

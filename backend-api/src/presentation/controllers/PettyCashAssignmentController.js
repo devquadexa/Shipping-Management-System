@@ -43,7 +43,9 @@ class PettyCashAssignmentController {
   async getByJob(req, res) {
     try {
       const { jobId } = req.params;
+      const assignmentId = req.query.assignmentId ? parseInt(req.query.assignmentId, 10) : null;
       console.log('getByJob controller - jobId:', jobId);
+      console.log('getByJob controller - assignmentId:', assignmentId);
       console.log('getByJob controller - userId:', req.user.userId);
       console.log('getByJob controller - userRole:', req.user.role);
       
@@ -51,7 +53,7 @@ class PettyCashAssignmentController {
       
       // For Waff Clerk, get only their assignment for this job
       // For Manager/Admin/Super Admin, get all assignments for this job
-      const assignment = await getPettyCashAssignmentByJob.execute(jobId, req.user.userId, req.user.role);
+      const assignment = await getPettyCashAssignmentByJob.execute(jobId, req.user.userId, req.user.role, assignmentId);
       console.log('getByJob controller - assignment:', assignment);
       console.log('getByJob controller - assignment type:', typeof assignment);
       console.log('getByJob controller - assignment keys:', assignment ? Object.keys(assignment) : 'null');
