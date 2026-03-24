@@ -51,6 +51,20 @@ module.exports = (container) => {
     auth, 
     (req, res) => controller.getSettlementItems(req, res)
   );
+  
+  // Update settlement item (Waff Clerk only, before invoice generation)
+  router.patch('/:assignmentId/settlement-items/:itemId', 
+    auth, 
+    checkRole('Waff Clerk'), 
+    (req, res) => controller.updateSettlementItem(req, res)
+  );
+  
+  // Delete settlement item (Waff Clerk only, before invoice generation)
+  router.delete('/:assignmentId/settlement-items/:itemId', 
+    auth, 
+    checkRole('Waff Clerk'), 
+    (req, res) => controller.deleteSettlementItem(req, res)
+  );
 
   // Settle assignment (User who was assigned)
   router.post('/:id/settle', 
