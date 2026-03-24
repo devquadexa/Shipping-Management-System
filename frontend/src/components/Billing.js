@@ -810,6 +810,8 @@ function Billing() {
       console.log('generateBillHTML - no pay items found in job');
       payItemsArray = [];
     }
+
+    const isCompactItemsLayout = payItemsArray.length >= 20;
     
     return `
       <!DOCTYPE html>
@@ -824,7 +826,7 @@ function Billing() {
             --theme-soft: ${isColorMode ? '#e8f0ff' : '#ffffff'};
           }
           @page { 
-            margin: 15mm 20mm; 
+            margin: ${isCompactItemsLayout ? '10mm 14mm' : '15mm 20mm'}; 
             size: A4;
           }
           * {
@@ -833,30 +835,30 @@ function Billing() {
           }
           body {
             font-family: Arial, sans-serif;
-            font-size: 10pt;
-            line-height: 1.3;
+            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
+            line-height: ${isCompactItemsLayout ? '1.22' : '1.3'};
             color: #111;
           }
           .invoice-page {
-            min-height: 258mm;
+            min-height: ${isCompactItemsLayout ? '275mm' : '258mm'};
             display: flex;
             flex-direction: column;
           }
           .page-header {
             position: relative;
-            margin-bottom: 15px;
-            padding: 8px 10px 10px 10px;
+            margin-bottom: ${isCompactItemsLayout ? '8px' : '15px'};
+            padding: ${isCompactItemsLayout ? '6px 8px 8px 8px' : '8px 10px 10px 10px'};
             border-bottom: 2px solid var(--theme-primary);
             background: ${isColorMode ? 'linear-gradient(180deg, var(--theme-soft) 0%, #ffffff 100%)' : '#ffffff'};
             border-radius: 6px;
             display: grid;
             grid-template-columns: auto 1fr auto;
             align-items: center;
-            gap: 15px;
+            gap: ${isCompactItemsLayout ? '10px' : '15px'};
           }
           .logo {
-            width: 72px;
-            height: 72px;
+            width: ${isCompactItemsLayout ? '62px' : '72px'};
+            height: ${isCompactItemsLayout ? '62px' : '72px'};
             display: flex;
             align-items: center;
             justify-content: center;
@@ -876,50 +878,50 @@ function Billing() {
             margin-bottom: 0;
           }
           .company-name {
-            font-size: 13pt;
+            font-size: ${isCompactItemsLayout ? '12pt' : '13pt'};
             font-weight: bold;
             letter-spacing: 1px;
             margin-bottom: 3px;
             color: var(--theme-primary);
           }
           .company-tagline {
-            font-size: 8pt;
+            font-size: ${isCompactItemsLayout ? '7.5pt' : '8pt'};
             margin: 1px 0;
             color: var(--theme-muted);
           }
           .invoice-header-right {
             text-align: right;
-            font-size: 9pt;
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
             line-height: 1.5;
             color: var(--theme-primary);
             font-weight: 600;
           }
           .invoice-header-right strong {
             display: block;
-            font-size: 10pt;
+            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
           }
           .recipient {
-            margin: 15px 0;
+            margin: ${isCompactItemsLayout ? '8px 0' : '15px 0'};
             line-height: 1.5;
           }
           .recipient-line {
-            margin: 2px 0;
-            font-size: 10pt;
+            margin: ${isCompactItemsLayout ? '1px 0' : '2px 0'};
+            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
           }
           .details-section {
-            margin: 12px 0;
-            padding-bottom: 10px;
+            margin: ${isCompactItemsLayout ? '8px 0' : '12px 0'};
+            padding-bottom: ${isCompactItemsLayout ? '6px' : '10px'};
             border-bottom: 1px solid var(--theme-primary);
           }
           .detail-row {
             display: flex;
-            margin: 3px 0;
-            font-size: 10pt;
+            margin: ${isCompactItemsLayout ? '2px 0' : '3px 0'};
+            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
           }
           .detail-label {
             font-weight: bold;
-            width: 145px;
-            min-width: 145px;
+            width: ${isCompactItemsLayout ? '128px' : '145px'};
+            min-width: ${isCompactItemsLayout ? '128px' : '145px'};
             white-space: nowrap;
             word-break: keep-all;
             color: var(--theme-primary);
@@ -930,68 +932,71 @@ function Billing() {
             overflow-wrap: anywhere;
           }
           .items-section {
-            margin: 15px 0;
+            margin: ${isCompactItemsLayout ? '8px 0' : '15px 0'};
           }
           .item-row {
             display: flex;
             justify-content: space-between;
-            margin: 4px 0;
-            font-size: 10pt;
-            padding: 2px 0;
+            margin: ${isCompactItemsLayout ? '1px 0' : '4px 0'};
+            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
+            padding: ${isCompactItemsLayout ? '1px 0' : '2px 0'};
             border-bottom: 1px solid #e0e0e0;
           }
           .item-description {
             flex: 1;
-            padding-right: 20px;
+            padding-right: ${isCompactItemsLayout ? '12px' : '20px'};
+            white-space: ${isCompactItemsLayout ? 'nowrap' : 'normal'};
+            overflow: ${isCompactItemsLayout ? 'hidden' : 'visible'};
+            text-overflow: ${isCompactItemsLayout ? 'ellipsis' : 'clip'};
           }
           .item-amount {
             text-align: right;
-            min-width: 100px;
+            min-width: ${isCompactItemsLayout ? '92px' : '100px'};
             padding-right: 5px;
             font-weight: normal;
           }
           .item-row.subtotal {
             border-top: 1px solid var(--theme-primary);
             border-bottom: none;
-            margin-top: 10px;
-            padding-top: 8px;
+            margin-top: ${isCompactItemsLayout ? '6px' : '10px'};
+            padding-top: ${isCompactItemsLayout ? '6px' : '8px'};
             font-weight: normal;
           }
           .item-row.total {
             border-top: 2px solid var(--theme-primary);
             border-bottom: none;
-            margin-top: 8px;
-            padding-top: 10px;
-            padding-bottom: 5px;
+            margin-top: ${isCompactItemsLayout ? '5px' : '8px'};
+            padding-top: ${isCompactItemsLayout ? '6px' : '10px'};
+            padding-bottom: ${isCompactItemsLayout ? '3px' : '5px'};
             font-weight: bold;
-            font-size: 11pt;
+            font-size: ${isCompactItemsLayout ? '10pt' : '11pt'};
             color: var(--theme-primary);
           }
           .signature-section {
-            margin-top: 40px;
+            margin-top: ${isCompactItemsLayout ? '24px' : '40px'};
             text-align: left;
           }
           .signature-space {
             border-top: 1px solid var(--theme-primary);
             width: 200px;
-            margin: 50px 0 5px 0;
+            margin: ${isCompactItemsLayout ? '35px 0 5px 0' : '50px 0 5px 0'};
             height: 2px;
           }
           .signature-label {
-            font-size: 10pt;
+            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
             font-weight: bold;
             margin-top: 5px;
             color: var(--theme-primary);
           }
           .footer {
             margin-top: auto;
-            padding-top: 16px;
+            padding-top: ${isCompactItemsLayout ? '10px' : '16px'};
             padding-bottom: 6px;
             border-top: 1px solid var(--theme-primary);
             background: ${isColorMode ? 'linear-gradient(180deg, #ffffff 0%, var(--theme-soft) 100%)' : '#ffffff'};
             text-align: center;
-            font-size: 8pt;
-            line-height: 1.3;
+            font-size: ${isCompactItemsLayout ? '7.5pt' : '8pt'};
+            line-height: ${isCompactItemsLayout ? '1.2' : '1.3'};
             color: var(--theme-accent);
           }
           .footer-line {
@@ -1110,8 +1115,8 @@ function Billing() {
         </div>
 
         <div class="footer">
-          <div class="footer-line">No. 10/A, Ground Floor, Y.M.B.A Building Colombo 01, Sri Lanka. Tel: 2433581, 2433983</div>
-          <div class="footer-line">Fax No. 2433580, 2439697 Hotline: 0777-898996, 076 6857070 E-mail: superallbrooks@gmail.com</div>
+          <div class="footer-line">No. 10/A, Ground Floor, Y.M.B.A Building Colombo 01, Sri Lanka. Office: 0112-433-581</div>
+          <div class="footer-line">WhatsApp: +94754-946-946, +1410-868-9329 Hotline: +94-777-898929 E-mail: Supershinecargo@gmail.com</div>
         </div>
         </div>
       </body>
