@@ -145,6 +145,112 @@ class PettyCashAssignmentController {
       res.status(500).json({ message: 'Error fetching user balances summary' });
     }
   }
+  
+  async updateSettlementItem(req, res) {
+    try {
+      const { assignmentId, itemId } = req.params;
+      const { itemName, actualCost } = req.body;
+      const userId = req.user.userId;
+      
+      console.log('updateSettlementItem - assignmentId:', assignmentId, 'itemId:', itemId);
+      console.log('updateSettlementItem - userId:', userId, 'data:', { itemName, actualCost });
+      
+      const pettyCashAssignmentRepository = this.container.resolve('pettyCashAssignmentRepository');
+      const billRepository = this.container.resolve('billRepository');
+      
+      // 1. Get assignment to verify ownership and get jobId
+      const assignment = await pettyCashAssignmentRepository.findById(parseInt(assignmentId));
+      if (!assignment) {
+        return res.status(404).json({ message: 'Assignment not found' });
+      }
+      
+      // 2. Verify this assignment belongs to the requesting user
+      if (assignment.assignedTo !== userId) {
+        return res.status(403).json({ message: 'You can only edit your own settlement items' });
+      }
+      
+      // 3. Verify assignment is in "Settled" status
+      if (assignment.status !== 'Settled') {
+        return res.status(400).json({ message: 'Can only edit items in Settled status' });
+      }
+      
+      // 4. Check if invoice has been generated for this job
+      const bills = await billRepository.findByJob(assignment.jobId);
+      if (bills && bills.length > 0) {
+        return res.status(400).json({ message: 'Cannot edit - Invoice already generated for this job' });
+      }
+      
+      // 5. Update the settlement item
+      const updatedItem = await pettyCashAssignmentRepository.updateSettlementItem(
+        parseInt(itemId),
+        itemName,
+        parseFloat(actualCost)
+      );
+      
+      // 6. Recalculate assignment totals
+      await pettyCashAssignmentRepository.recalculateAssignmentTotals(parseInt(assignmentId));
+      
+      res.json({ 
+        message: 'Settlement item updated successfully',
+        item: updatedItem
+      });
+    } catch (error) {
+      console.error('Error in updateSettlementItem:', error);
+      res.status(500).json({ message: error.message || 'Error updating settlement item' });
+    }
+  }
+  
+  async deleteSettlementItem(req, res) {
+    try {
+      const { assignmentId, itemId } = req.params;
+      const userId = req.user.userId;
+      
+      console.log('deleteSettlementItem - assignmentId:', assignmentId, 'itemId:', itemId);
+      console.log('deleteSettlementItem - userId:', userId);
+      
+      const pettyCashAssignmentRepository = this.container.resolve('pettyCashAssignmentRepository');
+      const billRepository = this.container.resolve('billRepository');
+      
+      // 1. Get assignment to verify ownership and get jobId
+      const assignment = await pettyCashAssignmentRepository.findById(parseInt(assignmentId));
+      if (!assignment) {
+        return res.status(404).json({ message: 'Assignment not found' });
+      }
+      
+      // 2. Verify this assignment belongs to the requesting user
+      if (assignment.assignedTo !== userId) {
+        return res.status(403).json({ message: 'You can only delete your own settlement items' });
+      }
+      
+      // 3. Verify assignment is in "Settled" status
+      if (assignment.status !== 'Settled') {
+        return res.status(400).json({ message: 'Can only delete items in Settled status' });
+      }
+      
+      // 4. Check if invoice has been generated for this job
+      const bills = await billRepository.findByJob(assignment.jobId);
+      if (bills && bills.length > 0) {
+        return res.status(400).json({ message: 'Cannot delete - Invoice already generated for this job' });
+      }
+      
+      // 5. Get settlement items count
+      const items = await pettyCashAssignmentRepository.getSettlementItems(parseInt(assignmentId));
+      if (items.length <= 1) {
+        return res.status(400).json({ message: 'Cannot delete the last settlement item' });
+      }
+      
+      // 6. Delete the settlement item
+      await pettyCashAssignmentRepository.deleteSettlementItem(parseInt(itemId));
+      
+      // 7. Recalculate assignment totals
+      await pettyCashAssignmentRepository.recalculateAssignmentTotals(parseInt(assignmentId));
+      
+      res.json({ message: 'Settlement item deleted successfully' });
+    } catch (error) {
+      console.error('Error in deleteSettlementItem:', error);
+      res.status(500).json({ message: error.message || 'Error deleting settlement item' });
+    }
+  }
 }
 
 module.exports = PettyCashAssignmentController;

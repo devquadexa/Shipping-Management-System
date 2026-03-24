@@ -189,6 +189,11 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
     }
   }
 
+  // Alias for consistency with other repositories
+  async findById(assignmentId) {
+    return this.getById(assignmentId);
+  }
+
   async getSettlementItems(assignmentId) {
     try {
       const pool = await this.getConnection();
@@ -625,6 +630,104 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
     } catch (error) {
       console.error('Error fetching all assignments by job:', error);
       console.error('Error stack:', error.stack);
+      throw error;
+    }
+  }
+  
+  // Update settlement item
+  async updateSettlementItem(itemId, itemName, actualCost) {
+    try {
+      const pool = await this.getConnection();
+      
+      const result = await pool.request()
+        .input('itemId', this.sql.Int, itemId)
+        .input('itemName', this.sql.NVarChar, itemName)
+        .input('actualCost', this.sql.Decimal(18, 2), actualCost)
+        .query(`
+          UPDATE PettyCashSettlementItems
+          SET itemName = @itemName, actualCost = @actualCost
+          OUTPUT INSERTED.*
+          WHERE settlementItemId = @itemId
+        `);
+      
+      if (result.recordset.length === 0) {
+        throw new Error('Settlement item not found');
+      }
+      
+      return result.recordset[0];
+    } catch (error) {
+      console.error('Error updating settlement item:', error);
+      throw error;
+    }
+  }
+  
+  // Delete settlement item
+  async deleteSettlementItem(itemId) {
+    try {
+      const pool = await this.getConnection();
+      
+      await pool.request()
+        .input('itemId', this.sql.Int, itemId)
+        .query(`
+          DELETE FROM PettyCashSettlementItems
+          WHERE settlementItemId = @itemId
+        `);
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting settlement item:', error);
+      throw error;
+    }
+  }
+  
+  // Recalculate assignment totals after edit/delete
+  async recalculateAssignmentTotals(assignmentId) {
+    try {
+      const pool = await this.getConnection();
+      
+      // Get sum of settlement items
+      const sumResult = await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
+        .query(`
+          SELECT ISNULL(SUM(actualCost), 0) as totalSpent
+          FROM PettyCashSettlementItems
+          WHERE assignmentId = @assignmentId
+        `);
+      
+      const actualSpent = sumResult.recordset[0].totalSpent;
+      
+      // Get assigned amount
+      const assignmentResult = await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
+        .query(`
+          SELECT assignedAmount
+          FROM PettyCashAssignments
+          WHERE assignmentId = @assignmentId
+        `);
+      
+      const assignedAmount = assignmentResult.recordset[0].assignedAmount;
+      
+      // Calculate balance/over amounts
+      const balanceAmount = Math.max(0, assignedAmount - actualSpent);
+      const overAmount = Math.max(0, actualSpent - assignedAmount);
+      
+      // Update assignment
+      await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
+        .input('actualSpent', this.sql.Decimal(18, 2), actualSpent)
+        .input('balanceAmount', this.sql.Decimal(18, 2), balanceAmount)
+        .input('overAmount', this.sql.Decimal(18, 2), overAmount)
+        .query(`
+          UPDATE PettyCashAssignments
+          SET actualSpent = @actualSpent,
+              balanceAmount = @balanceAmount,
+              overAmount = @overAmount
+          WHERE assignmentId = @assignmentId
+        `);
+      
+      return { actualSpent, balanceAmount, overAmount };
+    } catch (error) {
+      console.error('Error recalculating assignment totals:', error);
       throw error;
     }
   }

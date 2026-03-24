@@ -45,6 +45,7 @@ function Jobs() {
     if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') {
       fetchUsers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -223,7 +224,8 @@ function Jobs() {
         return {
           ...prev,
           shipmentCategory: value,
-          chassisNumber: isVehicleCategory ? prev.chassisNumber : ''
+          chassisNumber: isVehicleCategory ? prev.chassisNumber : '',
+          containerNumber: isVehicleCategory ? '' : prev.containerNumber // Clear container number for vehicle shipments
         };
       }
       return { ...prev, [name]: value };
@@ -771,10 +773,13 @@ function Jobs() {
                     <input type="text" name="lcNumber" value={formData.lcNumber} onChange={handleChange} placeholder="Letter of Credit Number" />
                   </div>
                   
-                  <div className="form-group">
-                    <label>Container Number</label>
-                    <input type="text" name="containerNumber" value={formData.containerNumber} onChange={handleChange} placeholder="Container Number" />
-                  </div>
+                  {/* Hide Container Number for Vehicle shipments */}
+                  {!(formData.shipmentCategory === 'Vehicle - Personal' || formData.shipmentCategory === 'Vehicle - Company') && (
+                    <div className="form-group">
+                      <label>Container Number</label>
+                      <input type="text" name="containerNumber" value={formData.containerNumber} onChange={handleChange} placeholder="Container Number" />
+                    </div>
+                  )}
                   
                   <div className="form-group">
                     <label>Exporter</label>

@@ -24,6 +24,11 @@ class Bill {
     invoiceDate = null,
     dueDate = null,
     isOverdue = false,
+    paymentMethod = null, // Cash, Cheque, Bank Transfer
+    chequeNumber = null,
+    chequeDate = null,
+    chequeAmount = null,
+    bankName = null, // Commercial Bank, Peoples Bank
     items = [],
     metadata = {}
   }) {
@@ -47,6 +52,11 @@ class Bill {
     this.invoiceDate = invoiceDate;
     this.dueDate = dueDate;
     this.isOverdue = isOverdue;
+    this.paymentMethod = paymentMethod;
+    this.chequeNumber = chequeNumber;
+    this.chequeDate = chequeDate;
+    this.chequeAmount = chequeAmount ? parseFloat(chequeAmount) : null;
+    this.bankName = bankName;
     this.items = items;
     this.metadata = metadata;
   }
@@ -110,12 +120,29 @@ class Bill {
     return this.advancePayment > 0;
   }
 
-  markAsPaid() {
+  markAsPaid(paymentDetails = {}) {
     if (this.paymentStatus === 'Paid') {
       throw new Error('Bill is already paid');
     }
     this.paymentStatus = 'Paid';
     this.paidDate = new Date();
+    
+    // Set payment details
+    if (paymentDetails.paymentMethod) {
+      this.paymentMethod = paymentDetails.paymentMethod;
+    }
+    if (paymentDetails.chequeNumber) {
+      this.chequeNumber = paymentDetails.chequeNumber;
+    }
+    if (paymentDetails.chequeDate) {
+      this.chequeDate = paymentDetails.chequeDate;
+    }
+    if (paymentDetails.chequeAmount) {
+      this.chequeAmount = parseFloat(paymentDetails.chequeAmount);
+    }
+    if (paymentDetails.bankName) {
+      this.bankName = paymentDetails.bankName;
+    }
   }
 
   markAsUnpaid() {
