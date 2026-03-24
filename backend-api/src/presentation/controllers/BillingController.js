@@ -60,7 +60,15 @@ class BillingController {
 
   async markAsPaid(req, res) {
     try {
-      const bill = await this.markBillAsPaid.execute(req.params.id);
+      const paymentDetails = {
+        paymentMethod: req.body.paymentMethod,
+        chequeNumber: req.body.chequeNumber,
+        chequeDate: req.body.chequeDate,
+        chequeAmount: req.body.chequeAmount,
+        bankName: req.body.bankName
+      };
+      
+      const bill = await this.markBillAsPaid.execute(req.params.id, paymentDetails);
       res.json(bill);
     } catch (error) {
       console.error('Mark bill paid error:', error);

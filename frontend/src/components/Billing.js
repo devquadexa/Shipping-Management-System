@@ -34,10 +34,17 @@ function Billing() {
   const [printMode, setPrintMode] = useState('color');
   
   // New states for pay item editing
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingPayItem, setEditingPayItem] = useState(null);
-  const [editingIndex, setEditingIndex] = useState(-1);
-  const [editBillingAmount, setEditBillingAmount] = useState('');
+  const [editingPayItemIndex, setEditingPayItemIndex] = useState(null);
+  const [editingBillingAmount, setEditingBillingAmount] = useState('');
+  
+  // Payment modal states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedBillForPayment, setSelectedBillForPayment] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeDate, setChequeDate] = useState('');
+  const [chequeAmount, setChequeAmount] = useState('');
+  const [bankName, setBankName] = useState('Commercial Bank');
 
   useEffect(() => {
     fetchBills();
@@ -466,30 +473,76 @@ function Billing() {
     return { actualCost, billingAmount, profit, grossTotal, advancePayment, netTotal };
   };
 
-  // Helper function to check if user can edit pay items
-  const canEditPayItems = () => {
-    return user?.role === 'Super Admin' || user?.role === 'Admin';
+  // Calculate real-time totals from unsaved pay items (before saving)
+  const calculateUnsavedTotals = () => {
+    // For actual cost: include items that have a name and actual cost (regardless of billing amount)
+    const itemsWithActualCost = payItems.filter(item => {
+      return item.name && (item.actualCost || item.actualCost === 0 || item.actualCost === '0');
+    });
+    
+    // For billing amount: include items that have a name and billing amount
+    const itemsWithBillingAmount = payItems.filter(item => {
+      return item.name && (item.billingAmount || item.billingAmount === 0 || item.billingAmount === '0');
+    });
+    
+    // For profit calculation: only items with BOTH actual cost and billing amount
+    const itemsWithBoth = payItems.filter(item => {
+      return item.name && 
+             (item.actualCost || item.actualCost === 0 || item.actualCost === '0') && 
+             (item.billingAmount || item.billingAmount === 0 || item.billingAmount === '0');
+    });
+    
+    const actualCost = itemsWithActualCost.reduce((sum, item) => {
+      return sum + (parseFloat(item.actualCost) || 0);
+    }, 0);
+    
+    const billingAmount = itemsWithBillingAmount.reduce((sum, item) => {
+      return sum + (parseFloat(item.billingAmount) || 0);
+    }, 0);
+    
+    const profit = billingAmount - actualCost;
+    const profitMargin = actualCost > 0 ? ((profit / actualCost) * 100) : 0;
+    
+    return { 
+      actualCost, 
+      billingAmount, 
+      profit, 
+      profitMargin, 
+      actualCostItemCount: itemsWithActualCost.length,
+      billingAmountItemCount: itemsWithBillingAmount.length,
+      profitItemCount: itemsWithBoth.length
+    };
   };
 
-  // Open edit modal for a pay item
-  const openEditModal = (payItem, index) => {
+  // Helper function to check if user can edit pay items
+  const canEditPayItems = () => {
+    return user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Manager';
+  };
+
+  // Start inline editing for a pay item
+  const startEditingPayItem = (index) => {
     if (!canEditPayItems()) {
-      setMessage('❌ Only Super Admin and Admin users can edit pay items. Please contact an administrator for changes.');
+      setMessage('❌ Only Super Admin, Admin, and Manager users can edit pay items. Please contact an administrator for changes.');
       setTimeout(() => setMessage(''), 5000);
       return;
     }
     
-    setEditingPayItem(payItem);
-    setEditingIndex(index);
-    setEditBillingAmount(payItem.billingAmount || payItem.amount || '');
-    setShowEditModal(true);
+    const payItem = selectedJob.payItems[index];
+    setEditingPayItemIndex(index);
+    setEditingBillingAmount(payItem.billingAmount || payItem.amount || '');
   };
 
-  // Save edited pay item
-  const saveEditedPayItem = async () => {
-    if (!editingPayItem || editingIndex === -1) return;
+  // Cancel inline editing
+  const cancelEditingPayItem = () => {
+    setEditingPayItemIndex(null);
+    setEditingBillingAmount('');
+  };
+
+  // Save inline edited pay item
+  const saveInlineEditedPayItem = async () => {
+    if (editingPayItemIndex === null) return;
     
-    const newBillingAmount = parseFloat(editBillingAmount);
+    const newBillingAmount = parseFloat(editingBillingAmount);
     if (isNaN(newBillingAmount) || newBillingAmount < 0) {
       setMessage('❌ Please enter a valid billing amount');
       setTimeout(() => setMessage(''), 3000);
@@ -499,8 +552,8 @@ function Billing() {
     try {
       // Update the pay item in the selectedJob
       const updatedPayItems = [...selectedJob.payItems];
-      updatedPayItems[editingIndex] = {
-        ...updatedPayItems[editingIndex],
+      updatedPayItems[editingPayItemIndex] = {
+        ...updatedPayItems[editingPayItemIndex],
         billingAmount: newBillingAmount
       };
 
@@ -514,10 +567,8 @@ function Billing() {
       });
 
       setMessage('✅ Pay item billing amount updated successfully');
-      setShowEditModal(false);
-      setEditingPayItem(null);
-      setEditingIndex(-1);
-      setEditBillingAmount('');
+      setEditingPayItemIndex(null);
+      setEditingBillingAmount('');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error updating pay item:', error);
@@ -529,7 +580,7 @@ function Billing() {
   // Remove a pay item
   const removePayItem = async (index) => {
     if (!canEditPayItems()) {
-      setMessage('❌ Only Super Admin and Admin users can remove pay items. Please contact an administrator for changes.');
+      setMessage('❌ Only Super Admin, Admin, and Manager users can remove pay items. Please contact an administrator for changes.');
       setTimeout(() => setMessage(''), 5000);
       return;
     }
@@ -584,9 +635,14 @@ function Billing() {
     if (!selectedJob.lcNumber || (typeof selectedJob.lcNumber === 'string' && selectedJob.lcNumber.trim() === '')) {
       missingFields.push('LC Number');
     }
-    if (!selectedJob.containerNumber || (typeof selectedJob.containerNumber === 'string' && selectedJob.containerNumber.trim() === '')) {
+    // Container Number is only required for non-vehicle shipments
+    if (
+      !isVehicleShipmentCategory(selectedJob.shipmentCategory) &&
+      (!selectedJob.containerNumber || (typeof selectedJob.containerNumber === 'string' && selectedJob.containerNumber.trim() === ''))
+    ) {
       missingFields.push('Container Number');
     }
+    // Chassis Number is only required for vehicle shipments
     if (
       isVehicleShipmentCategory(selectedJob.shipmentCategory) &&
       (!selectedJob.chassisNumber || (typeof selectedJob.chassisNumber === 'string' && selectedJob.chassisNumber.trim() === ''))
@@ -670,13 +726,71 @@ function Billing() {
   };
 
   const markAsPaid = async (billId) => {
+    // Open payment modal instead of directly marking as paid
+    const bill = bills.find(b => b.billId === billId);
+    setSelectedBillForPayment(bill);
+    setShowPaymentModal(true);
+    
+    // Reset payment form
+    setPaymentMethod('Cash');
+    setChequeNumber('');
+    setChequeDate('');
+    setChequeAmount('');
+    setBankName('Commercial Bank');
+  };
+  
+  const submitPayment = async () => {
+    if (!selectedBillForPayment) return;
+    
+    // Validate based on payment method
+    if (paymentMethod === 'Cheque') {
+      if (!chequeNumber || !chequeDate || !chequeAmount) {
+        setMessage('❌ Please fill in all cheque details (Number, Date, Amount)');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+      
+      const amount = parseFloat(chequeAmount);
+      if (isNaN(amount) || amount <= 0) {
+        setMessage('❌ Please enter a valid cheque amount');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+    }
+    
+    if (paymentMethod === 'Bank Transfer') {
+      if (!bankName) {
+        setMessage('❌ Please select a bank');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+    }
+    
     try {
-      await billingService.updateBill(billId, { paymentStatus: 'Paid' });
+      const paymentDetails = {
+        paymentMethod,
+        ...(paymentMethod === 'Cheque' && {
+          chequeNumber,
+          chequeDate,
+          chequeAmount: parseFloat(chequeAmount)
+        }),
+        ...(paymentMethod === 'Bank Transfer' && {
+          bankName
+        })
+      };
+      
+      await billingService.markAsPaid(selectedBillForPayment.billId, paymentDetails);
+      
+      setShowPaymentModal(false);
+      setSelectedBillForPayment(null);
       fetchBills();
-      setMessage('Invoice marked as paid!');
-      setTimeout(() => setMessage(''), 3000);
+      
+      setMessage(`✅ Invoice ${selectedBillForPayment.invoiceNumber} marked as paid via ${paymentMethod}`);
+      setTimeout(() => setMessage(''), 5000);
     } catch (error) {
       console.error('Error marking bill as paid:', error);
+      setMessage(`❌ Error: ${error.response?.data?.message || error.message}`);
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -1224,8 +1338,13 @@ function Billing() {
                     </span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">Container Number: {(!selectedJob.containerNumber || selectedJob.containerNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
-                    <span className={`info-value ${(!selectedJob.containerNumber || selectedJob.containerNumber.trim() === '') ? 'missing-value' : ''}`}>
+                    <span className="info-label">
+                      Container Number: 
+                      {!isVehicleShipmentCategory(selectedJob.shipmentCategory) && 
+                       (!selectedJob.containerNumber || selectedJob.containerNumber.trim() === '') && 
+                       <span className="required-indicator">*Required</span>}
+                    </span>
+                    <span className={`info-value ${!isVehicleShipmentCategory(selectedJob.shipmentCategory) && (!selectedJob.containerNumber || selectedJob.containerNumber.trim() === '') ? 'missing-value' : ''}`}>
                       {selectedJob.containerNumber || '-'}
                     </span>
                   </div>
@@ -1373,7 +1492,29 @@ function Billing() {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot className="pay-items-totals-footer">
+                        <tr className="totals-row">
+                          <td className="total-label"><strong>Total</strong></td>
+                          <td className="total-amount"><strong>{formatAmount(calculateUnsavedTotals().actualCost)}</strong></td>
+                          <td></td>
+                          <td className="total-amount"><strong>{formatAmount(calculateUnsavedTotals().billingAmount)}</strong></td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                        <tr className={`profit-row ${calculateUnsavedTotals().profit < 0 ? 'profit-negative-row' : ''}`}>
+                          <td className="profit-label"><strong>Profit Margin</strong></td>
+                          <td></td>
+                          <td></td>
+                          <td className={`profit-amount ${calculateUnsavedTotals().profit >= 0 ? 'profit-positive' : 'profit-negative'}`}>
+                            <strong>{formatAmount(calculateUnsavedTotals().profit)}</strong>
+                            <span className="profit-percentage">({calculateUnsavedTotals().profitMargin.toFixed(2)}%)</span>
+                          </td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
                     </table>
+                    
                     <div className="pay-items-actions">
                       <button onClick={addPayItemRow} className="btn btn-secondary btn-small">
                         + Add Another Item
@@ -1401,11 +1542,11 @@ function Billing() {
                     <div className="pay-items-review-header">
                       <h4>📋 Pay Items Review</h4>
                       <p className="review-subtitle">Review all pay items before generating invoice</p>
-                      {user?.role === 'Manager' && (
+                      {!canEditPayItems() && (
                         <div className="manager-notice">
                           <div className="notice-icon">💼</div>
                           <div className="notice-text">
-                            <strong>Manager Access:</strong> To modify billing amounts or remove pay items, please contact a Super Admin or Admin for assistance.
+                            <strong>Limited Access:</strong> To modify billing amounts or remove pay items, please contact a Super Admin, Admin, or Manager for assistance.
                           </div>
                         </div>
                       )}
@@ -1424,23 +1565,65 @@ function Billing() {
                           <div key={idx} className="table-row">
                             <div className="table-cell description-cell">{item.description}</div>
                             <div className="table-cell amount-cell">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</div>
-                            <div className="table-cell amount-cell">{formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)}</div>
+                            <div className="table-cell amount-cell">
+                              {editingPayItemIndex === idx ? (
+                                <div className="inline-edit-container">
+                                  <input
+                                    type="text"
+                                    className="inline-edit-input"
+                                    value={editingBillingAmount}
+                                    onChange={(e) => setEditingBillingAmount(e.target.value)}
+                                    onKeyPress={(e) => {
+                                      if (e.key === 'Enter') {
+                                        saveInlineEditedPayItem();
+                                      } else if (e.key === 'Escape') {
+                                        cancelEditingPayItem();
+                                      }
+                                    }}
+                                    autoFocus
+                                  />
+                                </div>
+                              ) : (
+                                formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)
+                              )}
+                            </div>
                             {canEditPayItems() && (
                               <div className="table-cell actions-cell">
-                                <button
-                                  className="action-btn edit-btn"
-                                  onClick={() => openEditModal(item, idx)}
-                                  title="Edit billing amount"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  className="action-btn remove-btn"
-                                  onClick={() => removePayItem(idx)}
-                                  title="Remove pay item"
-                                >
-                                  🗑️
-                                </button>
+                                {editingPayItemIndex === idx ? (
+                                  <>
+                                    <button
+                                      className="action-btn save-btn"
+                                      onClick={saveInlineEditedPayItem}
+                                      title="Save changes"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      className="action-btn cancel-btn"
+                                      onClick={cancelEditingPayItem}
+                                      title="Cancel editing"
+                                    >
+                                      ✗
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      className="action-btn edit-btn"
+                                      onClick={() => startEditingPayItem(idx)}
+                                      title="Edit billing amount"
+                                    >
+                                      ✏️
+                                    </button>
+                                    <button
+                                      className="action-btn remove-btn"
+                                      onClick={() => removePayItem(idx)}
+                                      title="Remove pay item"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1659,6 +1842,83 @@ function Billing() {
                                 <div className="detail-value total-due"><strong>LKR {formatAmount(bill.total)}</strong></div>
                               </div>
                             </div>
+                            
+                            {/* Payment Details Section - Only show if paid */}
+                            {bill.paymentStatus === 'Paid' && bill.paymentMethod && (
+                              <div className="payment-details-section">
+                                <h4 className="payment-details-title">💳 Payment Information</h4>
+                                <div className="payment-details-grid">
+                                  <div className="payment-detail-card">
+                                    <div className="payment-detail-label">Payment Method</div>
+                                    <div className="payment-detail-value">
+                                      <span className={`payment-method-badge payment-method-${bill.paymentMethod.toLowerCase().replace(' ', '-')}`}>
+                                        {bill.paymentMethod === 'Cash' && '💵'}
+                                        {bill.paymentMethod === 'Cheque' && '📝'}
+                                        {bill.paymentMethod === 'Bank Transfer' && '🏦'}
+                                        {' '}{bill.paymentMethod}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  {bill.paidDate && (
+                                    <div className="payment-detail-card">
+                                      <div className="payment-detail-label">Payment Date</div>
+                                      <div className="payment-detail-value">
+                                        {new Date(bill.paidDate).toLocaleDateString('en-US', { 
+                                          year: 'numeric', 
+                                          month: 'long', 
+                                          day: 'numeric' 
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {bill.paymentMethod === 'Cheque' && (
+                                    <>
+                                      {bill.chequeNumber && (
+                                        <div className="payment-detail-card">
+                                          <div className="payment-detail-label">Cheque Number</div>
+                                          <div className="payment-detail-value cheque-number">
+                                            {bill.chequeNumber}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {bill.chequeDate && (
+                                        <div className="payment-detail-card">
+                                          <div className="payment-detail-label">Cheque Date</div>
+                                          <div className="payment-detail-value">
+                                            {new Date(bill.chequeDate).toLocaleDateString('en-US', { 
+                                              year: 'numeric', 
+                                              month: 'long', 
+                                              day: 'numeric' 
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {bill.chequeAmount && (
+                                        <div className="payment-detail-card">
+                                          <div className="payment-detail-label">Cheque Amount</div>
+                                          <div className="payment-detail-value amount-highlight">
+                                            LKR {formatAmount(bill.chequeAmount)}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                  
+                                  {bill.paymentMethod === 'Bank Transfer' && bill.bankName && (
+                                    <div className="payment-detail-card">
+                                      <div className="payment-detail-label">Bank Name</div>
+                                      <div className="payment-detail-value bank-name">
+                                        🏦 {bill.bankName}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1671,69 +1931,138 @@ function Billing() {
         )}
       </div>
 
-      {/* Edit Pay Item Modal */}
-      {showEditModal && editingPayItem && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal modal-medium" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>✏️ Edit Pay Item</h3>
-              <button className="btn-close" onClick={() => setShowEditModal(false)}>×</button>
+      {/* Payment Details Modal */}
+      {showPaymentModal && selectedBillForPayment && (
+        <div className="payment-modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="payment-modal-header">
+              <h3>💳 Payment Details</h3>
+              <button 
+                className="modal-close-btn" 
+                onClick={() => setShowPaymentModal(false)}
+                title="Close"
+              >
+                ×
+              </button>
             </div>
-            <div className="modal-body">
-              <div className="edit-pay-item-info">
-                <div className="info-row">
-                  <span className="info-label">Description:</span>
-                  <span className="info-value">{editingPayItem.description}</span>
+            
+            <div className="payment-modal-body">
+              <div className="invoice-summary">
+                <div className="summary-row">
+                  <span className="summary-label">Invoice Number:</span>
+                  <span className="summary-value">{selectedBillForPayment.invoiceNumber}</span>
                 </div>
-                <div className="info-row">
-                  <span className="info-label">Actual Cost:</span>
-                  <span className="info-value">LKR {formatAmount(editingPayItem.actualCost || editingPayItem.amount || 0)}</span>
+                <div className="summary-row">
+                  <span className="summary-label">Customer:</span>
+                  <span className="summary-value">{getCustomerName(selectedBillForPayment.customerId)}</span>
                 </div>
-                <div className="info-row">
-                  <span className="info-label">Current Billing Amount:</span>
-                  <span className="info-value">LKR {formatAmount(editingPayItem.billingAmount || editingPayItem.amount || 0)}</span>
+                <div className="summary-row">
+                  <span className="summary-label">Job ID:</span>
+                  <span className="summary-value">{selectedBillForPayment.jobId}</span>
+                </div>
+                <div className="summary-row total-row">
+                  <span className="summary-label">Amount to Pay:</span>
+                  <span className="summary-value amount-highlight">LKR {formatAmount(selectedBillForPayment.netTotal || selectedBillForPayment.total)}</span>
                 </div>
               </div>
-              
-              <div className="form-group">
-                <label>New Billing Amount (LKR) <span className="required">*</span></label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={editBillingAmount}
-                  onChange={(e) => setEditBillingAmount(e.target.value)}
-                  placeholder="Enter new billing amount"
-                  className="form-control"
-                />
-                <p className="helper-text">
-                  💡 You can only modify the billing amount. The actual cost remains unchanged for accounting purposes.
-                </p>
-              </div>
-              
-              <div className="enterprise-notice">
-                <div className="notice-icon">🏢</div>
-                <div className="notice-content">
-                  <strong>Enterprise Policy:</strong>
-                  <p>Only Super Admin and Admin users can modify billing amounts. This ensures proper financial controls and audit trails in enterprise operations.</p>
+
+              <div className="payment-form">
+                <div className="form-group">
+                  <label>Payment Method <span style={{color: '#dc2626'}}>*</span></label>
+                  <select 
+                    className="form-control"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
                 </div>
+
+                {paymentMethod === 'Cheque' && (
+                  <div className="cheque-details">
+                    <div className="cheque-notice">
+                      <span className="notice-icon">📝</span>
+                      <span>Please provide cheque details</span>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Cheque Number <span style={{color: '#dc2626'}}>*</span></label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={chequeNumber}
+                        onChange={(e) => setChequeNumber(e.target.value)}
+                        placeholder="Enter cheque number"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Cheque Date <span style={{color: '#dc2626'}}>*</span></label>
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={chequeDate}
+                        onChange={(e) => setChequeDate(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Cheque Amount (LKR) <span style={{color: '#dc2626'}}>*</span></label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control"
+                        value={chequeAmount}
+                        onChange={(e) => setChequeAmount(e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === 'Bank Transfer' && (
+                  <div className="bank-details">
+                    <div className="bank-notice">
+                      <span className="notice-icon">🏦</span>
+                      <span>Please select the bank</span>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Bank Name <span style={{color: '#dc2626'}}>*</span></label>
+                      <select 
+                        className="form-control"
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                      >
+                        <option value="Commercial Bank">Commercial Bank</option>
+                        <option value="Peoples Bank">Peoples Bank</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="modal-actions">
-              <button onClick={() => setShowEditModal(false)} className="btn btn-secondary">
+
+            <div className="payment-modal-footer">
+              <button 
+                className="btn btn-secondary"
+                onClick={() => setShowPaymentModal(false)}
+              >
                 Cancel
               </button>
               <button 
-                onClick={saveEditedPayItem} 
-                className="btn btn-primary"
-                disabled={!editBillingAmount || parseFloat(editBillingAmount) < 0}
+                className="btn btn-success"
+                onClick={submitPayment}
               >
-                Save Changes
+                ✓ Confirm Payment
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

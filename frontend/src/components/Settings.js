@@ -13,13 +13,21 @@ function Settings() {
   const [newItemName, setNewItemName] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const defaultCategories = ['LCL', 'FCL', 'Air Freight', 'BOI', 'Vehicle - Personal', 'Vehicle - Company', 'TIEP'];
-  const categories = [...new Set([...defaultCategories, ...Object.keys(templates || {})])];
+  const defaultCategories = React.useMemo(() => 
+    ['LCL', 'FCL', 'Air Freight', 'BOI', 'Vehicle - Personal', 'Vehicle - Company', 'TIEP'],
+    []
+  );
+  
+  const categories = React.useMemo(() => 
+    [...new Set([...defaultCategories, ...Object.keys(templates || {})])],
+    [defaultCategories, templates]
+  );
 
   useEffect(() => {
     if (user?.role === 'Admin' || user?.role === 'Super Admin') {
       fetchTemplates();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
