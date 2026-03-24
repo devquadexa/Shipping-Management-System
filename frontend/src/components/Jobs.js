@@ -25,6 +25,7 @@ function Jobs() {
     cusdecNumber: '',
     openDate: '',
     shipmentCategory: '',
+    chassisNumber: '',
     exporter: '',
     lcNumber: '',
     containerNumber: '',
@@ -44,6 +45,7 @@ function Jobs() {
     if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') {
       fetchUsers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -174,6 +176,7 @@ function Jobs() {
         cusdecNumber: '', 
         openDate: '', 
         shipmentCategory: '',
+        chassisNumber: '',
         exporter: '',
         lcNumber: '',
         containerNumber: '',
@@ -214,7 +217,19 @@ function Jobs() {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => {
+      if (name === 'shipmentCategory') {
+        const isVehicleCategory = value === 'Vehicle - Personal' || value === 'Vehicle - Company';
+        return {
+          ...prev,
+          shipmentCategory: value,
+          chassisNumber: isVehicleCategory ? prev.chassisNumber : '',
+          containerNumber: isVehicleCategory ? '' : prev.containerNumber // Clear container number for vehicle shipments
+        };
+      }
+      return { ...prev, [name]: value };
+    });
   };
 
   const updateStatus = async (jobId, status) => {
@@ -266,6 +281,7 @@ function Jobs() {
       cusdecNumber: job.cusdecNumber || '',
       openDate: job.openDate ? job.openDate.split('T')[0] : '',
       shipmentCategory: job.shipmentCategory || '',
+      chassisNumber: job.chassisNumber || '',
       exporter: job.exporter || '',
       lcNumber: job.lcNumber || '',
       containerNumber: job.containerNumber || '',
@@ -309,6 +325,7 @@ function Jobs() {
         cusdecNumber: '',
         openDate: '',
         shipmentCategory: '',
+        chassisNumber: '',
         exporter: '',
         lcNumber: '',
         containerNumber: '',
@@ -573,6 +590,12 @@ function Jobs() {
                               <span className="detail-label">Open Date:</span>
                               <span className="detail-value">{job.openDate ? new Date(job.openDate).toLocaleDateString() : '-'}</span>
                             </div>
+                            {(job.shipmentCategory === 'Vehicle - Personal' || job.shipmentCategory === 'Vehicle - Company' || job.chassisNumber) && (
+                              <div className="detail-item">
+                                <span className="detail-label">Chassis Number:</span>
+                                <span className="detail-value">{job.chassisNumber || '-'}</span>
+                              </div>
+                            )}
                             <div className="detail-item">
                               <span className="detail-label">Transporter:</span>
                               <span className="detail-value">{job.transporter || '-'}</span>
@@ -712,8 +735,12 @@ function Jobs() {
                       <option value="FCL">FCL - Full Container Load</option>
                       <option value="Air Freight">Air Freight</option>
                       <option value="BOI">BOI - Board of Investment</option>
-                      <option value="Vehicle">Vehicle</option>
+                      <option value="Vehicle - Personal">Vehicle - Personal</option>
+                      <option value="Vehicle - Company">Vehicle - Company</option>
                       <option value="TIEP">TIEP - Temporary Importation for Export Processing</option>
+                      {formData.shipmentCategory && !['LCL', 'FCL', 'Air Freight', 'BOI', 'Vehicle - Personal', 'Vehicle - Company', 'TIEP'].includes(formData.shipmentCategory) && (
+                        <option value={formData.shipmentCategory}>{formData.shipmentCategory}</option>
+                      )}
                     </select>
                   </div>
                   
@@ -734,15 +761,25 @@ function Jobs() {
                 </div>
 
                 <div className="form-row">
+                  {(formData.shipmentCategory === 'Vehicle - Personal' || formData.shipmentCategory === 'Vehicle - Company') && (
+                    <div className="form-group">
+                      <label>Chassis Number</label>
+                      <input type="text" name="chassisNumber" value={formData.chassisNumber} onChange={handleChange} placeholder="Vehicle chassis number" />
+                    </div>
+                  )}
+
                   <div className="form-group">
                     <label>LC Number</label>
                     <input type="text" name="lcNumber" value={formData.lcNumber} onChange={handleChange} placeholder="Letter of Credit Number" />
                   </div>
                   
-                  <div className="form-group">
-                    <label>Container Number</label>
-                    <input type="text" name="containerNumber" value={formData.containerNumber} onChange={handleChange} placeholder="Container Number" />
-                  </div>
+                  {/* Hide Container Number for Vehicle shipments */}
+                  {!(formData.shipmentCategory === 'Vehicle - Personal' || formData.shipmentCategory === 'Vehicle - Company') && (
+                    <div className="form-group">
+                      <label>Container Number</label>
+                      <input type="text" name="containerNumber" value={formData.containerNumber} onChange={handleChange} placeholder="Container Number" />
+                    </div>
+                  )}
                   
                   <div className="form-group">
                     <label>Exporter</label>

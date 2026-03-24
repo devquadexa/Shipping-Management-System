@@ -18,6 +18,7 @@ const accountingRoutes = require('./presentation/routes/accounting');
 const locationRoutes = require('./presentation/routes/locations');
 const transporterRoutes = require('./presentation/routes/transporters');
 const cashBalanceSettlementRoutes = require('./presentation/routes/cashBalanceSettlements');
+const oldInvoiceRoutes = require('./presentation/routes/oldInvoices');
 const { getConnection } = require('./config/database');
 const container = require('./infrastructure/di/container');
 const { startOverdueChecker } = require('./infrastructure/scheduler/overdueChecker');
@@ -55,6 +56,7 @@ app.use('/api/accounting', accountingRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/transporters', transporterRoutes);
 app.use('/api/cash-balance-settlements', cashBalanceSettlementRoutes(container));
+app.use('/api/old-invoices', oldInvoiceRoutes(container));
 
 app.get('/', (req, res) => {
   res.json({ 

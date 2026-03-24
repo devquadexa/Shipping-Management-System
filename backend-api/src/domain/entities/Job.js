@@ -10,6 +10,7 @@ class Job {
     cusdecNumber = null,
     openDate = null,
     shipmentCategory = null,
+    chassisNumber = null,
     exporter = null,
     transporter = null,
     lcNumber = null,
@@ -36,6 +37,7 @@ class Job {
     this.cusdecNumber = cusdecNumber;
     this.openDate = openDate;
     this.shipmentCategory = shipmentCategory;
+    this.chassisNumber = chassisNumber;
     this.exporter = exporter;
     this.transporter = transporter;
     this.lcNumber = lcNumber;
@@ -192,6 +194,7 @@ class Job {
       cusdecNumber: this.cusdecNumber,
       openDate: this.openDate,
       shipmentCategory: this.shipmentCategory,
+      chassisNumber: this.chassisNumber,
       exporter: this.exporter,
       transporter: this.transporter,
       lcNumber: this.lcNumber,

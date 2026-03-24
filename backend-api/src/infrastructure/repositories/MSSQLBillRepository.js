@@ -152,12 +152,37 @@ class MSSQLBillRepository extends IBillRepository {
     return await this.findById(billId);
   }
 
-  async markAsPaid(billId) {
+  async markAsPaid(billId, paymentDetails = {}) {
     const pool = await this.db();
     
-    await pool.request()
+    const request = pool.request()
       .input('billId', this.sql.VarChar, billId)
-      .query("UPDATE Bills SET PaymentStatus = 'Paid' WHERE BillId = @billId");
+      .input('paidDate', this.sql.DateTime, new Date());
+    
+    const updates = ["PaymentStatus = 'Paid'", "paidDate = @paidDate"];
+    
+    if (paymentDetails.paymentMethod) {
+      request.input('paymentMethod', this.sql.VarChar, paymentDetails.paymentMethod);
+      updates.push('paymentMethod = @paymentMethod');
+    }
+    if (paymentDetails.chequeNumber) {
+      request.input('chequeNumber', this.sql.VarChar, paymentDetails.chequeNumber);
+      updates.push('chequeNumber = @chequeNumber');
+    }
+    if (paymentDetails.chequeDate) {
+      request.input('chequeDate', this.sql.Date, paymentDetails.chequeDate);
+      updates.push('chequeDate = @chequeDate');
+    }
+    if (paymentDetails.chequeAmount) {
+      request.input('chequeAmount', this.sql.Decimal(18, 2), paymentDetails.chequeAmount);
+      updates.push('chequeAmount = @chequeAmount');
+    }
+    if (paymentDetails.bankName) {
+      request.input('bankName', this.sql.VarChar, paymentDetails.bankName);
+      updates.push('bankName = @bankName');
+    }
+    
+    await request.query(`UPDATE Bills SET ${updates.join(', ')} WHERE BillId = @billId`);
     
     return await this.findById(billId);
   }
@@ -196,11 +221,16 @@ class MSSQLBillRepository extends IBillRepository {
       paymentStatus: row.PaymentStatus,
       createdDate: row.CreatedDate,
       billDate: row.BillDate || row.CreatedDate,
-      paidDate: row.PaidDate,
+      paidDate: row.paidDate || row.PaidDate,
       invoiceNumber: row.InvoiceNumber,
       invoiceDate: row.invoiceDate,
       dueDate: row.dueDate,
-      isOverdue: row.isOverdue || false
+      isOverdue: row.isOverdue || false,
+      paymentMethod: row.paymentMethod,
+      chequeNumber: row.chequeNumber,
+      chequeDate: row.chequeDate,
+      chequeAmount: row.chequeAmount,
+      bankName: row.bankName
     });
   }
 }

@@ -42,4 +42,9 @@ export const billingService = {
     const response = await apiClient.put(`/billing/${billId}`, billData);
     return response.data;
   },
+
+  markAsPaid: async (billId, paymentDetails) => {
+    const response = await apiClient.patch(`/billing/${billId}/pay`, paymentDetails);
+    return response.data;
+  },
 };

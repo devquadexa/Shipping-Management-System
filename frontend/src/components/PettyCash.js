@@ -30,6 +30,12 @@ function PettyCash() {
   const [showSettleModal, setShowSettleModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [settlementItems, setSettlementItems] = useState([]);
+  
+  // Edit settlement item states
+  const [editingSettlementItem, setEditingSettlementItem] = useState(null);
+  const [editItemName, setEditItemName] = useState('');
+  const [editActualCost, setEditActualCost] = useState('');
+  const [canEditSettlement, setCanEditSettlement] = useState(false);
 
   // Cash Balance Settlement Modal
   const [showSettlementModal, setShowSettlementModal] = useState(false);
@@ -47,6 +53,7 @@ function PettyCash() {
       fetchUsers();
       fetchOverallBalance();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchAssignments = async () => {
@@ -175,39 +182,66 @@ function PettyCash() {
       console.error('Error fetching customers:', error);
     }
   };
+  
+  // Check if invoice has been generated for a job
+  const checkInvoiceGenerated = async (jobId) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/billing`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const bills = await response.json();
+        const jobBill = bills.find(bill => bill.jobId === jobId);
+        return !!jobBill; // Returns true if invoice exists
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking invoice:', error);
+      return false;
+    }
+  };
 
   const getCustomerName = (customerId) => {
     const customer = customers.find(c => c.customerId === customerId);
     return customer ? customer.name : customerId;
   };
 
-  const getUserName = (userId) => {
-    const foundUser = users.find(u => u.userId === userId);
-    return foundUser ? foundUser.fullName : userId;
-  };
+  // Removed unused getUserName function
 
-  // Get jobs that have users who haven't received petty cash yet
+  const closedAssignmentStatuses = [
+    'Settled',
+    'Settled/Approved',
+    'Settled/Rejected',
+    'Balance Returned',
+    'Overdue Collected',
+    'Returned',
+    'Paid'
+  ];
+
+  const isActiveAssignment = (assignment) => !closedAssignmentStatuses.includes(assignment.status);
+
+  // Show all jobs that have assigned users.
+  // Availability for assignment is determined per-user by active (non-settled) petty cash entries.
   const getAvailableJobs = () => {
     return jobs.filter(job => {
-      // If job has no assignments, skip it
       if (!jobAssignments[job.jobId] || jobAssignments[job.jobId].length === 0) {
         return false;
       }
-      
-      // Get all users assigned to this job
-      const assignedUserIds = jobAssignments[job.jobId].map(a => a.userId);
-      
-      // Get users who already have petty cash for this job
-      const usersWithPettyCash = assignments
-        .filter(a => a.jobId === job.jobId && a.status !== 'Returned')
-        .map(a => a.assignedTo);
-      
-      // Check if there are any assigned users without petty cash
-      const hasUsersWithoutPettyCash = assignedUserIds.some(
-        userId => !usersWithPettyCash.includes(userId)
-      );
-      
-      return hasUsersWithoutPettyCash;
+
+      const jobPettyCashAssignments = assignments.filter(a => a.jobId === job.jobId);
+      const hasAssignments = jobPettyCashAssignments.length > 0;
+      const allAssignmentsClosed = hasAssignments && jobPettyCashAssignments.every(a => !isActiveAssignment(a));
+      const isJobMarkedSettled = job.pettyCashStatus === 'Settled';
+
+      // Do not show jobs that are already fully settled in petty cash flow.
+      if (allAssignmentsClosed || isJobMarkedSettled) {
+        return false;
+      }
+
+      return true;
     });
   };
 
@@ -225,19 +259,10 @@ function PettyCash() {
     // Get all users assigned to this job
     const assignedUserIds = jobAssignments[jobId].map(assignment => assignment.userId);
     console.log('Assigned user IDs for job:', assignedUserIds);
-    
-    // Get users who already have petty cash for this job (excluding Returned status)
-    const usersWithPettyCash = assignments
-      .filter(a => a.jobId === jobId && a.status !== 'Returned')
-      .map(a => a.assignedTo);
-    console.log('Users with petty cash for this job:', usersWithPettyCash);
-    
-    // Filter to show only assigned users who don't have petty cash yet
-    const availableUsers = users.filter(user => 
-      assignedUserIds.includes(user.userId) && 
-      !usersWithPettyCash.includes(user.userId)
-    );
-    console.log('Available users (assigned but no petty cash):', availableUsers);
+
+    // Allow multiple petty cash assignments to the same user for the same job.
+    const availableUsers = users.filter(user => assignedUserIds.includes(user.userId));
+    console.log('Available users (all users assigned to job):', availableUsers);
     
     return availableUsers;
   };
@@ -313,7 +338,7 @@ function PettyCash() {
       const job = jobs.find(j => j.jobId === assignment.jobId);
       if (job) {
         const assignmentResponse = await fetch(
-          `${API_BASE}/api/petty-cash-assignments/job/${assignment.jobId}`,
+          `${API_BASE}/api/petty-cash-assignments/job/${assignment.jobId}?assignmentId=${assignment.assignmentId}`,
           {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -372,6 +397,7 @@ function PettyCash() {
                   itemName: template.itemName,
                   actualCost: existingItem.actualCost,
                   isCustomItem: false,
+                  assignmentId: existingItem.assignmentId,
                   paidBy: existingItem.paidBy,
                   paidByName: existingItem.paidByName,
                   hasBill: existingItem.hasBill ? true : false,
@@ -383,6 +409,7 @@ function PettyCash() {
                   itemName: template.itemName,
                   actualCost: paidByOther.actualCost,
                   isCustomItem: false,
+                  assignmentId: paidByOther.assignmentId,
                   paidBy: paidByOther.paidBy,
                   paidByName: paidByOther.paidByName,
                   hasBill: paidByOther.hasBill ? true : false,
@@ -406,6 +433,7 @@ function PettyCash() {
                 itemName: ei.itemName,
                 actualCost: ei.actualCost,
                 isCustomItem: true,
+                assignmentId: ei.assignmentId,
                 paidBy: ei.paidBy,
                 paidByName: ei.paidByName,
                 hasBill: ei.hasBill ? true : false,
@@ -438,6 +466,171 @@ function PettyCash() {
 
   const addSettlementItem = () => {
     setSettlementItems([...settlementItems, { itemName: '', actualCost: '', isCustomItem: true, hasBill: false }]);
+  };
+  
+  // Start editing a settlement item
+  const startEditSettlementItem = (item) => {
+    setEditingSettlementItem(item.settlementItemId);
+    setEditItemName(item.itemName);
+    setEditActualCost(item.actualCost.toString());
+  };
+  
+  // Cancel editing
+  const cancelEditSettlementItem = () => {
+    setEditingSettlementItem(null);
+    setEditItemName('');
+    setEditActualCost('');
+  };
+  
+  // Save edited settlement item
+  const saveEditedSettlementItem = async () => {
+    if (!editItemName || !editActualCost) {
+      setMessage('❌ Please fill in all fields');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    
+    const cost = parseFloat(editActualCost);
+    if (isNaN(cost) || cost <= 0) {
+      setMessage('❌ Please enter a valid amount');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settlement-items/${editingSettlementItem}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            itemName: editItemName,
+            actualCost: cost
+          })
+        }
+      );
+      
+      if (response.ok) {
+        setMessage('✅ Settlement item updated successfully');
+        
+        // Reload settlement items
+        const itemsResponse = await fetch(
+          `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settlement-items`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+        
+        if (itemsResponse.ok) {
+          const items = await itemsResponse.json();
+          setSettlementItems(items);
+          
+          // Update selected assignment totals
+          const assignmentsResponse = await fetch(
+            user?.role === 'Waff Clerk' 
+              ? `${API_BASE}/api/petty-cash-assignments/my`
+              : `${API_BASE}/api/petty-cash-assignments`,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            }
+          );
+          
+          if (assignmentsResponse.ok) {
+            const allAssignments = await assignmentsResponse.json();
+            const updated = allAssignments.find(a => a.assignmentId === selectedAssignment.assignmentId);
+            if (updated) {
+              setSelectedAssignment(updated);
+            }
+          }
+        }
+        
+        cancelEditSettlementItem();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const error = await response.json();
+        setMessage(`❌ ${error.message || 'Error updating settlement item'}`);
+        setTimeout(() => setMessage(''), 5000);
+      }
+    } catch (error) {
+      console.error('Error updating settlement item:', error);
+      setMessage('❌ Error updating settlement item');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+  
+  // Delete settlement item
+  const deleteSettlementItem = async (item) => {
+    if (!window.confirm(`Are you sure you want to delete "${item.itemName}"?\n\nThis action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settlement-items/${item.settlementItemId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      
+      if (response.ok) {
+        setMessage('✅ Settlement item deleted successfully');
+        
+        // Reload settlement items
+        const itemsResponse = await fetch(
+          `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settlement-items`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+        
+        if (itemsResponse.ok) {
+          const items = await itemsResponse.json();
+          setSettlementItems(items);
+          
+          // Update selected assignment totals
+          const assignmentsResponse = await fetch(
+            user?.role === 'Waff Clerk' 
+              ? `${API_BASE}/api/petty-cash-assignments/my`
+              : `${API_BASE}/api/petty-cash-assignments`,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            }
+          );
+          
+          if (assignmentsResponse.ok) {
+            const allAssignments = await assignmentsResponse.json();
+            const updated = allAssignments.find(a => a.assignmentId === selectedAssignment.assignmentId);
+            if (updated) {
+              setSelectedAssignment(updated);
+            }
+          }
+        }
+        
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const error = await response.json();
+        setMessage(`❌ ${error.message || 'Error deleting settlement item'}`);
+        setTimeout(() => setMessage(''), 5000);
+      }
+    } catch (error) {
+      console.error('Error deleting settlement item:', error);
+      setMessage('❌ Error deleting settlement item');
+      setTimeout(() => setMessage(''), 3000);
+    }
   };
 
   const removeSettlementItem = (index) => {
@@ -843,6 +1036,13 @@ function PettyCash() {
                                 console.log('Loading settlement details for assignment:', assignment.assignmentId);
                                 setSelectedAssignment(assignment);
                                 
+                                // Check if invoice has been generated for this job
+                                const invoiceGenerated = await checkInvoiceGenerated(assignment.jobId);
+                                const isWaffClerk = user?.role === 'Waff Clerk';
+                                const canEdit = isWaffClerk && !invoiceGenerated && assignment.status === 'Settled';
+                                setCanEditSettlement(canEdit);
+                                console.log('Can edit settlement:', canEdit, '| Invoice generated:', invoiceGenerated, '| Is Waff Clerk:', isWaffClerk, '| Status:', assignment.status);
+                                
                                 // Load settlement items from API
                                 try {
                                   const response = await fetch(
@@ -928,7 +1128,7 @@ function PettyCash() {
                   ))}
                 </select>
                 {assignFormData.jobId && getAvailableUsersForJob(assignFormData.jobId).length === 0 && (
-                  <p className="helper-text warning">All assigned users for this job have already received petty cash.</p>
+                  <p className="helper-text warning">No users are assigned to this job.</p>
                 )}
               </div>
 
@@ -1019,7 +1219,10 @@ function PettyCash() {
 
             {(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? (
               <div className="settlement-items-view">
-                <h3>Settlement Items</h3>
+                <h3>Settlement Items {!canEditSettlement && '(Read-Only)'}</h3>
+                {canEditSettlement && (
+                  <p className="edit-notice">✏️ You can edit or delete items below (invoice not yet generated)</p>
+                )}
                 <table className="settlement-items-table">
                   <thead>
                     <tr>
@@ -1028,38 +1231,108 @@ function PettyCash() {
                       <th>Type</th>
                       <th>Bill</th>
                       <th>Paid By</th>
+                      {canEditSettlement && <th>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {settlementItems.map((item, index) => (
                       <tr key={index} className={item.hasBill ? 'has-bill-row-view' : ''}>
-                        <td>{item.itemName}</td>
-                        <td className="amount">LKR {formatAmount(item.actualCost)}</td>
-                        <td>
-                          <span className={`item-type-badge ${item.isCustomItem ? 'custom' : 'template'}`}>
-                            {item.isCustomItem ? 'Custom' : 'Template'}
-                          </span>
-                        </td>
-                        <td className="bill-cell">
-                          {item.hasBill ? (
-                            <span className="bill-badge">
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                <polyline points="14 2 14 8 20 8"></polyline>
-                                <line x1="16" y1="13" x2="8" y2="13"></line>
-                                <line x1="16" y1="17" x2="8" y2="17"></line>
-                              </svg>
-                              Bill
-                            </span>
-                          ) : (
-                            <span className="no-bill-badge">No Bill</span>
-                          )}
-                        </td>
-                        <td>
-                          <span className="paid-by-badge">
-                            {item.paidByName || 'Unknown'}
-                          </span>
-                        </td>
+                        {editingSettlementItem === item.settlementItemId ? (
+                          <>
+                            <td>
+                              <input
+                                type="text"
+                                value={editItemName}
+                                onChange={(e) => setEditItemName(e.target.value)}
+                                className="edit-input"
+                                placeholder="Item name"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editActualCost}
+                                onChange={(e) => setEditActualCost(e.target.value)}
+                                className="edit-input"
+                                placeholder="0.00"
+                              />
+                            </td>
+                            <td>
+                              <span className={`item-type-badge ${item.isCustomItem ? 'custom' : 'template'}`}>
+                                {item.isCustomItem ? 'Custom' : 'Template'}
+                              </span>
+                            </td>
+                            <td className="bill-cell">
+                              {item.hasBill ? (
+                                <span className="bill-badge">
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                  </svg>
+                                  Bill
+                                </span>
+                              ) : (
+                                <span className="no-bill-badge">No Bill</span>
+                              )}
+                            </td>
+                            <td>
+                              <span className="paid-by-badge">
+                                {item.paidByName || 'Unknown'}
+                              </span>
+                            </td>
+                            <td className="actions-cell">
+                              <button onClick={saveEditedSettlementItem} className="btn-save-edit" title="Save changes">
+                                ✓
+                              </button>
+                              <button onClick={cancelEditSettlementItem} className="btn-cancel-edit" title="Cancel">
+                                ✗
+                              </button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td>{item.itemName}</td>
+                            <td className="amount">LKR {formatAmount(item.actualCost)}</td>
+                            <td>
+                              <span className={`item-type-badge ${item.isCustomItem ? 'custom' : 'template'}`}>
+                                {item.isCustomItem ? 'Custom' : 'Template'}
+                              </span>
+                            </td>
+                            <td className="bill-cell">
+                              {item.hasBill ? (
+                                <span className="bill-badge">
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                  </svg>
+                                  Bill
+                                </span>
+                              ) : (
+                                <span className="no-bill-badge">No Bill</span>
+                              )}
+                            </td>
+                            <td>
+                              <span className="paid-by-badge">
+                                {item.paidByName || 'Unknown'}
+                              </span>
+                            </td>
+                            {canEditSettlement && (
+                              <td className="actions-cell">
+                                <button onClick={() => startEditSettlementItem(item)} className="btn-edit-item" title="Edit item">
+                                  ✏️
+                                </button>
+                                <button onClick={() => deleteSettlementItem(item)} className="btn-delete-item" title="Delete item">
+                                  🗑️
+                                </button>
+                              </td>
+                            )}
+                          </>
+                        )}
                       </tr>
                     ))}
                     <tr className="total-row">
@@ -1068,6 +1341,7 @@ function PettyCash() {
                       <td></td>
                       <td></td>
                       <td></td>
+                      {canEditSettlement && <td></td>}
                     </tr>
                   </tbody>
                 </table>
@@ -1075,7 +1349,7 @@ function PettyCash() {
             ) : (
               <form onSubmit={handleSettleSubmit} className="settlement-form">
                 <h3>Settlement Items</h3>
-                <p className="helper-text info">Fill in only the items you paid for. Tick the "Bill" checkbox if you have a proof receipt for that item. Items already paid by others are shown as read-only.</p>
+                <p className="helper-text info">Fill in only the items you paid for. Tick the "Bill" checkbox if you have a proof receipt for that item. Items already paid in other assignments are shown as read-only.</p>
                 <div className="settlement-items-list">
                   {settlementItems.map((item, index) => (
                     <div key={index} className={`settlement-item-row ${item.alreadyPaid ? 'paid-item-row' : ''} ${item.hasBill ? 'has-bill-row' : ''}`}>
@@ -1135,7 +1409,8 @@ function PettyCash() {
                       {item.alreadyPaid && (
                         <div className="paid-by-indicator">
                           <span className="paid-by-badge">
-                            Paid by {item.paidByName}
+                            {item.assignmentId ? `Paid in Assignment #${item.assignmentId}` : 'Paid'}
+                            {item.paidByName ? ` by ${item.paidByName}` : ''}
                           </span>
                         </div>
                       )}
@@ -1329,14 +1604,7 @@ const ManagementSettlementSection = ({ user }) => {
   const fetchSettlements = async () => {
     setLoading(true);
     try {
-      let endpoint = `${API_BASE}/api/cash-balance-settlements`;
-      if (activeTab === 'pending') {
-        endpoint += '?status=PENDING';
-      } else if (activeTab === 'approved') {
-        endpoint += '?status=APPROVED';
-      } else if (activeTab === 'rejected') {
-        endpoint += '?status=REJECTED';
-      }
+      const endpoint = `${API_BASE}/api/cash-balance-settlements`;
 
       const response = await fetch(endpoint, {
         headers: {

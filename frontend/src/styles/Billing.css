@@ -202,10 +202,30 @@
   color: white;
 }
 
+/* Right-align amount column headers */
+.pay-items-input-table th:nth-child(2),
+.pay-items-input-table th:nth-child(4) {
+  text-align: right;
+}
+
 .pay-items-input-table td {
   padding: 0.85rem;
   border-bottom: 1px solid #e0e0e0;
   vertical-align: middle;
+}
+
+/* Right-align amount column cells */
+.pay-items-input-table td:nth-child(2),
+.pay-items-input-table td:nth-child(4) {
+  text-align: right;
+}
+
+/* Right-align input fields in amount columns */
+.pay-items-input-table td:nth-child(2) .form-control-small,
+.pay-items-input-table td:nth-child(4) .form-control-small,
+.pay-items-input-table td:nth-child(2) input,
+.pay-items-input-table td:nth-child(4) input {
+  text-align: right;
 }
 
 .pay-items-input-table tbody tr {
@@ -290,6 +310,93 @@ input[type="number"] {
 .action-buttons-right {
   display: flex;
   gap: 0.5rem;
+}
+
+/* Pay Items Table Footer - Totals and Profit */
+.pay-items-totals-footer {
+  border-top: 3px solid #101036;
+}
+
+.pay-items-totals-footer tr {
+  border-bottom: none;
+}
+
+.pay-items-totals-footer td {
+  padding: 0.85rem 0.75rem;
+  font-size: 0.95rem;
+}
+
+/* Total Row - Light gray/blue background */
+.totals-row {
+  background: #e8eaf6;
+  border-top: 3px solid #101036;
+  border-bottom: 2px solid #101036;
+}
+
+.totals-row .total-label {
+  text-align: left;
+  color: #101036;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.totals-row .total-amount {
+  text-align: right;
+  color: #101036;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+/* Profit Row - Light green background with green text */
+.profit-row {
+  background: #e8f5e9;
+  border-top: 2px solid #4caf50;
+  border-bottom: 3px solid #4caf50;
+}
+
+.profit-row .profit-label {
+  text-align: left;
+  color: #2e7d32;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.profit-row .profit-amount {
+  text-align: right;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.profit-row .profit-amount.profit-positive {
+  color: #2e7d32;
+}
+
+.profit-row .profit-amount.profit-negative {
+  color: #c62828;
+  background: #ffebee;
+}
+
+/* Negative profit row styling */
+.profit-row.profit-negative-row {
+  background: #ffebee;
+  border-top: 2px solid #ef5350;
+  border-bottom: 3px solid #ef5350;
+}
+
+.profit-row.profit-negative-row .profit-label {
+  color: #c62828;
+}
+
+.profit-percentage {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 .saved-pay-items {
@@ -718,6 +825,18 @@ input[type="number"] {
   .pay-items-form {
     background: transparent !important;
     padding: 0 !important;
+  }
+
+  /* Pay items table footer responsive */
+  .pay-items-totals-footer td {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .profit-percentage {
+    display: block;
+    margin-left: 0;
+    margin-top: 0.25rem;
   }
 
   .pay-items-input-table {
@@ -1515,6 +1634,61 @@ input[type="number"] {
   transform: scale(1.05);
 }
 
+/* Save and Cancel buttons for inline editing */
+.save-btn {
+  background-color: #dcfce7;
+  border: 1px solid #22c55e;
+  color: #22c55e;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.save-btn:hover {
+  background-color: #22c55e;
+  color: white;
+  transform: scale(1.05);
+}
+
+.cancel-btn {
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.cancel-btn:hover {
+  background-color: #ef4444;
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Inline editing container and input */
+.inline-edit-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.inline-edit-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 2px solid #0ea5e9;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: right; /* Right-align for professional accounting appearance */
+  background-color: #f0f9ff;
+  transition: all 0.2s ease;
+}
+
+.inline-edit-input:focus {
+  outline: none;
+  border-color: #0284c7;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
 /* Edit Pay Item Modal Styles */
 .edit-pay-item-info {
   background: #f8fafc;
@@ -1720,5 +1894,342 @@ input[type="number"] {
   .modal-actions .btn {
     width: 100%;
     min-width: auto;
+  }
+}
+
+/* Payment Modal Styles */
+.payment-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+  padding: 1rem;
+}
+
+.payment-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
+  position: relative;
+}
+
+.payment-modal-header {
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%);
+  color: white;
+  padding: 1.5rem 2rem;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid #0ea5e9;
+}
+
+.payment-modal-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.payment-modal-body {
+  padding: 2rem;
+}
+
+.invoice-summary {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px solid #0ea5e9;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #bae6fd;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+}
+
+.summary-row.total-row {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid #0ea5e9;
+  border-bottom: none;
+}
+
+.summary-label {
+  font-weight: 600;
+  color: #0c4a6e;
+  font-size: 0.95rem;
+}
+
+.summary-value {
+  font-weight: 500;
+  color: #0369a1;
+  font-size: 0.95rem;
+}
+
+.summary-value.amount-highlight {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #101036;
+  font-family: 'Courier New', monospace;
+}
+
+.payment-form {
+  margin-top: 1.5rem;
+}
+
+.cheque-details,
+.bank-details {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.cheque-notice,
+.bank-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.notice-icon {
+  font-size: 1.2rem;
+}
+
+.payment-modal-footer {
+  padding: 1.5rem 2rem;
+  border-top: 2px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  background: #f8f9fa;
+  border-radius: 0 0 12px 12px;
+}
+
+.payment-modal-footer .btn {
+  min-width: 140px;
+  padding: 0.85rem 1.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.95rem;
+}
+
+/* Responsive Payment Modal */
+@media (max-width: 768px) {
+  .payment-modal {
+    max-width: 95%;
+    margin: 1rem;
+  }
+
+  .payment-modal-header {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .payment-modal-header h3 {
+    font-size: 1.2rem;
+  }
+
+  .payment-modal-body {
+    padding: 1.5rem;
+  }
+
+  .invoice-summary {
+    padding: 1.25rem;
+  }
+
+  .summary-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: 0.5rem 0;
+  }
+
+  .summary-value.amount-highlight {
+    font-size: 1.1rem;
+  }
+
+  .payment-modal-footer {
+    flex-direction: column;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .payment-modal-footer .btn {
+    width: 100%;
+    min-width: auto;
+  }
+}
+
+/* Payment Details Section in Expanded Invoice */
+.payment-details-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 3px solid #e5e7eb;
+}
+
+.payment-details-title {
+  margin: 0 0 1.5rem 0;
+  color: #101036;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.payment-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.payment-detail-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #f0f4ff 100%);
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 2px solid #e0e7ff;
+  transition: all 0.3s ease;
+}
+
+.payment-detail-card:hover {
+  box-shadow: 0 4px 12px rgba(16, 16, 54, 0.1);
+  transform: translateY(-2px);
+  border-color: #c7d2fe;
+}
+
+.payment-detail-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.payment-detail-value {
+  font-size: 1.1rem;
+  color: #101036;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.payment-method-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.payment-method-cash {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #166534;
+  border: 2px solid #86efac;
+}
+
+.payment-method-cheque {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border: 2px solid #fbbf24;
+}
+
+.payment-method-bank-transfer {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  border: 2px solid #60a5fa;
+}
+
+.cheque-number {
+  font-family: 'Courier New', monospace;
+  font-size: 1.2rem;
+  color: #92400e;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.bank-name {
+  font-size: 1.1rem;
+  color: #1e40af;
+  font-weight: 700;
+}
+
+.payment-detail-value.amount-highlight {
+  font-size: 1.25rem;
+  color: #059669;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+/* Responsive Payment Details */
+@media (max-width: 768px) {
+  .payment-details-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+  }
+
+  .payment-details-title {
+    font-size: 1rem;
+  }
+
+  .payment-details-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .payment-detail-card {
+    padding: 1rem;
+  }
+
+  .payment-detail-value {
+    font-size: 1rem;
+  }
+
+  .payment-method-badge {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .cheque-number {
+    font-size: 1rem;
+  }
+
+  .payment-detail-value.amount-highlight {
+    font-size: 1.1rem;
   }
 }

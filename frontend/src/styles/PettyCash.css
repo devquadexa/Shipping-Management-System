@@ -1764,3 +1764,113 @@ input[type="number"] {
     text-align: center;
   }
 }
+
+/* Edit/Delete Settlement Items Styles */
+.edit-notice {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.settlement-items-table .actions-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.btn-edit-item,
+.btn-delete-item,
+.btn-save-edit,
+.btn-cancel-edit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  margin: 0 0.2rem;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  transition: all 0.2s ease;
+}
+
+.btn-edit-item {
+  background-color: #dbeafe;
+  border: 1px solid #3b82f6;
+}
+
+.btn-edit-item:hover {
+  background-color: #3b82f6;
+  transform: scale(1.1);
+}
+
+.btn-delete-item {
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
+}
+
+.btn-delete-item:hover {
+  background-color: #ef4444;
+  transform: scale(1.1);
+}
+
+.btn-save-edit {
+  background-color: #dcfce7;
+  border: 1px solid #22c55e;
+  color: #22c55e;
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.btn-save-edit:hover {
+  background-color: #22c55e;
+  color: white;
+  transform: scale(1.1);
+}
+
+.btn-cancel-edit {
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.btn-cancel-edit:hover {
+  background-color: #ef4444;
+  color: white;
+  transform: scale(1.1);
+}
+
+.edit-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background-color: #f0f9ff;
+}
+
+.edit-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Responsive edit/delete buttons */
+@media (max-width: 768px) {
+  .btn-edit-item,
+  .btn-delete-item {
+    padding: 0.5rem;
+    font-size: 1rem;
+  }
+  
+  .btn-save-edit,
+  .btn-cancel-edit {
+    padding: 0.5rem;
+    font-size: 1.1rem;
+  }
+}

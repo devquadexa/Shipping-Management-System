@@ -18,6 +18,7 @@ const MSSQLPettyCashAssignmentRepository = require('../repositories/MSSQLPettyCa
 const MSSQLOfficePayItemRepository = require('../repositories/MSSQLOfficePayItemRepository');
 const MSSQLTransporterRepository = require('../repositories/MSSQLTransporterRepository');
 const MSSQLCashBalanceSettlementRepository = require('../repositories/MSSQLCashBalanceSettlementRepository');
+const MSSQLOldInvoiceRepository = require('../repositories/MSSQLOldInvoiceRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -87,6 +88,14 @@ const ApproveCashBalanceSettlement = require('../../application/use-cases/cashba
 const CompleteCashBalanceSettlement = require('../../application/use-cases/cashbalancesettlement/CompleteCashBalanceSettlement');
 const RejectCashBalanceSettlement = require('../../application/use-cases/cashbalancesettlement/RejectCashBalanceSettlement');
 
+// Old Invoice Use Cases
+const CreateOldInvoice = require('../../application/use-cases/oldinvoice/CreateOldInvoice');
+const GetAllOldInvoices = require('../../application/use-cases/oldinvoice/GetAllOldInvoices');
+const UpdateOldInvoice = require('../../application/use-cases/oldinvoice/UpdateOldInvoice');
+const DeleteOldInvoice = require('../../application/use-cases/oldinvoice/DeleteOldInvoice');
+const AddPaymentToOldInvoice = require('../../application/use-cases/oldinvoice/AddPaymentToOldInvoice');
+const DeletePaymentFromOldInvoice = require('../../application/use-cases/oldinvoice/DeletePaymentFromOldInvoice');
+
 // Auth Use Cases
 const AuthenticateUser = require('../../application/use-cases/auth/AuthenticateUser');
 
@@ -120,6 +129,7 @@ class Container {
     this.dependencies.officePayItemRepository = new MSSQLOfficePayItemRepository(getConnection, sql);
     this.dependencies.transporterRepository = new MSSQLTransporterRepository(getConnection, sql);
     this.dependencies.cashBalanceSettlementRepository = new MSSQLCashBalanceSettlementRepository(getConnection, sql);
+    this.dependencies.oldInvoiceRepository = new MSSQLOldInvoiceRepository(getConnection, sql);
   }
 
   setupUseCases() {
@@ -135,6 +145,7 @@ class Container {
       officePayItemRepository,
       transporterRepository,
       cashBalanceSettlementRepository,
+      oldInvoiceRepository,
     } = this.dependencies;
     
     // Customer use cases
@@ -214,6 +225,14 @@ class Container {
     this.dependencies.CompleteCashBalanceSettlement = new CompleteCashBalanceSettlement(cashBalanceSettlementRepository);
     this.dependencies.RejectCashBalanceSettlement = new RejectCashBalanceSettlement(cashBalanceSettlementRepository, pettyCashAssignmentRepository);
     this.dependencies.CashBalanceSettlementRepository = cashBalanceSettlementRepository;
+    
+    // Old Invoice use cases
+    this.dependencies.createOldInvoice = new CreateOldInvoice(oldInvoiceRepository);
+    this.dependencies.getAllOldInvoices = new GetAllOldInvoices(oldInvoiceRepository);
+    this.dependencies.updateOldInvoice = new UpdateOldInvoice(oldInvoiceRepository);
+    this.dependencies.deleteOldInvoice = new DeleteOldInvoice(oldInvoiceRepository);
+    this.dependencies.addPaymentToOldInvoice = new AddPaymentToOldInvoice(oldInvoiceRepository);
+    this.dependencies.deletePaymentFromOldInvoice = new DeletePaymentFromOldInvoice(oldInvoiceRepository);
     
     // Controllers
     this.dependencies.CashBalanceSettlementController = new CashBalanceSettlementController(this);
