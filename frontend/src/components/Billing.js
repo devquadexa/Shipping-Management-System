@@ -642,7 +642,6 @@ function Billing() {
     ) {
       missingFields.push('Container Number');
     }
-    // Chassis Number is only required for vehicle shipments
     if (
       isVehicleShipmentCategory(selectedJob.shipmentCategory) &&
       (!selectedJob.chassisNumber || (typeof selectedJob.chassisNumber === 'string' && selectedJob.chassisNumber.trim() === ''))
@@ -955,6 +954,12 @@ function Billing() {
           }
           .invoice-page {
             min-height: ${isCompactItemsLayout ? '275mm' : '258mm'};
+            font-size: 10pt;
+            line-height: 1.3;
+            color: #111;
+          }
+          .invoice-page {
+            min-height: 258mm;
             display: flex;
             flex-direction: column;
           }
@@ -962,6 +967,8 @@ function Billing() {
             position: relative;
             margin-bottom: ${isCompactItemsLayout ? '8px' : '15px'};
             padding: ${isCompactItemsLayout ? '6px 8px 8px 8px' : '8px 10px 10px 10px'};
+            margin-bottom: 15px;
+            padding: 8px 10px 10px 10px;
             border-bottom: 2px solid var(--theme-primary);
             background: ${isColorMode ? 'linear-gradient(180deg, var(--theme-soft) 0%, #ffffff 100%)' : '#ffffff'};
             border-radius: 6px;
@@ -1023,8 +1030,8 @@ function Billing() {
             font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
           }
           .details-section {
-            margin: ${isCompactItemsLayout ? '8px 0' : '12px 0'};
-            padding-bottom: ${isCompactItemsLayout ? '6px' : '10px'};
+            margin: 12px 0;
+            padding-bottom: 10px;
             border-bottom: 1px solid var(--theme-primary);
           }
           .detail-row {
@@ -1034,8 +1041,8 @@ function Billing() {
           }
           .detail-label {
             font-weight: bold;
-            width: ${isCompactItemsLayout ? '128px' : '145px'};
-            min-width: ${isCompactItemsLayout ? '128px' : '145px'};
+            width: 145px;
+            min-width: 145px;
             white-space: nowrap;
             word-break: keep-all;
             color: var(--theme-primary);
@@ -1083,7 +1090,7 @@ function Billing() {
             padding-top: ${isCompactItemsLayout ? '6px' : '10px'};
             padding-bottom: ${isCompactItemsLayout ? '3px' : '5px'};
             font-weight: bold;
-            font-size: ${isCompactItemsLayout ? '10pt' : '11pt'};
+            font-size: 11pt;
             color: var(--theme-primary);
           }
           .signature-section {
@@ -1105,12 +1112,13 @@ function Billing() {
           .footer {
             margin-top: auto;
             padding-top: ${isCompactItemsLayout ? '10px' : '16px'};
+            padding-top: 16px;
             padding-bottom: 6px;
             border-top: 1px solid var(--theme-primary);
             background: ${isColorMode ? 'linear-gradient(180deg, #ffffff 0%, var(--theme-soft) 100%)' : '#ffffff'};
             text-align: center;
-            font-size: ${isCompactItemsLayout ? '7.5pt' : '8pt'};
-            line-height: ${isCompactItemsLayout ? '1.2' : '1.3'};
+            font-size: 8pt;
+            line-height: 1.3;
             color: var(--theme-accent);
           }
           .footer-line {
@@ -1231,6 +1239,7 @@ function Billing() {
         <div class="footer">
           <div class="footer-line">No. 10/A, Ground Floor, Y.M.B.A Building Colombo 01, Sri Lanka. Office: 0112-433-581</div>
           <div class="footer-line">WhatsApp: +94754-946-946, +1410-868-9329 Hotline: +94-777-898929 E-mail: Supershinecargo@gmail.com</div>
+        </div>
         </div>
         </div>
       </body>
