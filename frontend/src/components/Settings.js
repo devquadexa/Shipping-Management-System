@@ -13,13 +13,20 @@ function Settings() {
   const [newItemName, setNewItemName] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const categories = ['LCL', 'FCL', 'Air Freight', 'BOI', 'Vehicle', 'TIEP'];
+  const defaultCategories = ['LCL', 'FCL', 'Air Freight', 'BOI', 'Vehicle - Personal', 'Vehicle - Company', 'TIEP'];
+  const categories = [...new Set([...defaultCategories, ...Object.keys(templates || {})])];
 
   useEffect(() => {
     if (user?.role === 'Admin' || user?.role === 'Super Admin') {
       fetchTemplates();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(selectedCategory)) {
+      setSelectedCategory(categories[0]);
+    }
+  }, [selectedCategory, categories]);
 
   const fetchTemplates = async () => {
     try {

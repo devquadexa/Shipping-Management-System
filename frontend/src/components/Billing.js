@@ -16,6 +16,10 @@ function Billing() {
       maximumFractionDigits: 2
     });
   };
+
+  const isVehicleShipmentCategory = (category) => {
+    return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
+  };
   const [bills, setBills] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -27,6 +31,7 @@ function Billing() {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
   const [expandedBillId, setExpandedBillId] = useState(null);
+  const [printMode, setPrintMode] = useState('color');
   
   // New states for pay item editing
   const [showEditModal, setShowEditModal] = useState(false);
@@ -582,11 +587,12 @@ function Billing() {
     if (!selectedJob.containerNumber || (typeof selectedJob.containerNumber === 'string' && selectedJob.containerNumber.trim() === '')) {
       missingFields.push('Container Number');
     }
-    // Check if transporter field exists in the job object before validating
-    if (selectedJob.hasOwnProperty('transporter') && (!selectedJob.transporter || (typeof selectedJob.transporter === 'string' && selectedJob.transporter.trim() === ''))) {
-      missingFields.push('Transporter');
+    if (
+      isVehicleShipmentCategory(selectedJob.shipmentCategory) &&
+      (!selectedJob.chassisNumber || (typeof selectedJob.chassisNumber === 'string' && selectedJob.chassisNumber.trim() === ''))
+    ) {
+      missingFields.push('Chassis Number');
     }
-    
     console.log('generateBill - missingFields:', missingFields);
     
     if (missingFields.length > 0) {
@@ -740,7 +746,7 @@ function Billing() {
       });
 
       const printWindow = window.open('', '', 'height=900,width=700');
-      printWindow.document.write(generateBillHTML(bill, jobWithPayItems, customer));
+      printWindow.document.write(generateBillHTML(bill, jobWithPayItems, customer, printMode));
       printWindow.document.close();
       printWindow.print();
     } catch (error) {
@@ -750,7 +756,8 @@ function Billing() {
     }
   };
 
-  const generateBillHTML = (bill, job, customer) => {
+  const generateBillHTML = (bill, job, customer, mode = 'color') => {
+    const isColorMode = mode === 'color';
     const billDate = new Date(bill.billDate || bill.createdDate).toLocaleDateString('en-GB');
     const invoiceNumber = bill.invoiceNumber || bill.billId;
     const invoiceLogoUrl = `${window.location.origin}/logo2.png`;
@@ -764,6 +771,12 @@ function Billing() {
     
     // Use job's advance payment if bill doesn't have it
     const advancePayment = parseFloat(bill.advancePayment || job.advancePayment || 0);
+    const rawAdvancePaymentDate = bill.advancePaymentDate || bill.paymentMadeDate || job.advancePaymentDate || job.paymentMadeDate;
+    const parsedAdvancePaymentDate = rawAdvancePaymentDate ? new Date(rawAdvancePaymentDate) : null;
+    const advancePaymentDateText = parsedAdvancePaymentDate && !Number.isNaN(parsedAdvancePaymentDate.getTime())
+      ? parsedAdvancePaymentDate.toLocaleDateString('en-GB')
+      : '-';
+    const advancePaymentLabel = `Advance payment (${advancePaymentDateText})`;
     const grossTotal = parseFloat(bill.grossTotal || bill.billingAmount || 0);
     const netTotal = grossTotal - advancePayment; // Always calculate, don't use bill.netTotal
     
@@ -804,6 +817,12 @@ function Billing() {
       <head>
         <title>Invoice - Super Shine Cargo Services</title>
         <style>
+          :root {
+            --theme-primary: ${isColorMode ? '#1a3e9a' : '#000000'};
+            --theme-accent: ${isColorMode ? '#2f6bd6' : '#000000'};
+            --theme-muted: ${isColorMode ? '#3f4f77' : '#333333'};
+            --theme-soft: ${isColorMode ? '#e8f0ff' : '#ffffff'};
+          }
           @page { 
             margin: 15mm 20mm; 
             size: A4;
@@ -816,13 +835,20 @@ function Billing() {
             font-family: Arial, sans-serif;
             font-size: 10pt;
             line-height: 1.3;
-            color: #000;
+            color: #111;
+          }
+          .invoice-page {
+            min-height: 258mm;
+            display: flex;
+            flex-direction: column;
           }
           .page-header {
             position: relative;
             margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #000;
+            padding: 8px 10px 10px 10px;
+            border-bottom: 2px solid var(--theme-primary);
+            background: ${isColorMode ? 'linear-gradient(180deg, var(--theme-soft) 0%, #ffffff 100%)' : '#ffffff'};
+            border-radius: 6px;
             display: grid;
             grid-template-columns: auto 1fr auto;
             align-items: center;
@@ -854,17 +880,19 @@ function Billing() {
             font-weight: bold;
             letter-spacing: 1px;
             margin-bottom: 3px;
-            color: #1a1a2e;
+            color: var(--theme-primary);
           }
           .company-tagline {
             font-size: 8pt;
             margin: 1px 0;
-            color: #555;
+            color: var(--theme-muted);
           }
           .invoice-header-right {
             text-align: right;
             font-size: 9pt;
             line-height: 1.5;
+            color: var(--theme-primary);
+            font-weight: 600;
           }
           .invoice-header-right strong {
             display: block;
@@ -881,7 +909,7 @@ function Billing() {
           .details-section {
             margin: 12px 0;
             padding-bottom: 10px;
-            border-bottom: 1px solid #000;
+            border-bottom: 1px solid var(--theme-primary);
           }
           .detail-row {
             display: flex;
@@ -890,12 +918,16 @@ function Billing() {
           }
           .detail-label {
             font-weight: bold;
-            width: 120px;
-            min-width: 120px;
+            width: 145px;
+            min-width: 145px;
+            white-space: nowrap;
+            word-break: keep-all;
+            color: var(--theme-primary);
           }
           .detail-value {
             flex: 1;
             word-wrap: break-word;
+            overflow-wrap: anywhere;
           }
           .items-section {
             margin: 15px 0;
@@ -919,27 +951,28 @@ function Billing() {
             font-weight: normal;
           }
           .item-row.subtotal {
-            border-top: 1px solid #000;
+            border-top: 1px solid var(--theme-primary);
             border-bottom: none;
             margin-top: 10px;
             padding-top: 8px;
             font-weight: normal;
           }
           .item-row.total {
-            border-top: 2px solid #000;
+            border-top: 2px solid var(--theme-primary);
             border-bottom: none;
             margin-top: 8px;
             padding-top: 10px;
             padding-bottom: 5px;
             font-weight: bold;
             font-size: 11pt;
+            color: var(--theme-primary);
           }
           .signature-section {
             margin-top: 40px;
             text-align: left;
           }
           .signature-space {
-            border-top: 1px solid #000;
+            border-top: 1px solid var(--theme-primary);
             width: 200px;
             margin: 50px 0 5px 0;
             height: 2px;
@@ -948,15 +981,18 @@ function Billing() {
             font-size: 10pt;
             font-weight: bold;
             margin-top: 5px;
+            color: var(--theme-primary);
           }
           .footer {
-            margin-top: 20px;
-            padding-top: 10px;
-            border-top: 1px solid #000;
+            margin-top: auto;
+            padding-top: 16px;
+            padding-bottom: 6px;
+            border-top: 1px solid var(--theme-primary);
+            background: ${isColorMode ? 'linear-gradient(180deg, #ffffff 0%, var(--theme-soft) 100%)' : '#ffffff'};
             text-align: center;
             font-size: 8pt;
             line-height: 1.3;
-            color: #333;
+            color: var(--theme-accent);
           }
           .footer-line {
             margin: 2px 0;
@@ -964,10 +1000,22 @@ function Billing() {
           @media print {
             body { margin: 0; padding: 0; }
             .no-print { display: none !important; }
+            html, body, .invoice-page, .page-header, .footer {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+              forced-color-adjust: none !important;
+            }
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              forced-color-adjust: none !important;
+            }
           }
         </style>
       </head>
       <body>
+        <div class="invoice-page">
         <div class="page-header">
           <div class="logo">
             <img src="${invoiceLogoUrl}" alt="SS Cargo Logo" />
@@ -1008,10 +1056,14 @@ function Billing() {
             <div class="detail-label">Container No</div>
             <div class="detail-value">: ${job.containerNumber || '-'}</div>
           </div>
-          ${job.shipmentCategory ? `
           <div class="detail-row">
-            <div class="detail-label">Cargo Description</div>
-            <div class="detail-value">: ${job.shipmentCategory}</div>
+            <div class="detail-label">Shipment Category</div>
+            <div class="detail-value">: ${job.shipmentCategory || '-'}</div>
+          </div>
+          ${isVehicleShipmentCategory(job.shipmentCategory) ? `
+          <div class="detail-row">
+            <div class="detail-label">Chassis No</div>
+            <div class="detail-value">: ${job.chassisNumber || '-'}</div>
           </div>
           ` : ''}
         </div>
@@ -1041,7 +1093,7 @@ function Billing() {
           
           ${advancePayment > 0 ? `
             <div class="item-row subtotal">
-              <div class="item-description">LESS: Advance Amount</div>
+              <div class="item-description">${advancePaymentLabel}</div>
               <div class="item-amount">${formatAmount(advancePayment)}</div>
             </div>
           ` : ''}
@@ -1060,6 +1112,7 @@ function Billing() {
         <div class="footer">
           <div class="footer-line">No. 10/A, Ground Floor, Y.M.B.A Building Colombo 01, Sri Lanka. Tel: 2433581, 2433983</div>
           <div class="footer-line">Fax No. 2433580, 2439697 Hotline: 0777-898996, 076 6857070 E-mail: superallbrooks@gmail.com</div>
+        </div>
         </div>
       </body>
       </html>
@@ -1114,6 +1167,10 @@ function Billing() {
             <div className="job-details-section">
               <div className="job-info-card">
                 <h3>Job Information</h3>
+                {(() => {
+                  const chassisMissing = !selectedJob.chassisNumber || selectedJob.chassisNumber.trim() === '';
+                  const chassisRequired = isVehicleShipmentCategory(selectedJob.shipmentCategory);
+                  return (
                 <div className="info-grid">
                   <div className="info-row">
                     <span className="info-label">Job ID:</span>
@@ -1129,6 +1186,16 @@ function Billing() {
                       <span className="category-badge">{selectedJob.shipmentCategory}</span>
                     </span>
                   </div>
+                  {chassisRequired && (
+                    <div className="info-row">
+                      <span className="info-label">
+                        Chassis Number: {chassisRequired && chassisMissing && <span className="required-indicator">*Required</span>}
+                      </span>
+                      <span className={`info-value ${chassisRequired && chassisMissing ? 'missing-value' : ''}`}>
+                        {selectedJob.chassisNumber || '-'}
+                      </span>
+                    </div>
+                  )}
                   <div className="info-row">
                     <span className="info-label">BL Number: {(!selectedJob.blNumber || selectedJob.blNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
                     <span className={`info-value ${(!selectedJob.blNumber || selectedJob.blNumber.trim() === '') ? 'missing-value' : ''}`}>
@@ -1159,8 +1226,8 @@ function Billing() {
                   </div>
                   {selectedJob.hasOwnProperty('transporter') && (
                     <div className="info-row">
-                      <span className="info-label">Transporter: {(!selectedJob.transporter || selectedJob.transporter.trim() === '') && <span className="required-indicator">*Required</span>}</span>
-                      <span className={`info-value ${(!selectedJob.transporter || selectedJob.transporter.trim() === '') ? 'missing-value' : ''}`}>
+                      <span className="info-label">Transporter:</span>
+                      <span className="info-value">
                         {selectedJob.transporter || '-'}
                       </span>
                     </div>
@@ -1183,6 +1250,8 @@ function Billing() {
                     </span>
                   </div>
                 </div>
+                  );
+                })()}
               </div>
 
               <div className="pay-items-card">
@@ -1474,6 +1543,18 @@ function Billing() {
       <div className="card">
         <div className="card-header">
           <h2>Generated Invoices ({bills.length})</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Print Mode</span>
+            <select
+              value={printMode}
+              onChange={(e) => setPrintMode(e.target.value)}
+              className="form-control"
+              style={{ minWidth: '180px', padding: '6px 10px' }}
+            >
+              <option value="color">Color (Theme)</option>
+              <option value="bw">Black & White</option>
+            </select>
+          </div>
         </div>
         {bills.length === 0 ? (
           <div className="empty-state">

@@ -254,38 +254,43 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         for (const item of settlementData.items) {
           console.log('settle - processing item:', item);
           
-          // For predefined items, check if already entered by another clerk for this job
+          // For predefined items, lock by assignment scope:
+          // if an item exists in another assignment for the same job, this assignment cannot overwrite it.
           if (!item.isCustomItem) {
             const existingPredefinedItem = await transaction.request()
               .input('jobId', this.sql.VarChar, assignment.jobId)
+              .input('assignmentId', this.sql.Int, assignmentId)
               .input('itemName', this.sql.NVarChar, item.itemName)
               .query(`
-                SELECT si.settlementItemId, si.paidBy, u.fullName as paidByName
+                SELECT si.settlementItemId, si.assignmentId, si.paidBy, u.fullName as paidByName
                 FROM PettyCashSettlementItems si
                 INNER JOIN PettyCashAssignments pca ON si.assignmentId = pca.assignmentId
                 LEFT JOIN Users u ON si.paidBy = u.userId
                 WHERE pca.jobId = @jobId 
                   AND si.itemName = @itemName 
                   AND si.isCustomItem = 0
+                  AND si.assignmentId <> @assignmentId
               `);
             
             if (existingPredefinedItem.recordset.length > 0) {
               const existingItem = existingPredefinedItem.recordset[0];
               console.log('settle - predefined item already exists:', existingItem);
-              
-              // If the item was entered by the same user, allow update (re-settlement)
-              if (existingItem.paidBy === (item.paidBy || assignment.assignedTo)) {
-                console.log('settle - allowing re-settlement by same user');
-                // Delete the existing item first, then insert the new one
-                await transaction.request()
-                  .input('settlementItemId', this.sql.Int, existingItem.settlementItemId)
-                  .query(`DELETE FROM PettyCashSettlementItems WHERE settlementItemId = @settlementItemId`);
-              } else {
-                // Item already entered by another clerk - skip this item
-                console.log(`settle - skipping predefined item '${item.itemName}' - already entered by ${existingItem.paidByName}`);
-                continue;
-              }
+
+              // Item already entered in another assignment - skip this item.
+              console.log(`settle - skipping predefined item '${item.itemName}' - already entered in assignment ${existingItem.assignmentId} by ${existingItem.paidByName || existingItem.paidBy}`);
+              continue;
             }
+
+            // Upsert behavior within the same assignment: replace existing value for this item.
+            await transaction.request()
+              .input('assignmentId', this.sql.Int, assignmentId)
+              .input('itemName', this.sql.NVarChar, item.itemName)
+              .query(`
+                DELETE FROM PettyCashSettlementItems
+                WHERE assignmentId = @assignmentId
+                  AND itemName = @itemName
+                  AND isCustomItem = 0
+              `);
           }
           
           console.log('settle - inserting item:', item.itemName, '| hasBill:', item.hasBill);
@@ -447,14 +452,33 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
    * Get petty cash assignment for a specific job and user
    * Each clerk sees ONLY their own spending, but can view predefined items from others as read-only
    */
-  async getByJobAndUser(jobId, userId) {
+  async getByJobAndUser(jobId, userId, assignmentId = null) {
     try {
-      console.log('MSSQLPettyCashAssignmentRepository.getByJobAndUser - jobId:', jobId, 'userId:', userId);
+      console.log('MSSQLPettyCashAssignmentRepository.getByJobAndUser - jobId:', jobId, 'userId:', userId, 'assignmentId:', assignmentId);
       const pool = await this.getConnection();
-      const queryResult = await pool.request()
+      const assignmentRequest = pool.request()
         .input('jobId', this.sql.VarChar, jobId)
-        .input('userId', this.sql.VarChar, userId)
-        .query(`
+        .input('userId', this.sql.VarChar, userId);
+
+      let queryResult;
+      if (assignmentId) {
+        queryResult = await assignmentRequest
+          .input('assignmentId', this.sql.Int, assignmentId)
+          .query(`
+          SELECT 
+            pca.*,
+            j.shipmentCategory,
+            assignedToUser.fullName as assignedToName,
+            assignedByUser.fullName as assignedByName
+          FROM PettyCashAssignments pca
+          LEFT JOIN Jobs j ON pca.jobId = j.jobId
+          LEFT JOIN Users assignedToUser ON pca.assignedTo = assignedToUser.userId
+          LEFT JOIN Users assignedByUser ON pca.assignedBy = assignedByUser.userId
+          WHERE pca.jobId = @jobId AND pca.assignedTo = @userId AND pca.assignmentId = @assignmentId
+          ORDER BY pca.assignedDate DESC
+        `);
+      } else {
+        queryResult = await assignmentRequest.query(`
           SELECT 
             pca.*,
             j.shipmentCategory,
@@ -467,6 +491,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           WHERE pca.jobId = @jobId AND pca.assignedTo = @userId
           ORDER BY pca.assignedDate DESC
         `);
+      }
       
       console.log('MSSQLPettyCashAssignmentRepository.getByJobAndUser - result count:', queryResult.recordset.length);
       
@@ -481,9 +506,10 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       const userOwnItems = await this.getSettlementItems(assignment.assignmentId);
       console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - user's own items:`, userOwnItems);
       
-      // Get ALL predefined items from ALL assignments for this job (for read-only reference)
+      // Get predefined items from OTHER assignments for the same job (read-only in current assignment)
       const allPredefinedItems = await pool.request()
         .input('jobId', this.sql.VarChar, jobId)
+        .input('assignmentId', this.sql.Int, assignment.assignmentId)
         .query(`
           SELECT 
             si.*,
@@ -494,6 +520,8 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           LEFT JOIN Users u ON si.paidBy = u.userId
           INNER JOIN PettyCashAssignments pca ON si.assignmentId = pca.assignmentId
           WHERE pca.jobId = @jobId
+            AND si.assignmentId <> @assignmentId
+            AND si.isCustomItem = 0
           ORDER BY si.settlementItemId
         `);
       
@@ -501,8 +529,8 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - ALL items:`, JSON.stringify(allPredefinedItems.recordset, null, 2));
       
       // Separate items into two categories:
-      // 1. User's own items (editable, counted in Total Spent)
-      // 2. Other clerks' predefined items (read-only, NOT counted in Total Spent)
+      // 1. Current assignment items (editable, counted in Total Spent)
+      // 2. Other assignment predefined items (read-only, NOT counted in Total Spent)
       
       const userOwnItemIds = new Set(userOwnItems.map(item => item.settlementItemId));
       console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - user's own item IDs:`, Array.from(userOwnItemIds));
@@ -515,29 +543,24 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         countInTotalSpent: true  // Only user's own items count
       }));
       
-      // Filter for items that are:
-      // 1. NOT entered by the current user (paidBy !== userId)
-      // 2. NOT already in the user's own items
-      // 3. Are predefined items (isCustomItem = 0 or false)
-      const otherClerksPredefinedItems = allPredefinedItems.recordset
+      const otherAssignmentsPredefinedItems = allPredefinedItems.recordset
         .filter(item => {
-          const isOtherClerk = item.paidBy && item.paidBy !== userId;
           const isNotUserItem = !userOwnItemIds.has(item.settlementItemId);
           const isPredefined = item.isCustomItem === 0 || item.isCustomItem === false;
           
-          console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - filtering item: ${item.itemName}, paidBy: ${item.paidBy}, userId: ${userId}, isOtherClerk: ${isOtherClerk}, isNotUserItem: ${isNotUserItem}, isPredefined: ${isPredefined}`);
+          console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - filtering item: ${item.itemName}, paidBy: ${item.paidBy}, isNotUserItem: ${isNotUserItem}, isPredefined: ${isPredefined}`);
           
-          return isOtherClerk && isNotUserItem && isPredefined;
+          return isNotUserItem && isPredefined;
         })
         .map(item => ({
           ...item,
           isReadOnly: true,
           isOwnItem: false,
-          countInTotalSpent: false  // Other clerks' items do NOT count in this user's Total Spent
+          countInTotalSpent: false  // Other assignment items do NOT count in this assignment's Total Spent
         }));
       
-      console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - other clerks' predefined items count:`, otherClerksPredefinedItems.length);
-      console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - other clerks' predefined items:`, JSON.stringify(otherClerksPredefinedItems, null, 2));
+      console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - other assignment predefined items count:`, otherAssignmentsPredefinedItems.length);
+      console.log(`MSSQLPettyCashAssignmentRepository.getByJobAndUser - other assignment predefined items:`, JSON.stringify(otherAssignmentsPredefinedItems, null, 2));
       
       // Calculate Total Spent based ONLY on user's own items
       const userOwnTotalSpent = userEditableItems.reduce((sum, item) => sum + parseFloat(item.actualCost || 0), 0);
@@ -550,7 +573,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         balanceAmount: parseFloat(assignment.assignedAmount) - userOwnTotalSpent,
         overAmount: userOwnTotalSpent > parseFloat(assignment.assignedAmount) ? userOwnTotalSpent - parseFloat(assignment.assignedAmount) : 0,
         settlementItems: userEditableItems,  // ONLY user's own items for Total Spent calculation
-        readOnlyPredefinedItems: otherClerksPredefinedItems  // Separate array for read-only reference
+        readOnlyPredefinedItems: otherAssignmentsPredefinedItems  // Separate array for read-only reference
       };
       
       const finalResult = new PettyCashAssignment(assignmentWithCorrectSpent);
