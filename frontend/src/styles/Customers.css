@@ -8,7 +8,7 @@
 
 .page-header {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 2.5rem;
   gap: 1rem;
@@ -610,6 +610,23 @@
   background: #1a1a4d !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 8px rgba(16, 16, 54, 0.25) !important;
+}
+
+/* Header add button should match Transporters page style */
+.customers-page .page-header .btn {
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px !important;
+  min-width: auto !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+}
+
+.customers-page .page-header .btn:hover {
+  background: #1a1a4d !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 .customers-page .btn-secondary,
