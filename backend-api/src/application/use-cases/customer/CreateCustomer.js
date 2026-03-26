@@ -23,12 +23,6 @@ class CreateCustomer {
       throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
     }
 
-    // Check for duplicate email
-    const existingCustomer = await this.customerRepository.findByEmail(customer.email);
-    if (existingCustomer) {
-      throw new Error('Customer with this email already exists');
-    }
-
     // Persist through repository
     const createdCustomer = await this.customerRepository.create(customer);
     

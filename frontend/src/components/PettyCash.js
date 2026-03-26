@@ -1344,6 +1344,20 @@ function PettyCash() {
                         <td>{new Date(assignment.assignedDate).toLocaleDateString()}</td>
                         <td>
                           <div className="actions-cell-hybrid">
+                            {/* Settle Button - for Assigned status */}
+                            {assignment.status === 'Assigned' && user?.role === 'Waff Clerk' && (
+                              <button
+                                className="btn-settle-primary"
+                                onClick={() => openSettleModal(assignment)}
+                                title="Settle this petty cash assignment"
+                              >
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                                Settle
+                              </button>
+                            )}
+
                             {/* Eye Icon - View Details */}
                             {(assignment.status === 'Settled' || assignment.status === 'Pending Approval' || assignment.status === 'Settled/Approved' || assignment.status === 'Settled/Rejected' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') && (
                               <button
@@ -1408,7 +1422,9 @@ function PettyCash() {
                                   <span className="fin-stat-label">Actual Spent</span>
                                   <span className="fin-stat-value">{assignment.actualSpent ? `LKR ${formatAmount(assignment.actualSpent)}` : '—'}</span>
                                 </div>
-                                {assignment.balanceAmount > 0 && (
+
+                                {/* Balance to Return — only show when not yet resolved */}
+                                {assignment.balanceAmount > 0 && assignment.status !== 'Balance Returned' && assignment.status !== 'Settled/Approved' && (
                                   <>
                                     <div className="fin-stat-divider" />
                                     <div className="fin-stat-item">
@@ -1417,12 +1433,34 @@ function PettyCash() {
                                     </div>
                                   </>
                                 )}
-                                {assignment.overAmount > 0 && (
+
+                                {/* Over Amount — only show when not yet resolved */}
+                                {assignment.overAmount > 0 && assignment.status !== 'Overdue Collected' && assignment.status !== 'Settled/Approved' && (
                                   <>
                                     <div className="fin-stat-divider" />
                                     <div className="fin-stat-item">
                                       <span className="fin-stat-label">Over Amount</span>
                                       <span className="fin-stat-value negative">LKR {formatAmount(assignment.overAmount)}</span>
+                                    </div>
+                                  </>
+                                )}
+
+                                {/* After approval — show resolved state in plain black like Assigned Amount */}
+                                {(assignment.status === 'Balance Returned' || (assignment.status === 'Settled/Approved' && assignment.balanceAmount > 0)) && (
+                                  <>
+                                    <div className="fin-stat-divider" />
+                                    <div className="fin-stat-item">
+                                      <span className="fin-stat-label">Balance Returned</span>
+                                      <span className="fin-stat-value">LKR {formatAmount(assignment.balanceAmount)}</span>
+                                    </div>
+                                  </>
+                                )}
+                                {(assignment.status === 'Overdue Collected' || (assignment.status === 'Settled/Approved' && assignment.overAmount > 0)) && (
+                                  <>
+                                    <div className="fin-stat-divider" />
+                                    <div className="fin-stat-item">
+                                      <span className="fin-stat-label">Overdue Collected</span>
+                                      <span className="fin-stat-value">LKR {formatAmount(assignment.overAmount)}</span>
                                     </div>
                                   </>
                                 )}
@@ -1610,85 +1648,6 @@ function PettyCash() {
                                     </div>
                                   </div>
                                 </div>
-                    <tr key={assignment.assignmentId}>
-                      <td data-label="Assignment ID">
-                        <strong className="assignment-id">#{assignment.assignmentId}</strong>
-                      </td>
-                      <td data-label="Job ID">{assignment.jobId}</td>
-                      <td data-label="Customer">{job ? getCustomerName(job.customerId) : '-'}</td>
-                      {user?.role !== 'Waff Clerk' && (
-                        <td data-label="Assigned To">{assignment.assignedToName || assignment.assignedTo}</td>
-                      )}
-                      <td data-label="Assigned Amount">
-                        <strong>LKR {formatAmount(assignment.assignedAmount)}</strong>
-                      </td>
-                      <td data-label="Actual Spent">
-                        {assignment.actualSpent ? `LKR ${formatAmount(assignment.actualSpent)}` : '-'}
-                      </td>
-                      <td data-label="Balance/Over">
-                        {(assignment.status === 'Settled/Approved' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') ? (
-                          <>
-                            {assignment.balanceAmount > 0 && (
-                              <span className="status-badge status-returned">
-                                ↩ Balance Returned
-                              </span>
-                            )}
-                            {assignment.overAmount > 0 && (
-                              <span className="status-badge status-paid">
-                                ✓ Overdue Collected
-                              </span>
-                            )}
-                          </>
-                        ) : assignment.status === 'Settled/Rejected' ? (
-                          <span className="status-badge status-rejected">
-                            ✗ Rejected
-                          </span>
-                        ) : (
-                          <>
-                            {assignment.balanceAmount > 0 && (
-                              <span className="balance-positive">
-                                Balance: LKR {formatAmount(assignment.balanceAmount)}
-                              </span>
-                            )}
-                            {assignment.overAmount > 0 && (
-                              <span className="balance-negative">
-                                Over: LKR {formatAmount(assignment.overAmount)}
-                              </span>
-                            )}
-                            {!assignment.balanceAmount && !assignment.overAmount && '-'}
-                          </>
-                        )}
-                      </td>
-                      <td data-label="Status">
-                        <span className={`status-badge ${getStatusBadgeClass(assignment.status)}`}>
-                          {assignment.status}
-                        </span>
-                      </td>
-                      <td data-label="Assigned Date">
-                        {new Date(assignment.assignedDate).toLocaleDateString()}
-                      </td>
-                      <td data-label="Actions">
-                        <div className="action-buttons">
-                          {assignment.status === 'Assigned' && user?.role === 'Waff Clerk' && (
-                            <button
-                              className="btn-action btn-settle"
-                              onClick={() => openSettleModal(assignment)}
-                            >
-                              Settle
-                            </button>
-                          )}
-                          
-                          {/* Settlement buttons for Waff Clerks with balance/over amounts */}
-                          {(assignment.status === 'Settled' || assignment.status === 'Settled/Rejected') && user?.role === 'Waff Clerk' && (
-                            <>
-                              {assignment.balanceAmount > 0 && (
-                                <button
-                                  className="btn-action btn-return-balance"
-                                  onClick={() => openSettlementModal(assignment, 'BALANCE_RETURN')}
-                                  title="Return balance cash to management"
-                                >
-                                  Return Balance
-                                </button>
                               )}
 
                               {(!assignment.settlementItems || assignment.settlementItems.length === 0) && (
@@ -1701,7 +1660,7 @@ function PettyCash() {
                                 </div>
                               )}
 
-                            </div>
+                            </div>{/* end expanded-content */}
                           </td>
                         </tr>
                       )}
