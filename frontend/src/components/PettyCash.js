@@ -1021,6 +1021,7 @@ function PettyCash() {
       case 'Pending Approval': return 'status-pending-approval';
       case 'Balance Returned': return 'status-balance-returned';
       case 'Overdue Collected': return 'status-overdue-collected';
+      case 'Closed': return 'status-closed';
       default: return 'status-assigned';
     }
   };

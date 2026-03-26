@@ -120,6 +120,12 @@
   border: 1px solid #fbcfe8;
 }
 
+.status-closed {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
 .balance-positive {
   color: #059669;
   font-weight: 600;

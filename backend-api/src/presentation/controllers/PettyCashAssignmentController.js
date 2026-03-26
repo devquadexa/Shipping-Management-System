@@ -251,6 +251,18 @@ class PettyCashAssignmentController {
       res.status(500).json({ message: error.message || 'Error deleting settlement item' });
     }
   }
+
+  async closeAssignment(req, res) {
+    try {
+      const { id } = req.params;
+      const pettyCashAssignmentRepository = this.container.resolve('pettyCashAssignmentRepository');
+      await pettyCashAssignmentRepository.updateStatus(parseInt(id), 'Closed');
+      res.json({ message: 'Assignment closed successfully' });
+    } catch (error) {
+      console.error('Error in closeAssignment:', error);
+      res.status(500).json({ message: error.message || 'Error closing assignment' });
+    }
+  }
 }
 
 module.exports = PettyCashAssignmentController;
