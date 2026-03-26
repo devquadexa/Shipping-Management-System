@@ -464,35 +464,26 @@ function Jobs() {
                     <td data-label="Open Date">{job.openDate ? new Date(job.openDate).toLocaleDateString() : '-'}</td>
                     {user?.role !== 'Waff Clerk' && (
                       <td data-label="Assigned To">
-                        {(user?.role === 'Admin' || user?.role === 'Super Admin') && !job.assignedTo && (!job.assignments || job.assignments.length === 0) ? (
-                          <select onChange={(e) => assignJob(job.jobId, e.target.value)} defaultValue="">
-                            <option value="">Assign User</option>
-                            {users.map(u => (
-                              <option key={u.userId} value={u.userId}>{u.fullName}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="assigned-users">
-                            {job.assignments && job.assignments.length > 0 ? (
-                              <div className="multi-user-assignments">
-                                {job.assignments.slice(0, 2).map((assignment, index) => (
-                                  <span key={assignment.userId || index} className="assigned-user-badge">
-                                    {assignment.userName || getUserFullName(assignment.userId)}
-                                  </span>
-                                ))}
-                                {job.assignments.length > 2 && (
-                                  <span className="more-users-badge">
-                                    +{job.assignments.length - 2} more
-                                  </span>
-                                )}
-                              </div>
-                            ) : job.assignedTo ? (
-                              <span className="assigned-user-badge">{getUserFullName(job.assignedTo)}</span>
-                            ) : (
-                              <span className="unassigned-text">Unassigned</span>
-                            )}
-                          </div>
-                        )}
+                        <div className="assigned-users">
+                          {job.assignments && job.assignments.length > 0 ? (
+                            <div className="multi-user-assignments">
+                              {job.assignments.slice(0, 2).map((assignment, index) => (
+                                <span key={assignment.userId || index} className="assigned-user-badge">
+                                  {assignment.userName || getUserFullName(assignment.userId)}
+                                </span>
+                              ))}
+                              {job.assignments.length > 2 && (
+                                <span className="more-users-badge">
+                                  +{job.assignments.length - 2} more
+                                </span>
+                              )}
+                            </div>
+                          ) : job.assignedTo ? (
+                            <span className="assigned-user-badge">{getUserFullName(job.assignedTo)}</span>
+                          ) : (
+                            <span className="unassigned-text">No Assigned Users</span>
+                          )}
+                        </div>
                       </td>
                     )}
                     <td data-label="Status">
@@ -614,7 +605,7 @@ function Jobs() {
                                 ) : job.assignedTo ? (
                                   <span className="assigned-user-badge">{getUserFullName(job.assignedTo)}</span>
                                 ) : (
-                                  <span className="unassigned-text">Unassigned</span>
+                                  <span className="unassigned-text">No Assigned Users</span>
                                 )}
                               </span>
                             </div>

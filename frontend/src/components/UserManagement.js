@@ -49,8 +49,62 @@ function UserManagement() {
     }
   };
 
+  const validateUsernameInput = (value) => {
+    // Allow letters, underscores, and hyphens only (no numbers)
+    return /^[a-zA-Z_-]*$/.test(value);
+  };
+
+  const validateNameInput = (value) => {
+    // Allow letters, spaces, and hyphens only (no numbers)
+    return /^[a-zA-Z\s-]*$/.test(value);
+  };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let { name, value } = e.target;
+
+    // Apply validation for username and fullName
+    if (name === 'username' && !validateUsernameInput(value)) {
+      return; // Don't update if invalid
+    }
+    if (name === 'fullName' && !validateNameInput(value)) {
+      return; // Don't update if invalid
+    }
+
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleUsernameKeyDown = (e) => {
+    // Allow: letters, underscore, hyphen, backspace, delete, arrow keys, tab
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+    const char = String.fromCharCode(e.which || e.keyCode);
+
+    if (!allowedKeys.includes(e.key) && !/^[a-zA-Z_-]$/.test(char)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleNameKeyDown = (e) => {
+    // Allow: letters, space, hyphen, backspace, delete, arrow keys, tab
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+    const char = String.fromCharCode(e.which || e.keyCode);
+
+    if (!allowedKeys.includes(e.key) && !/^[a-zA-Z\s-]$/.test(char)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleUsernamePaste = (e) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (!validateUsernameInput(pastedText)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleNamePaste = (e) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (!validateNameInput(pastedText)) {
+      e.preventDefault();
+    }
   };
 
   const filteredUsers = users.filter(u =>
@@ -160,7 +214,9 @@ function UserManagement() {
                       type="text" 
                       name="username" 
                       value={formData.username} 
-                      onChange={handleChange} 
+                      onChange={handleChange}
+                      onKeyDown={handleUsernameKeyDown}
+                      onPaste={handleUsernamePaste}
                       placeholder="Enter username"
                       required 
                     />
@@ -171,7 +227,9 @@ function UserManagement() {
                       type="text" 
                       name="fullName" 
                       value={formData.fullName} 
-                      onChange={handleChange} 
+                      onChange={handleChange}
+                      onKeyDown={handleNameKeyDown}
+                      onPaste={handleNamePaste}
                       placeholder="Enter full name"
                       required 
                     />
