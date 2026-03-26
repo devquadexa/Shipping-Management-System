@@ -112,12 +112,65 @@ function AdvancePayment({ job, onUpdate }) {
     }
   }, [job]);
 
+  const sanitizeCurrencyInput = (value) => {
+    if (!value) return '';
+
+    // Keep only digits and one decimal point
+    let sanitized = value.replace(/[^\d.]/g, '');
+    const parts = sanitized.split('.');
+
+    if (parts.length > 2) {
+      sanitized = `${parts[0]}.${parts.slice(1).join('')}`;
+    }
+
+    // Allow up to 2 decimal places
+    if (sanitized.includes('.')) {
+      const [wholePart, decimalPart] = sanitized.split('.');
+      sanitized = `${wholePart}.${decimalPart.slice(0, 2)}`;
+    }
+
+    return sanitized;
+  };
+
+  const handleAdvanceAmountChange = (e) => {
+    setFormData({ ...formData, advancePayment: sanitizeCurrencyInput(e.target.value) });
+  };
+
+  const handleAdvanceAmountKeyDown = (e) => {
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', '.'];
+
+    if (allowedKeys.includes(e.key)) {
+      if (e.key === '.' && e.target.value.includes('.')) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (!/^\d$/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleAdvanceAmountPaste = (e) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (!/^\d+(\.\d{1,2})?$/.test(pastedText)) {
+      e.preventDefault();
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const amount = parseFloat(formData.advancePayment) || 0;
+      const amount = parseFloat(formData.advancePayment);
+
+      if (!formData.advancePayment || Number.isNaN(amount)) {
+        setMessage('Please enter a valid advance payment amount');
+        setTimeout(() => setMessage(''), 3000);
+        setLoading(false);
+        return;
+      }
       
       if (amount < 0) {
         setMessage('Advance payment cannot be negative');
@@ -310,13 +363,14 @@ function AdvancePayment({ job, onUpdate }) {
                 <div className="form-group">
                   <label htmlFor="advancePayment">Advance Amount (LKR) <span className="required">*</span></label>
                   <input
-                    type="number"
+                    type="text"
                     id="advancePayment"
-                    step="0.01"
-                    min="0"
                     value={formData.advancePayment}
-                    onChange={(e) => setFormData({ ...formData, advancePayment: e.target.value })}
+                    onChange={handleAdvanceAmountChange}
+                    onKeyDown={handleAdvanceAmountKeyDown}
+                    onPaste={handleAdvanceAmountPaste}
                     placeholder="0.00"
+                    inputMode="decimal"
                     className="form-control"
                     required
                   />

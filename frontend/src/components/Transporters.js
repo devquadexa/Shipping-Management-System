@@ -150,6 +150,8 @@ function Transporters() {
 
     if (!formData.name.trim()) {
       errors.name = 'Transporter name is required';
+    } else if (!/^[a-zA-Z\s-]+$/.test(formData.name.trim())) {
+      errors.name = 'Transporter name can only contain letters, spaces, and hyphens (-)';
     }
 
     if (!formData.mainPhone.trim()) {
@@ -199,6 +201,8 @@ function Transporters() {
     validContactPersons.forEach((contactPerson, index) => {
       if (!contactPerson.name.trim()) {
         errors[`contactPersonName${index}`] = 'Contact person name is required';
+        } else if (!/^[a-zA-Z\s-]+$/.test(contactPerson.name.trim())) {
+          errors[`contactPersonName${index}`] = 'Name can only contain letters, spaces, and hyphens (-)';
       }
 
       if (!contactPerson.phone.trim()) {
@@ -219,6 +223,30 @@ function Transporters() {
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
 
+    if (name === 'name') {
+      const sanitizedName = value.replace(/[^a-zA-Z\s-]/g, '');
+      setFormData((prev) => ({
+        ...prev,
+        name: sanitizedName,
+      }));
+      if (formErrors.name) {
+        setFormErrors((prev) => ({ ...prev, name: '' }));
+      }
+      return;
+    }
+
+    if (name === 'mainPhone') {
+      const sanitizedPhone = value.replace(/\D/g, '').slice(0, 10);
+      setFormData((prev) => ({
+        ...prev,
+        mainPhone: sanitizedPhone,
+      }));
+      if (formErrors.mainPhone) {
+        setFormErrors((prev) => ({ ...prev, mainPhone: '' }));
+      }
+      return;
+    }
+
     if (name === 'addressDistrict') {
       setFilteredCities(getFilteredCities(value));
       setFormData((prev) => ({
@@ -236,12 +264,48 @@ function Transporters() {
   };
 
   const handleContactPersonChange = (index, field, value) => {
+    let sanitizedValue = value;
+    if (field === 'name') {
+      sanitizedValue = value.replace(/[^a-zA-Z\s-]/g, '');
+    } else if (field === 'phone') {
+      sanitizedValue = value.replace(/\D/g, '').slice(0, 10);
+    }
+
     setFormData((prev) => ({
       ...prev,
       contactPersons: prev.contactPersons.map((contactPerson, contactPersonIndex) =>
-        contactPersonIndex === index ? { ...contactPerson, [field]: value } : contactPerson
+        contactPersonIndex === index ? { ...contactPerson, [field]: sanitizedValue } : contactPerson
       ),
     }));
+
+    const errorKey = field === 'name' ? `contactPersonName${index}` : field === 'phone' ? `contactPersonPhone${index}` : '';
+    if (errorKey && formErrors[errorKey]) {
+      setFormErrors((prev) => ({ ...prev, [errorKey]: '' }));
+    }
+  };
+
+  const validateNameInput = (event) => {
+    const { key } = event;
+    if (key.length > 1) {
+      return true;
+    }
+    if (!/^[a-zA-Z\s-]$/.test(key)) {
+      event.preventDefault();
+      return false;
+    }
+    return true;
+  };
+
+  const validatePhoneInput = (event) => {
+    const { key } = event;
+    if (key.length > 1) {
+      return true;
+    }
+    if (!/^\d$/.test(key)) {
+      event.preventDefault();
+      return false;
+    }
+    return true;
   };
 
   const addContactPerson = () => {
@@ -559,6 +623,7 @@ function Transporters() {
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
+                      onKeyPress={validateNameInput}
                       placeholder="Enter name (letters, spaces, and hyphens only)"
                     />
                     {formErrors.name && <span className="form-error">{formErrors.name}</span>}
@@ -570,7 +635,9 @@ function Transporters() {
                       name="mainPhone"
                       value={formData.mainPhone}
                       onChange={handleChange}
+                      onKeyPress={validatePhoneInput}
                       placeholder="0771234567"
+                      maxLength="10"
                     />
                     {formErrors.mainPhone && <span className="form-error">{formErrors.mainPhone}</span>}
                   </div>
@@ -723,6 +790,7 @@ function Transporters() {
                         <input
                           value={contactPerson.name}
                           onChange={(event) => handleContactPersonChange(index, 'name', event.target.value)}
+                          onKeyPress={validateNameInput}
                           placeholder="Enter contact person name"
                         />
                         {formErrors[`contactPersonName${index}`] && (
@@ -735,7 +803,9 @@ function Transporters() {
                         <input
                           value={contactPerson.phone}
                           onChange={(event) => handleContactPersonChange(index, 'phone', event.target.value)}
+                          onKeyPress={validatePhoneInput}
                           placeholder="0771234567"
+                          maxLength="10"
                         />
                         {formErrors[`contactPersonPhone${index}`] && (
                           <span className="form-error">{formErrors[`contactPersonPhone${index}`]}</span>

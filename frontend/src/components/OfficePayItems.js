@@ -59,11 +59,18 @@ function OfficePayItems({ jobId, onUpdate }) {
     e.preventDefault();
     try {
       setLoading(true);
+
+      const actualCost = parseFloat(formData.actualCost);
+      if (!formData.actualCost || Number.isNaN(actualCost) || actualCost < 0) {
+        setMessage('Please enter a valid Amount Paid');
+        setTimeout(() => setMessage(''), 3000);
+        return;
+      }
       
       const payItemData = {
         jobId,
         description: formData.description,
-        actualCost: parseFloat(formData.actualCost)
+        actualCost
       };
 
       if (editingId) {
@@ -129,11 +136,64 @@ function OfficePayItems({ jobId, onUpdate }) {
     });
   };
 
+  const sanitizeCurrencyInput = (value) => {
+    if (!value) return '';
+
+    // Remove everything except digits and decimal point
+    let sanitized = value.replace(/[^\d.]/g, '');
+
+    // Keep only one decimal point
+    const parts = sanitized.split('.');
+    if (parts.length > 2) {
+      sanitized = `${parts[0]}.${parts.slice(1).join('')}`;
+    }
+
+    // Limit to 2 decimal places
+    if (sanitized.includes('.')) {
+      const [wholePart, decimalPart] = sanitized.split('.');
+      sanitized = `${wholePart}.${decimalPart.slice(0, 2)}`;
+    }
+
+    return sanitized;
+  };
+
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === 'actualCost') {
+      setFormData({
+        ...formData,
+        actualCost: sanitizeCurrencyInput(value)
+      });
+      return;
+    }
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+  };
+
+  const handleAmountKeyDown = (e) => {
+    const allowedKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', '.'];
+
+    if (allowedKeys.includes(e.key)) {
+      if (e.key === '.' && e.target.value.includes('.')) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (!/^\d$/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleAmountPaste = (e) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (!/^\d+(\.\d{1,2})?$/.test(pastedText)) {
+      e.preventDefault();
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -206,14 +266,15 @@ function OfficePayItems({ jobId, onUpdate }) {
                 <div className="form-group">
                   <label htmlFor="actualCost">Amount Paid (LKR) <span className="required">*</span></label>
                   <input
-                    type="number"
+                    type="text"
                     id="actualCost"
                     name="actualCost"
                     value={formData.actualCost}
                     onChange={handleChange}
+                    onKeyDown={handleAmountKeyDown}
+                    onPaste={handleAmountPaste}
                     placeholder="0.00"
-                    step="0.01"
-                    min="0"
+                    inputMode="decimal"
                     required
                   />
                 </div>

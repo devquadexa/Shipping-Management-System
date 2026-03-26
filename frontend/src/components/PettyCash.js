@@ -37,6 +37,23 @@ function PettyCash() {
   const [editActualCost, setEditActualCost] = useState('');
   const [canEditSettlement, setCanEditSettlement] = useState(false);
 
+  // Edit Settlement Modal (new - for editing from main table)
+  const [showEditSettlementModal, setShowEditSettlementModal] = useState(false);
+  const [editSettlementItems, setEditSettlementItems] = useState([]);
+
+  // Expandable rows state
+  const [expandedRows, setExpandedRows] = useState(new Set());
+  
+  // Dropdown menu state
+  const [activeDropdown, setActiveDropdown] = useState(null);
+
+  // Inline edit state for settlement items in expanded rows
+  const [inlineEditingItem, setInlineEditingItem] = useState(null); // { assignmentId, itemId }
+  const [inlineEditName, setInlineEditName] = useState('');
+  const [inlineEditCost, setInlineEditCost] = useState('');
+  const [inlineAddingRow, setInlineAddingRow] = useState(null); // assignmentId
+  const [inlineNewItem, setInlineNewItem] = useState({ itemName: '', actualCost: '', hasBill: false });
+
   // Cash Balance Settlement Modal
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [settlementFormData, setSettlementFormData] = useState({
@@ -55,6 +72,18 @@ function PettyCash() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (activeDropdown && !event.target.closest('.actions-dropdown')) {
+        setActiveDropdown(null);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [activeDropdown]);
 
   const fetchAssignments = async () => {
     try {
@@ -267,11 +296,58 @@ function PettyCash() {
     return availableUsers;
   };
 
+  const sanitizeCurrencyInput = (value) => {
+    const cleaned = String(value || '').replace(/[^\d.]/g, '');
+    const [integerPart, ...decimalParts] = cleaned.split('.');
+    const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '');
+    const decimalPart = decimalParts.join('').slice(0, 2);
+
+    if (cleaned.includes('.')) {
+      return `${normalizedInteger || '0'}.${decimalPart}`;
+    }
+
+    return normalizedInteger;
+  };
+
+  const handleAssignedAmountChange = (e) => {
+    const sanitizedAmount = sanitizeCurrencyInput(e.target.value);
+    setAssignFormData({ ...assignFormData, assignedAmount: sanitizedAmount });
+  };
+
+  const handleAssignedAmountKeyDown = (e) => {
+    const allowedControlKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (allowedControlKeys.includes(e.key)) {
+      return;
+    }
+
+    const isDigit = /^\d$/.test(e.key);
+    const isDecimalPoint = e.key === '.';
+    const hasDecimalPoint = String(assignFormData.assignedAmount || '').includes('.');
+
+    if (!isDigit && !(isDecimalPoint && !hasDecimalPoint)) {
+      e.preventDefault();
+    }
+  };
+
   const handleAssignSubmit = async (e) => {
     e.preventDefault();
     
     if (!assignFormData.jobId || !assignFormData.assignedTo || !assignFormData.assignedAmount) {
       setMessage('Please fill all required fields');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    const assignedAmountText = String(assignFormData.assignedAmount).trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(assignedAmountText)) {
+      setMessage('Assigned amount must be a valid number');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    const assignedAmount = parseFloat(assignedAmountText);
+    if (Number.isNaN(assignedAmount) || assignedAmount <= 0) {
+      setMessage('Assigned amount must be greater than 0');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -285,7 +361,7 @@ function PettyCash() {
         },
         body: JSON.stringify({
           ...assignFormData,
-          assignedAmount: parseFloat(assignFormData.assignedAmount)
+          assignedAmount
         })
       });
 
@@ -455,6 +531,170 @@ function PettyCash() {
     // Fallback: just show existing items
     setSettlementItems(existingItems);
     setShowSettleModal(true);
+  };
+
+  // Open Edit Settlement Modal (from main table action button)
+  const openEditSettlementModal = async (assignment) => {
+    console.log('Opening edit settlement modal for assignment:', assignment.assignmentId);
+    setSelectedAssignment(assignment);
+    
+    // Load existing settlement items
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const items = await response.json();
+        console.log('Loaded settlement items for editing:', items);
+        setEditSettlementItems(items);
+        setShowEditSettlementModal(true);
+      } else {
+        setMessage('❌ Failed to load settlement items');
+        setTimeout(() => setMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error loading settlement items:', error);
+      setMessage('❌ Error loading settlement items');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const handleEditSettlementItemChange = (index, field, value) => {
+    const newItems = editSettlementItems.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    );
+    setEditSettlementItems(newItems);
+  };
+
+  const addNewSettlementItem = () => {
+    setEditSettlementItems([...editSettlementItems, { 
+      itemName: '', 
+      actualCost: '', 
+      isCustomItem: true, 
+      hasBill: false,
+      isNew: true // Mark as new item
+    }]);
+  };
+
+  const removeEditSettlementItem = (index) => {
+    if (editSettlementItems.length > 1) {
+      setEditSettlementItems(editSettlementItems.filter((_, i) => i !== index));
+    } else {
+      setMessage('❌ Cannot remove the last item');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const saveAllSettlementChanges = async () => {
+    try {
+      // Validate all items
+      const validItems = editSettlementItems.filter(item => 
+        item.itemName && item.actualCost && parseFloat(item.actualCost) > 0
+      );
+      
+      if (validItems.length === 0) {
+        setMessage('❌ Please add at least one valid item');
+        setTimeout(() => setMessage(''), 3000);
+        return;
+      }
+
+      // Process each item
+      for (const item of validItems) {
+        if (item.isNew) {
+          // Add new item via settle endpoint (append mode)
+          await fetch(
+            `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settle`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                items: [{
+                  itemName: item.itemName,
+                  actualCost: parseFloat(item.actualCost),
+                  isCustomItem: true,
+                  hasBill: item.hasBill ? true : false
+                }]
+              })
+            }
+          );
+        } else if (item.settlementItemId) {
+          // Update existing item
+          await fetch(
+            `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settlement-items/${item.settlementItemId}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                itemName: item.itemName,
+                actualCost: parseFloat(item.actualCost)
+              })
+            }
+          );
+        }
+      }
+
+      setMessage('✅ Settlement items updated successfully');
+      setShowEditSettlementModal(false);
+      setEditSettlementItems([]);
+      setSelectedAssignment(null);
+      fetchAssignments(); // Reload assignments
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error saving settlement changes:', error);
+      setMessage('❌ Error saving changes');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const deleteEditSettlementItem = async (item) => {
+    if (!item.settlementItemId) {
+      // Just remove from list if it's a new unsaved item
+      removeEditSettlementItem(editSettlementItems.indexOf(item));
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete "${item.itemName}"?\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settlement-items/${item.settlementItemId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        setMessage('✅ Item deleted successfully');
+        // Remove from local state
+        setEditSettlementItems(editSettlementItems.filter(i => i.settlementItemId !== item.settlementItemId));
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const error = await response.json();
+        setMessage(`❌ ${error.message || 'Error deleting item'}`);
+        setTimeout(() => setMessage(''), 5000);
+      }
+    } catch (error) {
+      console.error('Error deleting settlement item:', error);
+      setMessage('❌ Error deleting item');
+      setTimeout(() => setMessage(''), 3000);
+    }
   };
 
   const handleSettlementItemChange = (index, field, value) => {
@@ -785,6 +1025,162 @@ function PettyCash() {
     }
   };
 
+  // Toggle row expansion
+  const toggleRowExpansion = async (assignmentId) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(assignmentId)) {
+      newExpanded.delete(assignmentId);
+    } else {
+      newExpanded.add(assignmentId);
+      
+      // Load settlement items if not already loaded
+      const assignment = assignments.find(a => a.assignmentId === assignmentId);
+      if (assignment && (!assignment.settlementItems || assignment.settlementItems.length === 0)) {
+        try {
+          const response = await fetch(
+            `${API_BASE}/api/petty-cash-assignments/${assignmentId}/settlement-items`,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const items = await response.json();
+            // Update the assignment with settlement items
+            setAssignments(assignments.map(a => 
+              a.assignmentId === assignmentId ? { ...a, settlementItems: items } : a
+            ));
+          }
+        } catch (error) {
+          console.error('Error loading settlement items:', error);
+        }
+      }
+    }
+    setExpandedRows(newExpanded);
+  };
+
+  // Inline edit handlers for settlement items in expanded rows
+  const startInlineEdit = (assignmentId, item) => {
+    setInlineEditingItem({ assignmentId, itemId: item.settlementItemId });
+    setInlineEditName(item.itemName);
+    setInlineEditCost(item.actualCost.toString());
+  };
+
+  const cancelInlineEdit = () => {
+    setInlineEditingItem(null);
+    setInlineEditName('');
+    setInlineEditCost('');
+  };
+
+  const saveInlineEdit = async (assignmentId) => {
+    const cost = parseFloat(inlineEditCost);
+    if (!inlineEditName.trim() || isNaN(cost) || cost <= 0) {
+      setMessage('❌ Please enter a valid item name and cost');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/petty-cash-assignments/${assignmentId}/settlement-items/${inlineEditingItem.itemId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          body: JSON.stringify({ itemName: inlineEditName.trim(), actualCost: cost })
+        }
+      );
+      if (response.ok) {
+        cancelInlineEdit();
+        await reloadAssignmentItems(assignmentId);
+        setMessage('✅ Item updated');
+        setTimeout(() => setMessage(''), 2000);
+      } else {
+        const err = await response.json();
+        setMessage(`❌ ${err.message || 'Error updating item'}`);
+        setTimeout(() => setMessage(''), 4000);
+      }
+    } catch {
+      setMessage('❌ Error updating item');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const deleteInlineItem = async (assignmentId, item) => {
+    if (!window.confirm(`Delete "${item.itemName}"?`)) return;
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/petty-cash-assignments/${assignmentId}/settlement-items/${item.settlementItemId}`,
+        { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+      );
+      if (response.ok) {
+        await reloadAssignmentItems(assignmentId);
+        setMessage('✅ Item deleted');
+        setTimeout(() => setMessage(''), 2000);
+      } else {
+        const err = await response.json();
+        setMessage(`❌ ${err.message || 'Error deleting item'}`);
+        setTimeout(() => setMessage(''), 4000);
+      }
+    } catch {
+      setMessage('❌ Error deleting item');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const saveInlineNewItem = async (assignmentId) => {
+    const cost = parseFloat(inlineNewItem.actualCost);
+    if (!inlineNewItem.itemName.trim() || isNaN(cost) || cost <= 0) {
+      setMessage('❌ Please enter a valid item name and cost');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/petty-cash-assignments/${assignmentId}/settle`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          body: JSON.stringify({
+            items: [{ itemName: inlineNewItem.itemName.trim(), actualCost: cost, isCustomItem: true, hasBill: inlineNewItem.hasBill }]
+          })
+        }
+      );
+      if (response.ok) {
+        setInlineAddingRow(null);
+        setInlineNewItem({ itemName: '', actualCost: '', hasBill: false });
+        await reloadAssignmentItems(assignmentId);
+        setMessage('✅ Item added');
+        setTimeout(() => setMessage(''), 2000);
+      } else {
+        const err = await response.json();
+        setMessage(`❌ ${err.message || 'Error adding item'}`);
+        setTimeout(() => setMessage(''), 4000);
+      }
+    } catch {
+      setMessage('❌ Error adding item');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const reloadAssignmentItems = async (assignmentId) => {
+    const [itemsRes, assignmentsRes] = await Promise.all([
+      fetch(`${API_BASE}/api/petty-cash-assignments/${assignmentId}/settlement-items`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      }),
+      fetch(`${API_BASE}/api/petty-cash-assignments${user?.role === 'Waff Clerk' ? '/my' : ''}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      })
+    ]);
+    if (itemsRes.ok && assignmentsRes.ok) {
+      const items = await itemsRes.json();
+      const allAssignments = await assignmentsRes.json();
+      setAssignments(allAssignments.map(a =>
+        a.assignmentId === assignmentId ? { ...a, settlementItems: items } : a
+      ));
+    }
+  };
+
   return (
     <div className="petty-cash-page">
       <div className="page-header">
@@ -875,42 +1271,6 @@ function PettyCash() {
       )}
 
       {/* User's Own Balance Summary */}
-      {user?.role === 'Waff Clerk' && assignments.length > 0 && (
-        <div className="balance-cards">
-          <div className="balance-card user-balance">
-            <div className="balance-card-icon">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-            </div>
-            <div className="balance-card-content">
-              <h3>Your Petty Cash Summary</h3>
-              <div className="user-balance-details">
-                <div className="balance-detail-row">
-                  <span>Total Assigned:</span>
-                  <span className="balance-value">
-                    LKR {formatAmount(assignments.reduce((sum, a) => sum + parseFloat(a.assignedAmount || 0), 0))}
-                  </span>
-                </div>
-                <div className="balance-detail-row">
-                  <span>Active Assignments:</span>
-                  <span className="balance-value">
-                    {assignments.filter(a => a.status === 'Assigned').length}
-                  </span>
-                </div>
-                <div className="balance-detail-row">
-                  <span>Settled Assignments:</span>
-                  <span className="balance-value">
-                    {assignments.filter(a => a.status === 'Settled' || a.status === 'Settled/Approved' || a.status === 'Settled/Rejected').length}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {message && (
         <div className={`alert ${message.includes('Error') ? 'alert-error' : 'alert-success'}`}>
           {message}
@@ -939,16 +1299,13 @@ function PettyCash() {
           </div>
         ) : (
           <div className="assignments-table-wrapper">
-            <table className="assignments-table">
+            <table className="assignments-table-modern">
               <thead>
                 <tr>
+                  <th style={{width: '50px'}}></th>
                   <th>Assignment ID</th>
                   <th>Job ID</th>
-                  <th>Customer</th>
-                  {user?.role !== 'Waff Clerk' && <th>Assigned To</th>}
-                  <th>Assigned Amount</th>
-                  <th>Actual Spent</th>
-                  <th>Balance/Over</th>
+                  <th style={{minWidth: '220px'}}>Customer</th>
                   <th>Status</th>
                   <th>Assigned Date</th>
                   <th>Actions</th>
@@ -957,7 +1314,302 @@ function PettyCash() {
               <tbody>
                 {assignments.map(assignment => {
                   const job = jobs.find(j => j.jobId === assignment.jobId);
+                  const isExpanded = expandedRows.has(assignment.assignmentId);
+                  
                   return (
+                    <React.Fragment key={assignment.assignmentId}>
+                      {/* Main Row */}
+                      <tr className={`assignment-row ${isExpanded ? 'expanded' : ''}`}>
+                        <td>
+                          <button 
+                            className="expand-btn"
+                            onClick={() => toggleRowExpansion(assignment.assignmentId)}
+                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                          >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`expand-icon ${isExpanded ? 'rotated' : ''}`}>
+                              <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                          </button>
+                        </td>
+                        <td>
+                          <strong className="assignment-id">#{assignment.assignmentId}</strong>
+                        </td>
+                        <td>{assignment.jobId}</td>
+                        <td className="customer-name-cell">{job ? getCustomerName(job.customerId) : '-'}</td>
+                        <td>
+                          <span className={`status-badge ${getStatusBadgeClass(assignment.status)}`}>
+                            {assignment.status}
+                          </span>
+                        </td>
+                        <td>{new Date(assignment.assignedDate).toLocaleDateString()}</td>
+                        <td>
+                          <div className="actions-cell-hybrid">
+                            {/* Eye Icon - View Details */}
+                            {(assignment.status === 'Settled' || assignment.status === 'Pending Approval' || assignment.status === 'Settled/Approved' || assignment.status === 'Settled/Rejected' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') && (
+                              <button
+                                className="btn-view-eye"
+                                onClick={() => toggleRowExpansion(assignment.assignmentId)}
+                                title={isExpanded ? 'Hide Details' : 'View Details'}
+                              >
+                                {isExpanded ? (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                  </svg>
+                                ) : (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                  </svg>
+                                )}
+                              </button>
+                            )}
+
+                            {/* Return Balance Button */}
+                            {(assignment.status === 'Settled' || assignment.status === 'Settled/Rejected') && user?.role === 'Waff Clerk' && assignment.balanceAmount > 0 && (
+                              <button
+                                className="btn-modern btn-success"
+                                onClick={() => openSettlementModal(assignment, 'BALANCE_RETURN')}
+                                title="Return balance cash to management"
+                              >
+                                Return Balance
+                              </button>
+                            )}
+                            
+                            {/* Collect Overdue Button */}
+                            {(assignment.status === 'Settled' || assignment.status === 'Settled/Rejected') && user?.role === 'Waff Clerk' && assignment.overAmount > 0 && (
+                              <button
+                                className="btn-modern btn-warning"
+                                onClick={() => openSettlementModal(assignment, 'OVERDUE_COLLECTION')}
+                                title="Collect overdue cash from management"
+                              >
+                                Collect Overdue
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      {/* Expanded Details Row */}
+                      {isExpanded && (
+                        <tr className="expanded-details-row">
+                          <td colSpan="7">
+                            <div className="expanded-content">
+
+                              {/* Financial Summary Strip */}
+                              <div className="financial-summary-strip">
+                                <div className="fin-stat-item">
+                                  <span className="fin-stat-label">Assigned Amount</span>
+                                  <span className="fin-stat-value">LKR {formatAmount(assignment.assignedAmount)}</span>
+                                </div>
+                                <div className="fin-stat-divider" />
+                                <div className="fin-stat-item">
+                                  <span className="fin-stat-label">Actual Spent</span>
+                                  <span className="fin-stat-value">{assignment.actualSpent ? `LKR ${formatAmount(assignment.actualSpent)}` : '—'}</span>
+                                </div>
+                                {assignment.balanceAmount > 0 && (
+                                  <>
+                                    <div className="fin-stat-divider" />
+                                    <div className="fin-stat-item">
+                                      <span className="fin-stat-label">Balance to Return</span>
+                                      <span className="fin-stat-value positive">LKR {formatAmount(assignment.balanceAmount)}</span>
+                                    </div>
+                                  </>
+                                )}
+                                {assignment.overAmount > 0 && (
+                                  <>
+                                    <div className="fin-stat-divider" />
+                                    <div className="fin-stat-item">
+                                      <span className="fin-stat-label">Over Amount</span>
+                                      <span className="fin-stat-value negative">LKR {formatAmount(assignment.overAmount)}</span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Settlement Items Table */}
+                              {assignment.settlementItems && assignment.settlementItems.length > 0 && (
+                                <div className="settlement-items-section">
+                                  <div className="settlement-items-header">
+                                    <span className="settlement-items-title">Settlement Items</span>
+                                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                      <span className="settlement-items-count">{assignment.settlementItems.length} item{assignment.settlementItems.length !== 1 ? 's' : ''}</span>
+                                      {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
+                                        <button
+                                          className="btn-add-inline-item"
+                                          onClick={async () => {
+                                            const invoiceGenerated = await checkInvoiceGenerated(assignment.jobId);
+                                            if (invoiceGenerated) {
+                                              setMessage('❌ Cannot add - Invoice already generated');
+                                              setTimeout(() => setMessage(''), 3000);
+                                              return;
+                                            }
+                                            setInlineAddingRow(assignment.assignmentId);
+                                            setInlineNewItem({ itemName: '', actualCost: '', hasBill: false });
+                                          }}
+                                        >
+                                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                          Add New Pay Item
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="settlement-review-table">
+                                    <div className={`settlement-table-header ${assignment.status === 'Settled' && user?.role === 'Waff Clerk' ? 'with-actions' : ''}`}>
+                                      <div className="settlement-header-cell settlement-num-col">#</div>
+                                      <div className="settlement-header-cell settlement-name-col">Item Name</div>
+                                      <div className="settlement-header-cell settlement-type-col">Type</div>
+                                      <div className="settlement-header-cell settlement-bill-col">Bill</div>
+                                      <div className="settlement-header-cell settlement-amount-col">Actual Cost</div>
+                                      {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
+                                        <div className="settlement-header-cell settlement-actions-col">Actions</div>
+                                      )}
+                                    </div>
+                                    <div className="settlement-table-body">
+                                      {assignment.settlementItems.map((item, idx) => {
+                                        const isEditing = inlineEditingItem?.assignmentId === assignment.assignmentId && inlineEditingItem?.itemId === item.settlementItemId;
+                                        return (
+                                          <div key={idx} className={`settlement-table-row ${isEditing ? 'editing-row' : ''} ${assignment.status === 'Settled' && user?.role === 'Waff Clerk' ? 'with-actions' : ''}`}>
+
+                                            <div className="settlement-table-cell settlement-num-col settlement-num">{idx + 1}</div>
+                                            <div className="settlement-table-cell settlement-name-col">
+                                              {isEditing ? (
+                                                <input
+                                                  className="inline-edit-field"
+                                                  value={inlineEditName}
+                                                  onChange={e => setInlineEditName(e.target.value)}
+                                                  autoFocus
+                                                />
+                                              ) : item.itemName}
+                                            </div>
+                                            <div className="settlement-table-cell settlement-type-col">
+                                              <span className={`type-badge ${item.isCustomItem ? 'custom' : 'template'}`}>
+                                                {item.isCustomItem ? 'Custom' : 'Template'}
+                                              </span>
+                                            </div>
+                                            <div className="settlement-table-cell settlement-bill-col">
+                                              {item.hasBill ? (
+                                                <span className="bill-badge-small has-bill">
+                                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                  Bill
+                                                </span>
+                                              ) : (
+                                                <span className="bill-badge-small no-bill">No Bill</span>
+                                              )}
+                                            </div>
+                                            <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
+                                              {isEditing ? (
+                                                <input
+                                                  className="inline-edit-field inline-edit-amount"
+                                                  type="number"
+                                                  step="0.01"
+                                                  value={inlineEditCost}
+                                                  onChange={e => setInlineEditCost(e.target.value)}
+                                                  onKeyDown={e => { if (e.key === 'Enter') saveInlineEdit(assignment.assignmentId); if (e.key === 'Escape') cancelInlineEdit(); }}
+                                                />
+                                              ) : `LKR ${formatAmount(item.actualCost)}`}
+                                            </div>
+                                            {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
+                                              <div className="settlement-table-cell settlement-actions-col">
+                                                {isEditing ? (
+                                                  <div className="inline-action-btns">
+                                                    <button className="inline-btn-save" onClick={() => saveInlineEdit(assignment.assignmentId)} title="Save">
+                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                                    </button>
+                                                    <button className="inline-btn-cancel" onClick={cancelInlineEdit} title="Cancel">
+                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                    </button>
+                                                  </div>
+                                                ) : (
+                                                  <div className="inline-action-btns">
+                                                    <button className="inline-btn-edit" onClick={async () => {
+                                                      const invoiceGenerated = await checkInvoiceGenerated(assignment.jobId);
+                                                      if (invoiceGenerated) { setMessage('❌ Invoice already generated'); setTimeout(() => setMessage(''), 3000); return; }
+                                                      startInlineEdit(assignment.assignmentId, item);
+                                                    }} title="Edit item">
+                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                      </svg>
+                                                    </button>
+                                                    <button className="inline-btn-delete" onClick={() => deleteInlineItem(assignment.assignmentId, item)} title="Delete item">
+                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <polyline points="3 6 5 6 21 6"/>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                                      </svg>
+                                                    </button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+
+                                      {/* Add New Item Row */}
+                                      {inlineAddingRow === assignment.assignmentId && (
+                                        <div className="settlement-table-row new-item-row with-actions">
+                                          <div className="settlement-table-cell settlement-num-col settlement-num">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                          </div>
+                                          <div className="settlement-table-cell settlement-name-col">
+                                            <input
+                                              className="inline-edit-field"
+                                              placeholder="Item name"
+                                              value={inlineNewItem.itemName}
+                                              onChange={e => setInlineNewItem({...inlineNewItem, itemName: e.target.value})}
+                                              autoFocus
+                                            />
+                                          </div>
+                                          <div className="settlement-table-cell settlement-type-col">
+                                            <span className="type-badge custom">Custom</span>
+                                          </div>
+                                          <div className="settlement-table-cell settlement-bill-col">
+                                            <label className="inline-bill-check">
+                                              <input type="checkbox" checked={inlineNewItem.hasBill} onChange={e => setInlineNewItem({...inlineNewItem, hasBill: e.target.checked})} />
+                                              Bill
+                                            </label>
+                                          </div>
+                                          <div className="settlement-table-cell settlement-amount-col">
+                                            <input
+                                              className="inline-edit-field inline-edit-amount"
+                                              type="number"
+                                              step="0.01"
+                                              placeholder="0.00"
+                                              value={inlineNewItem.actualCost}
+                                              onChange={e => setInlineNewItem({...inlineNewItem, actualCost: e.target.value})}
+                                              onKeyDown={e => { if (e.key === 'Enter') saveInlineNewItem(assignment.assignmentId); if (e.key === 'Escape') { setInlineAddingRow(null); setInlineNewItem({ itemName: '', actualCost: '', hasBill: false }); } }}
+                                            />
+                                          </div>
+                                          <div className="settlement-table-cell settlement-actions-col">
+                                            <div className="inline-action-btns">
+                                              <button className="inline-btn-save" onClick={() => saveInlineNewItem(assignment.assignmentId)} title="Save new item">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                              </button>
+                                              <button className="inline-btn-cancel" onClick={() => { setInlineAddingRow(null); setInlineNewItem({ itemName: '', actualCost: '', hasBill: false }); }} title="Cancel">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      <div className={`settlement-table-row settlement-total-row ${assignment.status === 'Settled' && user?.role === 'Waff Clerk' ? 'with-actions' : ''}`}>
+                                        <div className="settlement-table-cell settlement-num-col"></div>
+                                        <div className="settlement-table-cell settlement-name-col"><strong>Total</strong></div>
+                                        <div className="settlement-table-cell settlement-type-col"></div>
+                                        <div className="settlement-table-cell settlement-bill-col"></div>
+                                        <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
+                                          <strong>LKR {formatAmount(assignment.settlementItems.reduce((sum, i) => sum + parseFloat(i.actualCost || 0), 0))}</strong>
+                                        </div>
+                                        {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
+                                          <div className="settlement-table-cell settlement-actions-col"></div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
                     <tr key={assignment.assignmentId}>
                       <td data-label="Assignment ID">
                         <strong className="assignment-id">#{assignment.assignmentId}</strong>
@@ -974,17 +1626,38 @@ function PettyCash() {
                         {assignment.actualSpent ? `LKR ${formatAmount(assignment.actualSpent)}` : '-'}
                       </td>
                       <td data-label="Balance/Over">
-                        {assignment.balanceAmount > 0 && (
-                          <span className="balance-positive">
-                            Balance: LKR {formatAmount(assignment.balanceAmount)}
+                        {(assignment.status === 'Settled/Approved' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') ? (
+                          <>
+                            {assignment.balanceAmount > 0 && (
+                              <span className="status-badge status-returned">
+                                ↩ Balance Returned
+                              </span>
+                            )}
+                            {assignment.overAmount > 0 && (
+                              <span className="status-badge status-paid">
+                                ✓ Overdue Collected
+                              </span>
+                            )}
+                          </>
+                        ) : assignment.status === 'Settled/Rejected' ? (
+                          <span className="status-badge status-rejected">
+                            ✗ Rejected
                           </span>
+                        ) : (
+                          <>
+                            {assignment.balanceAmount > 0 && (
+                              <span className="balance-positive">
+                                Balance: LKR {formatAmount(assignment.balanceAmount)}
+                              </span>
+                            )}
+                            {assignment.overAmount > 0 && (
+                              <span className="balance-negative">
+                                Over: LKR {formatAmount(assignment.overAmount)}
+                              </span>
+                            )}
+                            {!assignment.balanceAmount && !assignment.overAmount && '-'}
+                          </>
                         )}
-                        {assignment.overAmount > 0 && (
-                          <span className="balance-negative">
-                            Over: LKR {formatAmount(assignment.overAmount)}
-                          </span>
-                        )}
-                        {!assignment.balanceAmount && !assignment.overAmount && '-'}
                       </td>
                       <td data-label="Status">
                         <span className={`status-badge ${getStatusBadgeClass(assignment.status)}`}>
@@ -1017,65 +1690,22 @@ function PettyCash() {
                                   Return Balance
                                 </button>
                               )}
-                              {assignment.overAmount > 0 && (
-                                <button
-                                  className="btn-action btn-collect-overdue"
-                                  onClick={() => openSettlementModal(assignment, 'OVERDUE_COLLECTION')}
-                                  title="Collect overdue cash from management"
-                                >
-                                  Collect Overdue
-                                </button>
+
+                              {(!assignment.settlementItems || assignment.settlementItems.length === 0) && (
+                                <div className="no-settlement-items">
+                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                  </svg>
+                                  <p>No settlement items recorded</p>
+                                </div>
                               )}
-                            </>
-                          )}
-                          
-                          {(assignment.status === 'Settled' || assignment.status === 'Pending Approval' || assignment.status === 'Settled/Approved' || assignment.status === 'Settled/Rejected' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') && (
-                            <button
-                              className="btn-action btn-view"
-                              onClick={async () => {
-                                console.log('Loading settlement details for assignment:', assignment.assignmentId);
-                                setSelectedAssignment(assignment);
-                                
-                                // Check if invoice has been generated for this job
-                                const invoiceGenerated = await checkInvoiceGenerated(assignment.jobId);
-                                const isWaffClerk = user?.role === 'Waff Clerk';
-                                const canEdit = isWaffClerk && !invoiceGenerated && assignment.status === 'Settled';
-                                setCanEditSettlement(canEdit);
-                                console.log('Can edit settlement:', canEdit, '| Invoice generated:', invoiceGenerated, '| Is Waff Clerk:', isWaffClerk, '| Status:', assignment.status);
-                                
-                                // Load settlement items from API
-                                try {
-                                  const response = await fetch(
-                                    `${API_BASE}/api/petty-cash-assignments/${assignment.assignmentId}/settlement-items`,
-                                    {
-                                      headers: {
-                                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                                      }
-                                    }
-                                  );
-                                  
-                                  if (response.ok) {
-                                    const items = await response.json();
-                                    console.log('Loaded settlement items:', items);
-                                    setSettlementItems(items);
-                                  } else {
-                                    console.error('Failed to load settlement items:', response.status);
-                                    setSettlementItems(assignment.settlementItems || []);
-                                  }
-                                } catch (error) {
-                                  console.error('Error loading settlement items:', error);
-                                  setSettlementItems(assignment.settlementItems || []);
-                                }
-                                
-                                setShowSettleModal(true);
-                              }}
-                            >
-                              View Details
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -1135,10 +1765,17 @@ function PettyCash() {
               <div className="form-group">
                 <label>Amount (LKR) <span className="required">*</span></label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={assignFormData.assignedAmount}
-                  onChange={(e) => setAssignFormData({ ...assignFormData, assignedAmount: e.target.value })}
+                  onChange={handleAssignedAmountChange}
+                  onKeyDown={handleAssignedAmountKeyDown}
+                  onPaste={(e) => {
+                    const pastedText = e.clipboardData.getData('text');
+                    if (!/^\d+(\.\d{1,2})?$/.test(pastedText.trim())) {
+                      e.preventDefault();
+                    }
+                  }}
                   placeholder="0.00"
                   required
                 />
@@ -1581,6 +2218,193 @@ function PettyCash() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Settlement Modal (from main table) */}
+      {showEditSettlementModal && selectedAssignment && (
+        <div className="modal-overlay" onClick={() => {
+          setShowEditSettlementModal(false);
+          setEditSettlementItems([]);
+          setSelectedAssignment(null);
+        }}>
+          <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px', verticalAlign: 'middle'}}>
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                Edit Settlement Items
+              </h2>
+              <button className="btn-close" onClick={() => {
+                setShowEditSettlementModal(false);
+                setEditSettlementItems([]);
+                setSelectedAssignment(null);
+              }}>×</button>
+            </div>
+
+            <div className="modal-body-scrollable">
+              <div className="settlement-info">
+                <div className="settlement-info-grid">
+                  <div className="settlement-info-item">
+                    <span className="info-label">Assignment ID:</span>
+                    <span className="info-value">#{selectedAssignment.assignmentId}</span>
+                  </div>
+                  <div className="settlement-info-item">
+                    <span className="info-label">Job ID:</span>
+                    <span className="info-value">{selectedAssignment.jobId}</span>
+                  </div>
+                  <div className="settlement-info-item">
+                    <span className="info-label">Assigned Amount:</span>
+                    <span className="info-value">LKR {formatAmount(selectedAssignment.assignedAmount)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="edit-settlement-form">
+                <div className="form-header">
+                  <h3>Settlement Items</h3>
+                  <button 
+                    type="button" 
+                    onClick={addNewSettlementItem} 
+                    className="btn btn-secondary btn-add-item"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '6px'}}>
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add New Item
+                  </button>
+                </div>
+
+                <div className="edit-settlement-items-list">
+                  {editSettlementItems.map((item, index) => (
+                    <div key={index} className={`edit-settlement-item-card ${item.isNew ? 'new-item' : ''}`}>
+                      <div className="item-header">
+                        <span className="item-number">#{index + 1}</span>
+                        {item.isNew && <span className="new-badge">New</span>}
+                        <button
+                          type="button"
+                          onClick={() => deleteEditSettlementItem(item)}
+                          className="btn-delete-card"
+                          title="Delete item"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      <div className="item-fields">
+                        <div className="form-group">
+                          <label>Item Name <span className="required">*</span></label>
+                          <input
+                            type="text"
+                            value={item.itemName}
+                            onChange={(e) => handleEditSettlementItemChange(index, 'itemName', e.target.value)}
+                            placeholder="Enter item name"
+                            className="form-control"
+                          />
+                        </div>
+                        
+                        <div className="form-group">
+                          <label>Actual Cost (LKR) <span className="required">*</span></label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.actualCost}
+                            onChange={(e) => handleEditSettlementItemChange(index, 'actualCost', e.target.value)}
+                            placeholder="0.00"
+                            className="form-control"
+                          />
+                        </div>
+
+                        {item.isNew && (
+                          <div className="form-group checkbox-group">
+                            <label className="checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={!!item.hasBill}
+                                onChange={(e) => handleEditSettlementItemChange(index, 'hasBill', e.target.checked)}
+                              />
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                              </svg>
+                              Has Bill/Receipt
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="settlement-summary">
+                  <div className="summary-row">
+                    <span>Assigned Amount:</span>
+                    <span>LKR {formatAmount(selectedAssignment.assignedAmount)}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span>Total Spent:</span>
+                    <span>LKR {formatAmount(editSettlementItems.reduce((sum, item) => sum + (parseFloat(item.actualCost) || 0), 0))}</span>
+                  </div>
+                  <div className="summary-row total">
+                    {editSettlementItems.reduce((sum, item) => sum + (parseFloat(item.actualCost) || 0), 0) < selectedAssignment.assignedAmount ? (
+                      <>
+                        <span>Balance to Return:</span>
+                        <span className="balance-positive">
+                          LKR {formatAmount(selectedAssignment.assignedAmount - editSettlementItems.reduce((sum, item) => sum + (parseFloat(item.actualCost) || 0), 0))}
+                        </span>
+                      </>
+                    ) : editSettlementItems.reduce((sum, item) => sum + (parseFloat(item.actualCost) || 0), 0) > selectedAssignment.assignedAmount ? (
+                      <>
+                        <span>Over Amount:</span>
+                        <span className="balance-negative">
+                          LKR {formatAmount(editSettlementItems.reduce((sum, item) => sum + (parseFloat(item.actualCost) || 0), 0) - selectedAssignment.assignedAmount)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Exact Match:</span>
+                        <span>LKR 0.00</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditSettlementModal(false);
+                      setEditSettlementItems([]);
+                      setSelectedAssignment(null);
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={saveAllSettlementChanges} 
+                    className="btn btn-success"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '6px'}}>
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Save All Changes
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@
 
 .transporters-page .page-header {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
   margin-bottom: 2rem;

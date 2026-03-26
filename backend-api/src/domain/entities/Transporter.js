@@ -49,10 +49,14 @@ class Transporter {
 
     if (!this.name || this.name.trim().length === 0) {
       errors.push('Transporter name is required');
+    } else if (!/^[a-zA-Z\s-]+$/.test(this.name.trim())) {
+      errors.push('Transporter name can only contain letters, spaces, and hyphens (-)');
     }
 
     if (!this.mainPhone || this.mainPhone.trim().length === 0) {
       errors.push('Main phone number is required');
+    } else if (!/^\d{10}$/.test(this.mainPhone.replace(/\s/g, ''))) {
+      errors.push('Main phone number must be exactly 10 digits');
     }
 
     if (!this.email || !this.isValidEmail(this.email)) {

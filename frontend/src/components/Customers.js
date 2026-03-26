@@ -169,6 +169,19 @@ function Customers() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Please enter a valid email address';
     }
+
+    // Credit period validation - numeric only, range 1-365
+    const creditPeriodValue = String(formData.creditPeriodDays ?? '').trim();
+    if (!creditPeriodValue) {
+      errors.creditPeriodDays = 'Credit period is required';
+    } else if (!/^\d+$/.test(creditPeriodValue)) {
+      errors.creditPeriodDays = 'Credit period must contain numbers only';
+    } else {
+      const creditPeriodDays = parseInt(creditPeriodValue, 10);
+      if (Number.isNaN(creditPeriodDays) || creditPeriodDays < 1 || creditPeriodDays > 365) {
+        errors.creditPeriodDays = 'Credit period must be between 1 and 365 days';
+      }
+    }
     
     // Address validation
     if (!formData.addressNumber.trim()) {
@@ -428,6 +441,18 @@ function Customers() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (name === 'creditPeriodDays') {
+      const digitsOnly = value.replace(/\D/g, '');
+      const normalizedValue = digitsOnly === '' ? '' : String(Math.min(parseInt(digitsOnly, 10), 365));
+
+      setFormData({ ...formData, creditPeriodDays: normalizedValue });
+
+      if (formErrors.creditPeriodDays) {
+        setFormErrors({ ...formErrors, creditPeriodDays: '' });
+      }
+      return;
+    }
     
     if (type === 'checkbox') {
       setFormData({ ...formData, [name]: checked });
@@ -466,6 +491,39 @@ function Customers() {
     }
     e.preventDefault();
     return false;
+  };
+
+  const validateCreditPeriodInput = (e) => {
+    const value = e.target.value;
+    if (value === '' || /^\d*$/.test(value)) {
+      return true;
+    }
+    e.preventDefault();
+    return false;
+  };
+
+  const handleCreditPeriodKeyDown = (e) => {
+    const allowedControlKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (allowedControlKeys.includes(e.key)) {
+      return;
+    }
+
+    if (!/^\d$/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleCreditPeriodBeforeInput = (e) => {
+    if (e.data && !/^\d+$/.test(e.data)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleCreditPeriodPaste = (e) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (!/^\d+$/.test(pastedText.trim())) {
+      e.preventDefault();
+    }
   };
 
   const handleContactPersonChange = (index, field, value) => {
@@ -802,15 +860,24 @@ function Customers() {
                   <div className="form-group">
                     <label>Credit Period (Days) <span className="required">*</span></label>
                     <input 
-                      type="number" 
+                      type="text" 
                       name="creditPeriodDays" 
                       value={formData.creditPeriodDays} 
                       onChange={handleChange}
+                      onKeyPress={validateCreditPeriodInput}
+                      onKeyDown={handleCreditPeriodKeyDown}
+                      onBeforeInput={handleCreditPeriodBeforeInput}
+                      onPaste={handleCreditPeriodPaste}
                       min="1"
                       max="365"
+                      step="1"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      className={formErrors.creditPeriodDays ? 'error' : ''}
                       placeholder="30"
                       required 
                     />
+                    {formErrors.creditPeriodDays && <span className="error-message">{formErrors.creditPeriodDays}</span>}
                     <small className="help-text">Number of days before invoice becomes overdue</small>
                   </div>
 
