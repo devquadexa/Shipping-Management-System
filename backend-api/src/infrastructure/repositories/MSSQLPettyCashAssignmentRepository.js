@@ -415,6 +415,25 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
     }
   }
 
+  // On approval: set final status only — amount stays for display purposes
+  async updateStatusAndClearAmount(assignmentId, status, settlementType) {
+    try {
+      const pool = await this.getConnection();
+      await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
+        .input('status', this.sql.NVarChar, status)
+        .query(`
+          UPDATE PettyCashAssignments
+          SET status = @status
+          WHERE assignmentId = @assignmentId
+        `);
+      return await this.getById(assignmentId);
+    } catch (error) {
+      console.error('Error updating assignment status:', error);
+      throw error;
+    }
+  }
+
   async returnBalance(assignmentId, returnData) {
     try {
       const pool = await this.getConnection();

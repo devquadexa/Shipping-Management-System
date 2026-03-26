@@ -30,13 +30,20 @@ class ApproveCashBalanceSettlement {
     });
 
     // Update related assignment statuses after management approval
-    // Clerk-facing status should clearly show both settlement and decision state.
     if (settlement.relatedAssignments && settlement.relatedAssignments.length > 0) {
-      const finalStatus = 'Settled/Approved';
+      // Set final status based on settlement type so the UI knows what was resolved
+      const finalStatus = settlement.settlementType === 'BALANCE_RETURN'
+        ? 'Balance Returned'
+        : 'Overdue Collected';
 
       for (const assignmentId of settlement.relatedAssignments) {
         try {
-          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, finalStatus);
+          // Update status AND zero out the resolved amount
+          await this.pettyCashAssignmentRepository.updateStatusAndClearAmount(
+            assignmentId,
+            finalStatus,
+            settlement.settlementType
+          );
         } catch (error) {
           console.error(`Failed to update assignment ${assignmentId} status:`, error);
         }
