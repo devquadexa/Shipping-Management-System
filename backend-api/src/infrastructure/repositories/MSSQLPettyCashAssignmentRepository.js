@@ -415,6 +415,24 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
     }
   }
 
+  // Close all assignments for a job after invoice is generated
+  async closeAllByJob(jobId) {
+    try {
+      const pool = await this.getConnection();
+      await pool.request()
+        .input('jobId', this.sql.VarChar, jobId)
+        .query(`
+          UPDATE PettyCashAssignments
+          SET status = 'Closed'
+          WHERE jobId = @jobId
+            AND status NOT IN ('Closed')
+        `);
+    } catch (error) {
+      console.error('Error closing petty cash assignments for job:', error);
+      throw error;
+    }
+  }
+
   // On approval: set final status only — amount stays for display purposes
   async updateStatusAndClearAmount(assignmentId, status, settlementType) {
     try {

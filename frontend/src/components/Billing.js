@@ -182,50 +182,54 @@ function Billing() {
       }
       
       // 3. Smart UI Logic: Only show entry form if no pay items exist in the job
-      if (allPayItems.length > 0) {
+      const hasExistingPayItems = job.payItems && job.payItems.length > 0;
+
+      if (hasExistingPayItems) {
+        // Job has saved pay items — merge any office pay items not already saved
+        let mergedPayItems = [...job.payItems];
+        const officeItemsFromApi = allPayItems.filter(item => item.isOfficePayItem);
+        officeItemsFromApi.forEach(opi => {
+          const alreadySaved = mergedPayItems.some(
+            p => p.source === 'Office Payment' && p.description === opi.name
+          );
+          if (!alreadySaved) {
+            mergedPayItems.push({
+              description: opi.name,
+              amount: parseFloat(opi.actualCost),
+              actualCost: parseFloat(opi.actualCost),
+              billingAmount: parseFloat(opi.billingAmount || opi.actualCost || 0),
+              paidBy: opi.paidByName || opi.paidBy || 'Office',
+              source: 'Office Payment',
+              officePayItemId: opi.officePayItemId
+            });
+          }
+        });
+        setSelectedJob({ ...job, payItems: mergedPayItems });
+        setShowPayItemsRow(false);
+        setMessage(`📋 Job has ${mergedPayItems.length} pay items. Use "+ Add More Items" to add additional items.`);
+        setTimeout(() => setMessage(''), 5000);
+      } else if (allPayItems.length > 0) {
         setPayItems(allPayItems);
-        
-        // SMART UI: Only show entry form if the job doesn't have saved pay items
-        // If job already has pay items, show only the review table
-        const hasExistingPayItems = job.payItems && job.payItems.length > 0;
-        setShowPayItemsRow(!hasExistingPayItems);
+        setShowPayItemsRow(true);
         
         const officeItemsCount = allPayItems.filter(item => item.isOfficePayItem).length;
         const pettyCashItemsCount = allPayItems.filter(item => item.isPettyCashItem).length;
-        
-        let message;
-        if (hasExistingPayItems) {
-          message = `📋 Job has ${job.payItems.length} saved pay items. Use "+ Add More Items" to add additional items.`;
-        } else {
-          message = `✅ Loaded ${allPayItems.length} items: `;
-          if (officeItemsCount > 0) message += `${officeItemsCount} office payments`;
-          if (pettyCashItemsCount > 0) {
-            if (officeItemsCount > 0) message += `, `;
-            message += `${pettyCashItemsCount} petty cash items`;
-          }
-          message += '. Please review billing amounts.';
+        let message = `✅ Loaded ${allPayItems.length} items: `;
+        if (officeItemsCount > 0) message += `${officeItemsCount} office payments`;
+        if (pettyCashItemsCount > 0) {
+          if (officeItemsCount > 0) message += `, `;
+          message += `${pettyCashItemsCount} petty cash items`;
         }
-        
+        message += '. Please review billing amounts.';
         setMessage(message);
         setTimeout(() => setMessage(''), 5000);
       } else {
-        // No items found from office/petty cash, check if job has existing pay items
-        const hasExistingPayItems = job.payItems && job.payItems.length > 0;
-        
-        if (hasExistingPayItems) {
-          // Job has existing pay items, don't show entry form
-          setShowPayItemsRow(false);
-          setMessage(`📋 Job has ${job.payItems.length} saved pay items. Use "+ Add More Items" to add additional items.`);
-          setTimeout(() => setMessage(''), 5000);
+        // No existing pay items, no office/petty cash items — show entry form or load templates
+        if (job?.pettyCashStatus !== 'Settled') {
+          setMessage('Petty cash must be settled before generating invoice');
+          setTimeout(() => setMessage(''), 3000);
         } else {
-          // No existing pay items, show entry form or load templates
-          if (job?.pettyCashStatus !== 'Settled') {
-            setMessage('Petty cash must be settled before generating invoice');
-            setTimeout(() => setMessage(''), 3000);
-          } else {
-            // Load templates for first-time entry
-            loadPayItemTemplates(job);
-          }
+          loadPayItemTemplates(job);
         }
         setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, paidBy: '', paidByName: '' }]);
       }
@@ -407,16 +411,40 @@ function Billing() {
       const updatedJobs = await jobService.getAll();
       const updatedJob = updatedJobs.find(j => j.jobId === selectedJob.jobId);
       
-      console.log('Updated selected job with pay items:', updatedJob);
-      console.log('Updated job payItems:', updatedJob?.payItems);
-      console.log('Updated job payItems length:', updatedJob?.payItems?.length);
-      
       if (updatedJob) {
-        setSelectedJob(updatedJob);
-        console.log('✓ Selected job updated successfully');
+        // Re-fetch office pay items and merge into the review table
+        let mergedPayItems = [...(updatedJob.payItems || [])];
+        try {
+          const officeRes = await fetch(`${API_BASE}/api/office-pay-items/job/${selectedJob.jobId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (officeRes.ok) {
+            const freshOfficeItems = await officeRes.json();
+            // Add office pay items that are not already in the saved payItems
+            freshOfficeItems.forEach(opi => {
+              const alreadySaved = mergedPayItems.some(
+                p => p.source === 'Office Payment' && p.description === opi.description
+              );
+              if (!alreadySaved) {
+                mergedPayItems.push({
+                  description: opi.description,
+                  amount: parseFloat(opi.actualCost),
+                  actualCost: parseFloat(opi.actualCost),
+                  billingAmount: parseFloat(opi.billingAmount || opi.actualCost),
+                  paidBy: opi.paidByName || opi.paidBy || 'Office',
+                  source: 'Office Payment',
+                  officePayItemId: opi.officePayItemId
+                });
+              }
+            });
+          }
+        } catch (err) {
+          console.error('Error re-fetching office pay items after save:', err);
+        }
+        setSelectedJob({ ...updatedJob, payItems: mergedPayItems });
+        console.log('✓ Selected job updated with merged pay items:', mergedPayItems.length);
       } else {
         console.error('❌ Could not find updated job');
-        // Fallback: just update the current selectedJob with new pay items
         setSelectedJob({
           ...selectedJob,
           payItems: allPayItemsData
@@ -633,7 +661,7 @@ function Billing() {
       missingFields.push('CUSDEC Number');
     }
     if (!selectedJob.lcNumber || (typeof selectedJob.lcNumber === 'string' && selectedJob.lcNumber.trim() === '')) {
-      missingFields.push('LC Number');
+      missingFields.push('TT / LC / DA / DP / NFE Number');
     }
     // Container Number is only required for non-vehicle shipments
     if (
@@ -703,6 +731,24 @@ function Billing() {
       
       await billingService.createBill(billData);
       
+      // Update petty cash assignment status to Closed via direct API call (safety net)
+      try {
+        const assignmentsRes = await fetch(`${API_BASE}/api/petty-cash-assignments/job/${selectedJob.jobId}/all`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (assignmentsRes.ok) {
+          const jobAssignments = await assignmentsRes.json();
+          for (const a of jobAssignments) {
+            await fetch(`${API_BASE}/api/petty-cash-assignments/${a.assignmentId}/close`, {
+              method: 'PATCH',
+              headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Could not close petty cash assignments from frontend:', err.message);
+      }
+
       setMessage('Invoice generated successfully!');
       setSelectedJob(null);
       fetchBills();
@@ -1041,7 +1087,8 @@ function Billing() {
           }
           .detail-label {
             font-weight: bold;
-            width: 145px;
+            width: 185px;
+            min-width: 185px;
             min-width: 145px;
             white-space: nowrap;
             word-break: keep-all;
@@ -1176,7 +1223,7 @@ function Billing() {
             <div class="detail-value">: ${job.exporter || '-'}</div>
           </div>
           <div class="detail-row">
-            <div class="detail-label">LC No</div>
+            <div class="detail-label">TT / LC / DA / DP / NFE No</div>
             <div class="detail-value">: ${job.lcNumber || '-'}</div>
           </div>
           <div class="detail-row">
@@ -1341,7 +1388,7 @@ function Billing() {
                     <span className="info-value">{selectedJob.exporter || '-'}</span>
                   </div>
                   <div className="info-row">
-                    <span className="info-label">LC Number: {(!selectedJob.lcNumber || selectedJob.lcNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
+                    <span className="info-label">TT / LC / DA / DP / NFE Number: {(!selectedJob.lcNumber || selectedJob.lcNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
                     <span className={`info-value ${(!selectedJob.lcNumber || selectedJob.lcNumber.trim() === '') ? 'missing-value' : ''}`}>
                       {selectedJob.lcNumber || '-'}
                     </span>
