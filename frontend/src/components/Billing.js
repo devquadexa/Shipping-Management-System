@@ -1678,7 +1678,7 @@ function Billing() {
                         </div>
                         {selectedJob.advancePayment > 0 && (
                           <div className="table-row advance-payment-row">
-                            <div className="table-cell description-cell advance-payment-label">Less: Advance Payment</div>
+                            <div className="table-cell description-cell advance-payment-label">Advance Payment</div>
                             <div className="table-cell amount-cell"></div>
                             <div className="table-cell amount-cell advance-payment-amount">
                               <strong className="advance-deduction">({formatAmount(calculateTotals().advancePayment)})</strong>

@@ -296,11 +296,58 @@ function PettyCash() {
     return availableUsers;
   };
 
+  const sanitizeCurrencyInput = (value) => {
+    const cleaned = String(value || '').replace(/[^\d.]/g, '');
+    const [integerPart, ...decimalParts] = cleaned.split('.');
+    const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '');
+    const decimalPart = decimalParts.join('').slice(0, 2);
+
+    if (cleaned.includes('.')) {
+      return `${normalizedInteger || '0'}.${decimalPart}`;
+    }
+
+    return normalizedInteger;
+  };
+
+  const handleAssignedAmountChange = (e) => {
+    const sanitizedAmount = sanitizeCurrencyInput(e.target.value);
+    setAssignFormData({ ...assignFormData, assignedAmount: sanitizedAmount });
+  };
+
+  const handleAssignedAmountKeyDown = (e) => {
+    const allowedControlKeys = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (allowedControlKeys.includes(e.key)) {
+      return;
+    }
+
+    const isDigit = /^\d$/.test(e.key);
+    const isDecimalPoint = e.key === '.';
+    const hasDecimalPoint = String(assignFormData.assignedAmount || '').includes('.');
+
+    if (!isDigit && !(isDecimalPoint && !hasDecimalPoint)) {
+      e.preventDefault();
+    }
+  };
+
   const handleAssignSubmit = async (e) => {
     e.preventDefault();
     
     if (!assignFormData.jobId || !assignFormData.assignedTo || !assignFormData.assignedAmount) {
       setMessage('Please fill all required fields');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    const assignedAmountText = String(assignFormData.assignedAmount).trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(assignedAmountText)) {
+      setMessage('Assigned amount must be a valid number');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    const assignedAmount = parseFloat(assignedAmountText);
+    if (Number.isNaN(assignedAmount) || assignedAmount <= 0) {
+      setMessage('Assigned amount must be greater than 0');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -314,7 +361,7 @@ function PettyCash() {
         },
         body: JSON.stringify({
           ...assignFormData,
-          assignedAmount: parseFloat(assignFormData.assignedAmount)
+          assignedAmount
         })
       });
 
@@ -1563,6 +1610,85 @@ function PettyCash() {
                                     </div>
                                   </div>
                                 </div>
+                    <tr key={assignment.assignmentId}>
+                      <td data-label="Assignment ID">
+                        <strong className="assignment-id">#{assignment.assignmentId}</strong>
+                      </td>
+                      <td data-label="Job ID">{assignment.jobId}</td>
+                      <td data-label="Customer">{job ? getCustomerName(job.customerId) : '-'}</td>
+                      {user?.role !== 'Waff Clerk' && (
+                        <td data-label="Assigned To">{assignment.assignedToName || assignment.assignedTo}</td>
+                      )}
+                      <td data-label="Assigned Amount">
+                        <strong>LKR {formatAmount(assignment.assignedAmount)}</strong>
+                      </td>
+                      <td data-label="Actual Spent">
+                        {assignment.actualSpent ? `LKR ${formatAmount(assignment.actualSpent)}` : '-'}
+                      </td>
+                      <td data-label="Balance/Over">
+                        {(assignment.status === 'Settled/Approved' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') ? (
+                          <>
+                            {assignment.balanceAmount > 0 && (
+                              <span className="status-badge status-returned">
+                                ↩ Balance Returned
+                              </span>
+                            )}
+                            {assignment.overAmount > 0 && (
+                              <span className="status-badge status-paid">
+                                ✓ Overdue Collected
+                              </span>
+                            )}
+                          </>
+                        ) : assignment.status === 'Settled/Rejected' ? (
+                          <span className="status-badge status-rejected">
+                            ✗ Rejected
+                          </span>
+                        ) : (
+                          <>
+                            {assignment.balanceAmount > 0 && (
+                              <span className="balance-positive">
+                                Balance: LKR {formatAmount(assignment.balanceAmount)}
+                              </span>
+                            )}
+                            {assignment.overAmount > 0 && (
+                              <span className="balance-negative">
+                                Over: LKR {formatAmount(assignment.overAmount)}
+                              </span>
+                            )}
+                            {!assignment.balanceAmount && !assignment.overAmount && '-'}
+                          </>
+                        )}
+                      </td>
+                      <td data-label="Status">
+                        <span className={`status-badge ${getStatusBadgeClass(assignment.status)}`}>
+                          {assignment.status}
+                        </span>
+                      </td>
+                      <td data-label="Assigned Date">
+                        {new Date(assignment.assignedDate).toLocaleDateString()}
+                      </td>
+                      <td data-label="Actions">
+                        <div className="action-buttons">
+                          {assignment.status === 'Assigned' && user?.role === 'Waff Clerk' && (
+                            <button
+                              className="btn-action btn-settle"
+                              onClick={() => openSettleModal(assignment)}
+                            >
+                              Settle
+                            </button>
+                          )}
+                          
+                          {/* Settlement buttons for Waff Clerks with balance/over amounts */}
+                          {(assignment.status === 'Settled' || assignment.status === 'Settled/Rejected') && user?.role === 'Waff Clerk' && (
+                            <>
+                              {assignment.balanceAmount > 0 && (
+                                <button
+                                  className="btn-action btn-return-balance"
+                                  onClick={() => openSettlementModal(assignment, 'BALANCE_RETURN')}
+                                  title="Return balance cash to management"
+                                >
+                                  Return Balance
+                                </button>
                               )}
 
                               {(!assignment.settlementItems || assignment.settlementItems.length === 0) && (
@@ -1639,10 +1765,17 @@ function PettyCash() {
               <div className="form-group">
                 <label>Amount (LKR) <span className="required">*</span></label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={assignFormData.assignedAmount}
-                  onChange={(e) => setAssignFormData({ ...assignFormData, assignedAmount: e.target.value })}
+                  onChange={handleAssignedAmountChange}
+                  onKeyDown={handleAssignedAmountKeyDown}
+                  onPaste={(e) => {
+                    const pastedText = e.clipboardData.getData('text');
+                    if (!/^\d+(\.\d{1,2})?$/.test(pastedText.trim())) {
+                      e.preventDefault();
+                    }
+                  }}
                   placeholder="0.00"
                   required
                 />
