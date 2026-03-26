@@ -72,5 +72,12 @@ module.exports = (container) => {
     (req, res) => controller.settle(req, res)
   );
 
+  // Close assignment after invoice generation
+  router.patch('/:id/close',
+    auth,
+    checkRole('Admin', 'Super Admin', 'Manager'),
+    (req, res) => controller.closeAssignment(req, res)
+  );
+
   return router;
 };

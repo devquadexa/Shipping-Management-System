@@ -4,10 +4,11 @@
 const Bill = require('../../../domain/entities/Bill');
 
 class CreateBill {
-  constructor(billRepository, jobRepository, customerRepository) {
+  constructor(billRepository, jobRepository, customerRepository, pettyCashAssignmentRepository) {
     this.billRepository = billRepository;
     this.jobRepository = jobRepository;
     this.customerRepository = customerRepository;
+    this.pettyCashAssignmentRepository = pettyCashAssignmentRepository;
   }
 
   async execute(billData) {
@@ -111,6 +112,15 @@ class CreateBill {
     console.log('CreateBill - Updating job status to Pending Payment');
     await this.jobRepository.updateStatus(billData.jobId, 'Pending Payment');
     console.log('CreateBill - Job status updated successfully');
+
+    // Close all petty cash assignments for this job
+    try {
+      await this.pettyCashAssignmentRepository.closeAllByJob(billData.jobId);
+      console.log('CreateBill - Petty cash assignments closed for job:', billData.jobId);
+    } catch (err) {
+      console.error('CreateBill - Failed to close petty cash assignments:', err.message);
+      // Non-fatal — bill is already saved
+    }
     
     return savedBill;
   }

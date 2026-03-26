@@ -173,7 +173,7 @@ class Container {
     this.dependencies.replacePayItems = new ReplacePayItems(jobRepository);
     
     // Billing use cases
-    this.dependencies.createBill = new CreateBill(billRepository, jobRepository, customerRepository);
+    this.dependencies.createBill = new CreateBill(billRepository, jobRepository, customerRepository, pettyCashAssignmentRepository);
     this.dependencies.getAllBills = new GetAllBills(billRepository);
     this.dependencies.getBillById = new GetBillById(billRepository);
     this.dependencies.markBillAsPaid = new MarkBillAsPaid(billRepository);

@@ -120,6 +120,12 @@
   border: 1px solid #fbcfe8;
 }
 
+.status-closed {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
 .balance-positive {
   color: #059669;
   font-weight: 600;
@@ -2238,6 +2244,30 @@ input[type="number"] {
   gap: 8px;
   position: relative;
   flex-wrap: nowrap;
+}
+
+/* Settle Primary Button */
+.btn-settle-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 20px;
+  background: #101036;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.btn-settle-primary:hover {
+  background: #1a1a5e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(16, 16, 54, 0.25);
 }
 
 /* Eye Icon View Button */

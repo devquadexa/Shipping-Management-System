@@ -760,8 +760,8 @@ function Jobs() {
                   )}
 
                   <div className="form-group">
-                    <label>LC Number</label>
-                    <input type="text" name="lcNumber" value={formData.lcNumber} onChange={handleChange} placeholder="Letter of Credit Number" />
+                    <label>TT / LC / DA / DP / NFE Number</label>
+                    <input type="text" name="lcNumber" value={formData.lcNumber} onChange={handleChange} placeholder="TT / LC / DA / DP / NFE Number" />
                   </div>
                   
                   {/* Hide Container Number for Vehicle shipments */}

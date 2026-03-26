@@ -1514,17 +1514,17 @@ input[type="number"] {
 }
 
 .advance-payment-row {
-  background: rgba(239, 68, 68, 0.05) !important;
+  background: #f9fafb !important;
 }
 
 .advance-payment-label {
-  color: #dc2626;
+  color: #374151;
   font-weight: 600;
   padding-left: 1rem !important;
 }
 
 .advance-deduction {
-  color: #dc2626 !important;
+  color: #374151 !important;
   font-weight: 700;
 }
 
