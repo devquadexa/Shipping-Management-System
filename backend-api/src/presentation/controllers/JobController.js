@@ -26,6 +26,7 @@ class JobController {
         customerId: req.body.customerId,
         blNumber: req.body.blNumber || null,
         cusdecNumber: req.body.cusdecNumber || null,
+        cusdecDate: req.body.cusdecDate || null,
         openDate: req.body.openDate || null,
         shipmentCategory: req.body.shipmentCategory,
         chassisNumber: req.body.chassisNumber || null,
@@ -420,6 +421,7 @@ class JobController {
       const jobData = {
         blNumber: req.body.blNumber,
         cusdecNumber: req.body.cusdecNumber,
+        cusdecDate: req.body.cusdecDate,
         openDate: req.body.openDate,
         shipmentCategory: req.body.shipmentCategory,
         chassisNumber: req.body.chassisNumber,

@@ -23,6 +23,7 @@ function Jobs() {
     customerId: '',
     blNumber: '',
     cusdecNumber: '',
+    cusdecDate: '',
     openDate: '',
     shipmentCategory: '',
     chassisNumber: '',
@@ -174,6 +175,7 @@ function Jobs() {
         customerId: '', 
         blNumber: '', 
         cusdecNumber: '', 
+        cusdecDate: '',
         openDate: '', 
         shipmentCategory: '',
         chassisNumber: '',
@@ -216,8 +218,54 @@ function Jobs() {
     return `${selectedUsers.length} users selected`;
   };
 
+  const normalizeCusdecNumber = (value) => {
+    const rawValue = (value || '').trim();
+    if (!rawValue) return '';
+
+    const cleaned = rawValue.replace(/^i\s*-\s*/i, '').trim();
+    if (!cleaned) return '';
+
+    return `I - ${cleaned}`;
+  };
+
+  const formatDateDDMMYYYY = (dateValue) => {
+    if (!dateValue) return '';
+
+    const normalized = String(dateValue).split('T')[0];
+    const dateParts = normalized.split('-');
+    if (dateParts.length === 3) {
+      const [year, month, day] = dateParts;
+      return `${day}/${month}/${year}`;
+    }
+
+    const parsed = new Date(dateValue);
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleDateString('en-GB');
+  };
+
+  const formatCusdecNumberForDisplay = (value) => {
+    const rawValue = (value || '').trim();
+    if (!rawValue) return '';
+
+    const cleaned = rawValue.replace(/^i\s*-\s*/i, '').trim();
+    return cleaned ? `I-${cleaned}` : '';
+  };
+
+  const formatCusdecWithDate = (cusdecNumber, cusdecDate) => {
+    const formattedNumber = formatCusdecNumberForDisplay(cusdecNumber);
+    if (!formattedNumber) return '-';
+
+    const formattedDate = formatDateDDMMYYYY(cusdecDate);
+    return formattedDate ? `${formattedNumber} of ${formattedDate}` : formattedNumber;
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'cusdecNumber') {
+      setFormData((prev) => ({ ...prev, cusdecNumber: normalizeCusdecNumber(value) }));
+      return;
+    }
+
     setFormData(prev => {
       if (name === 'shipmentCategory') {
         const isVehicleCategory = value === 'Vehicle - Personal' || value === 'Vehicle - Company';
@@ -278,7 +326,8 @@ function Jobs() {
     setFormData({
       customerId: job.customerId,
       blNumber: job.blNumber || '',
-      cusdecNumber: job.cusdecNumber || '',
+      cusdecNumber: normalizeCusdecNumber(job.cusdecNumber || ''),
+      cusdecDate: job.cusdecDate ? job.cusdecDate.split('T')[0] : '',
       openDate: job.openDate ? job.openDate.split('T')[0] : '',
       shipmentCategory: job.shipmentCategory || '',
       chassisNumber: job.chassisNumber || '',
@@ -323,6 +372,7 @@ function Jobs() {
         customerId: '',
         blNumber: '',
         cusdecNumber: '',
+        cusdecDate: '',
         openDate: '',
         shipmentCategory: '',
         chassisNumber: '',
@@ -575,7 +625,7 @@ function Jobs() {
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">CUSDEC Number:</span>
-                              <span className="detail-value">{job.cusdecNumber || '-'}</span>
+                              <span className="detail-value">{formatCusdecWithDate(job.cusdecNumber, job.cusdecDate)}</span>
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">Open Date:</span>
@@ -644,7 +694,7 @@ function Jobs() {
             <form onSubmit={isEditing ? handleUpdate : handleSubmit} className="job-form">
               <div className="form-section">
                 <h3 className="section-heading">Basic Information</h3>
-                <div className="form-row">
+                <div className="form-row basic-info-row">
                   <div className="form-group">
                     <label>Customer <span className="required">*</span></label>
                     <select name="customerId" value={formData.customerId} onChange={handleChange} required disabled={isEditing}>
@@ -712,6 +762,11 @@ function Jobs() {
                       </div>
                     )}
                   </div>
+
+                  <div className="form-group">
+                    <label>Open Date <span className="required">*</span></label>
+                    <input type="date" name="openDate" value={formData.openDate} onChange={handleChange} required />
+                  </div>
                 </div>
               </div>
 
@@ -736,11 +791,6 @@ function Jobs() {
                   </div>
                   
                   <div className="form-group">
-                    <label>Open Date <span className="required">*</span></label>
-                    <input type="date" name="openDate" value={formData.openDate} onChange={handleChange} required />
-                  </div>
-                  
-                  <div className="form-group">
                     <label>BL Number</label>
                     <input type="text" name="blNumber" value={formData.blNumber} onChange={handleChange} placeholder="Bill of Lading Number" />
                   </div>
@@ -748,6 +798,11 @@ function Jobs() {
                   <div className="form-group">
                     <label>CUSDEC Number</label>
                     <input type="text" name="cusdecNumber" value={formData.cusdecNumber} onChange={handleChange} placeholder="Customs Declaration Number" />
+                  </div>
+
+                  <div className="form-group">
+                    <label>CUSDEC Date</label>
+                    <input type="date" name="cusdecDate" value={formData.cusdecDate} onChange={handleChange} />
                   </div>
                 </div>
 

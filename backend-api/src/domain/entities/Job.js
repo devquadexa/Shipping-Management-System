@@ -8,6 +8,7 @@ class Job {
     customerId,
     blNumber = null,
     cusdecNumber = null,
+    cusdecDate = null,
     openDate = null,
     shipmentCategory = null,
     chassisNumber = null,
@@ -35,6 +36,7 @@ class Job {
     this.customerId = customerId;
     this.blNumber = blNumber;
     this.cusdecNumber = cusdecNumber;
+    this.cusdecDate = cusdecDate;
     this.openDate = openDate;
     this.shipmentCategory = shipmentCategory;
     this.chassisNumber = chassisNumber;
@@ -192,6 +194,7 @@ class Job {
       customerId: this.customerId,
       blNumber: this.blNumber,
       cusdecNumber: this.cusdecNumber,
+      cusdecDate: this.cusdecDate,
       openDate: this.openDate,
       shipmentCategory: this.shipmentCategory,
       chassisNumber: this.chassisNumber,
