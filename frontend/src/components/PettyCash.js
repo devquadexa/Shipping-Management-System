@@ -10,6 +10,7 @@ function PettyCash() {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [invoicedJobIds, setInvoicedJobIds] = useState(new Set()); // Track jobs with invoices
   const [users, setUsers] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [message, setMessage] = useState('');
@@ -66,6 +67,7 @@ function PettyCash() {
     fetchAssignments();
     fetchJobs();
     fetchCustomers();
+    fetchInvoicedJobs();
     if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') {
       fetchUsers();
       fetchOverallBalance();
@@ -87,6 +89,7 @@ function PettyCash() {
 
   const fetchAssignments = async () => {
     try {
+      // Use regular endpoint - the component already has grouping logic
       const endpoint = user?.role === 'Waff Clerk' 
         ? `${API_BASE}/api/petty-cash-assignments/my`
         : `${API_BASE}/api/petty-cash-assignments`;
@@ -105,6 +108,9 @@ function PettyCash() {
       
       const data = await response.json();
       console.log('Fetched assignments:', data);
+      if (Array.isArray(data)) {
+        data.forEach(a => console.log(`  >> Assignment ${a.assignmentId}: status=${a.status}, groupId=${a.groupId}`));
+      }
       
       // Ensure data is an array
       if (Array.isArray(data)) {
@@ -214,22 +220,36 @@ function PettyCash() {
   
   // Check if invoice has been generated for a job
   const checkInvoiceGenerated = async (jobId) => {
+    // First check the cached set
+    if (invoicedJobIds.has(jobId)) return true;
     try {
       const response = await fetch(`${API_BASE}/api/billing`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
-      
       if (response.ok) {
         const bills = await response.json();
         const jobBill = bills.find(bill => bill.jobId === jobId);
-        return !!jobBill; // Returns true if invoice exists
+        return !!jobBill;
       }
       return false;
     } catch (error) {
       console.error('Error checking invoice:', error);
       return false;
+    }
+  };
+
+  // Fetch all invoiced job IDs upfront so UI can hide edit buttons without async calls
+  const fetchInvoicedJobs = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/billing`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.ok) {
+        const bills = await response.json();
+        setInvoicedJobIds(new Set(bills.map(b => b.jobId)));
+      }
+    } catch (error) {
+      console.error('Error fetching invoiced jobs:', error);
     }
   };
 
@@ -892,7 +912,6 @@ function PettyCash() {
   const handleSettleSubmit = async (e) => {
     e.preventDefault();
     
-    // Only submit items that have both name and cost filled in
     const validItems = settlementItems.filter(item => 
       item.itemName && item.actualCost && parseFloat(item.actualCost) > 0 && !item.alreadyPaid
     );
@@ -903,27 +922,43 @@ function PettyCash() {
       return;
     }
 
+    const itemsPayload = validItems.map(item => ({
+      itemName: item.itemName,
+      actualCost: parseFloat(item.actualCost),
+      isCustomItem: item.isCustomItem,
+      hasBill: item.hasBill ? true : false,
+      paidBy: item.paidBy
+    }));
+
     try {
-      console.log('Submitting settlement items with hasBill:', validItems.map(i => ({ name: i.itemName, hasBill: i.hasBill })));
-      const response = await fetch(
-        `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settle`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({
-            items: validItems.map(item => ({
-              itemName: item.itemName,
-              actualCost: parseFloat(item.actualCost),
-              isCustomItem: item.isCustomItem,
-              hasBill: item.hasBill ? true : false
-            }))
-            // Removed partialSettlement flag - each assignment should be fully settled
-          })
-        }
-      );
+      let url, body;
+
+      if (selectedAssignment.isGroupedSettlement && selectedAssignment.groupAssignments?.length > 1) {
+        // Use the group settle endpoint — settles ALL assignments in the group at once
+        const groupId = selectedAssignment.groupAssignments[0].groupId
+          || `${selectedAssignment.groupAssignments[0].jobId}_${selectedAssignment.groupAssignments[0].assignedTo}`;
+        url = `${API_BASE}/api/petty-cash-assignments/group/${encodeURIComponent(groupId)}/settle`;
+        body = JSON.stringify({ items: itemsPayload });
+        console.log('GROUP SETTLE - URL:', url, 'groupId:', groupId);
+      } else {
+        // Single assignment settle
+        url = `${API_BASE}/api/petty-cash-assignments/${selectedAssignment.assignmentId}/settle`;
+        body = JSON.stringify({ items: itemsPayload });
+        console.log('SINGLE SETTLE - URL:', url);
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body
+      });
+
+      console.log('Settle response status:', response.status);
+      const responseData = await response.clone().json().catch(() => ({}));
+      console.log('Settle response body:', responseData);
 
       if (response.ok) {
         setMessage('Petty cash settled successfully!');
@@ -978,7 +1013,7 @@ function PettyCash() {
           settlementType: settlementFormData.settlementType,
           amount: parseFloat(settlementFormData.amount),
           notes: settlementFormData.notes,
-          relatedAssignments: [selectedAssignment.assignmentId]
+          relatedAssignments: selectedAssignment.groupAssignmentIds || [selectedAssignment.assignmentId]
         })
       });
 
@@ -1182,6 +1217,188 @@ function PettyCash() {
     }
   };
 
+  // Renders the expanded details row for a single assignment
+  const renderExpandedDetails = (assignment) => (
+    <tr className="expanded-details-row" key={`exp-${assignment.assignmentId}`}>
+      <td colSpan="8">
+        <div className="expanded-content">
+          {/* Financial Summary Strip */}
+          <div className="financial-summary-strip">
+            <div className="fin-stat-item">
+              <span className="fin-stat-label">Assigned Amount</span>
+              <span className="fin-stat-value">LKR {formatAmount(assignment.assignedAmount)}</span>
+            </div>
+            <div className="fin-stat-divider" />
+            <div className="fin-stat-item">
+              <span className="fin-stat-label">Actual Spent</span>
+              <span className="fin-stat-value">{assignment.actualSpent ? `LKR ${formatAmount(assignment.actualSpent)}` : '—'}</span>
+            </div>
+            {assignment.balanceAmount > 0 && !['Balance Returned', 'Settled/Approved', 'Closed'].includes(assignment.status) && (
+              <>
+                <div className="fin-stat-divider" />
+                <div className="fin-stat-item">
+                  <span className="fin-stat-label">Balance to Return</span>
+                  <span className="fin-stat-value positive">LKR {formatAmount(assignment.balanceAmount)}</span>
+                </div>
+              </>
+            )}
+            {assignment.overAmount > 0 && !['Overdue Collected', 'Settled/Approved', 'Closed'].includes(assignment.status) && (
+              <>
+                <div className="fin-stat-divider" />
+                <div className="fin-stat-item">
+                  <span className="fin-stat-label">Over Amount</span>
+                  <span className="fin-stat-value negative">LKR {formatAmount(assignment.overAmount)}</span>
+                </div>
+              </>
+            )}
+            {(assignment.status === 'Balance Returned' || assignment.status === 'Closed' || (assignment.status === 'Settled/Approved' && assignment.balanceAmount > 0)) && assignment.balanceAmount > 0 && (
+              <>
+                <div className="fin-stat-divider" />
+                <div className="fin-stat-item">
+                  <span className="fin-stat-label">Balance Returned</span>
+                  <span className="fin-stat-value">LKR {formatAmount(assignment.balanceAmount)}</span>
+                </div>
+              </>
+            )}
+            {(assignment.status === 'Overdue Collected' || (assignment.status === 'Settled/Approved' && assignment.overAmount > 0)) && (
+              <>
+                <div className="fin-stat-divider" />
+                <div className="fin-stat-item">
+                  <span className="fin-stat-label">Overdue Collected</span>
+                  <span className="fin-stat-value">LKR {formatAmount(assignment.overAmount)}</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Settlement Items Table */}
+          {assignment.settlementItems && assignment.settlementItems.length > 0 && (
+            <div className="settlement-items-section">
+              <div className="settlement-items-header">
+                <span className="settlement-items-title">Settlement Items</span>
+                <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                  <span className="settlement-items-count">{assignment.settlementItems.length} item{assignment.settlementItems.length !== 1 ? 's' : ''}</span>
+                  {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId) && (
+                    <button className="btn-add-inline-item" onClick={() => {
+                      setInlineAddingRow(assignment.assignmentId);
+                      setInlineNewItem({ itemName: '', actualCost: '', hasBill: false });
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      Add New Pay Item
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="settlement-review-table">
+                {(() => {
+                  const canEditItems = assignment.status === 'Settled' && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId);
+                  return (
+                    <>
+                      <div className={`settlement-table-header ${canEditItems ? 'with-actions' : ''}`}>
+                        <div className="settlement-header-cell settlement-num-col">#</div>
+                        <div className="settlement-header-cell settlement-name-col">Item Name</div>
+                        <div className="settlement-header-cell settlement-type-col">Type</div>
+                        <div className="settlement-header-cell settlement-bill-col">Bill</div>
+                        <div className="settlement-header-cell settlement-amount-col">Actual Cost</div>
+                        {canEditItems && <div className="settlement-header-cell settlement-actions-col">Actions</div>}
+                      </div>
+                      <div className="settlement-table-body">
+                        {assignment.settlementItems.map((item, idx) => {
+                          const isEditing = inlineEditingItem?.assignmentId === assignment.assignmentId && inlineEditingItem?.itemId === item.settlementItemId;
+                          return (
+                            <div key={idx} className={`settlement-table-row ${isEditing ? 'editing-row' : ''} ${canEditItems ? 'with-actions' : ''}`}>
+                              <div className="settlement-table-cell settlement-num-col settlement-num">{idx + 1}</div>
+                              <div className="settlement-table-cell settlement-name-col">
+                                {isEditing ? <input className="inline-edit-field" value={inlineEditName} onChange={e => setInlineEditName(e.target.value)} autoFocus /> : item.itemName}
+                              </div>
+                              <div className="settlement-table-cell settlement-type-col">
+                                <span className={`type-badge ${item.isCustomItem ? 'custom' : 'template'}`}>{item.isCustomItem ? 'Custom' : 'Template'}</span>
+                              </div>
+                              <div className="settlement-table-cell settlement-bill-col">
+                                {item.hasBill ? (
+                                  <span className="bill-badge-small has-bill"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>Bill</span>
+                                ) : (
+                                  <span className="bill-badge-small no-bill">No Bill</span>
+                                )}
+                              </div>
+                              <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
+                                {isEditing ? (
+                                  <input className="inline-edit-field inline-edit-amount" type="number" step="0.01" value={inlineEditCost} onChange={e => setInlineEditCost(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveInlineEdit(assignment.assignmentId); if (e.key === 'Escape') cancelInlineEdit(); }} />
+                                ) : `LKR ${formatAmount(item.actualCost)}`}
+                              </div>
+                              {canEditItems && (
+                                <div className="settlement-table-cell settlement-actions-col">
+                                  {isEditing ? (
+                                    <div className="inline-action-btns">
+                                      <button className="inline-btn-save" onClick={() => saveInlineEdit(assignment.assignmentId)} title="Save"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>
+                                      <button className="inline-btn-cancel" onClick={cancelInlineEdit} title="Cancel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                    </div>
+                                  ) : (
+                                    <div className="inline-action-btns">
+                                      <button className="inline-btn-edit" onClick={async () => {
+                                        const inv = await checkInvoiceGenerated(assignment.jobId);
+                                        if (inv) { setMessage('❌ Invoice already generated'); setTimeout(() => setMessage(''), 3000); return; }
+                                        startInlineEdit(assignment.assignmentId, item);
+                                      }} title="Edit item">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                      </button>
+                                      <button className="inline-btn-delete" onClick={() => deleteInlineItem(assignment.assignmentId, item)} title="Delete item">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {inlineAddingRow === assignment.assignmentId && (
+                          <div className="settlement-table-row new-item-row with-actions">
+                            <div className="settlement-table-cell settlement-num-col settlement-num"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+                            <div className="settlement-table-cell settlement-name-col"><input className="inline-edit-field" placeholder="Item name" value={inlineNewItem.itemName} onChange={e => setInlineNewItem({...inlineNewItem, itemName: e.target.value})} autoFocus /></div>
+                            <div className="settlement-table-cell settlement-type-col"><span className="type-badge custom">Custom</span></div>
+                            <div className="settlement-table-cell settlement-bill-col"><label className="inline-bill-check"><input type="checkbox" checked={inlineNewItem.hasBill} onChange={e => setInlineNewItem({...inlineNewItem, hasBill: e.target.checked})} />Bill</label></div>
+                            <div className="settlement-table-cell settlement-amount-col"><input className="inline-edit-field inline-edit-amount" type="number" step="0.01" placeholder="0.00" value={inlineNewItem.actualCost} onChange={e => setInlineNewItem({...inlineNewItem, actualCost: e.target.value})} onKeyDown={e => { if (e.key === 'Enter') saveInlineNewItem(assignment.assignmentId); if (e.key === 'Escape') { setInlineAddingRow(null); setInlineNewItem({ itemName: '', actualCost: '', hasBill: false }); } }} /></div>
+                            <div className="settlement-table-cell settlement-actions-col">
+                              <div className="inline-action-btns">
+                                <button className="inline-btn-save" onClick={() => saveInlineNewItem(assignment.assignmentId)} title="Save new item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>
+                                <button className="inline-btn-cancel" onClick={() => { setInlineAddingRow(null); setInlineNewItem({ itemName: '', actualCost: '', hasBill: false }); }} title="Cancel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div className={`settlement-table-row settlement-total-row ${assignment.status === 'Settled' && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId) ? 'with-actions' : ''}`}>
+                          <div className="settlement-table-cell settlement-num-col"></div>
+                          <div className="settlement-table-cell settlement-name-col"><strong>Total</strong></div>
+                          <div className="settlement-table-cell settlement-type-col"></div>
+                          <div className="settlement-table-cell settlement-bill-col"></div>
+                          <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
+                            <strong>LKR {formatAmount(assignment.settlementItems.reduce((sum, i) => sum + parseFloat(i.actualCost || 0), 0))}</strong>
+                          </div>
+                          {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId) && <div className="settlement-table-cell settlement-actions-col"></div>}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {(!assignment.settlementItems || assignment.settlementItems.length === 0) && (
+            <div className="no-settlement-items">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <p>No settlement items recorded</p>
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="petty-cash-page">
       <div className="page-header">
@@ -1305,375 +1522,403 @@ function PettyCash() {
                 <tr>
                   <th style={{width: '50px'}}></th>
                   <th>Assignment ID</th>
-                  <th>Job ID</th>
+                  <th>Job ID / CUSDEC Number</th>
                   <th style={{minWidth: '220px'}}>Customer</th>
+                  <th>Assigned To</th>
                   <th>Status</th>
+                  <th>Total Assigned</th>
                   <th>Assigned Date</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {assignments.map(assignment => {
-                  const job = jobs.find(j => j.jobId === assignment.jobId);
-                  const isExpanded = expandedRows.has(assignment.assignmentId);
+                {(() => {
+                  // Group assignments by groupId
+                  console.log('=== GROUPING DEBUG ===');
+                  console.log('Total assignments:', assignments.length);
+                  console.log('Assignments data:', assignments);
                   
-                  return (
-                    <React.Fragment key={assignment.assignmentId}>
-                      {/* Main Row */}
-                      <tr className={`assignment-row ${isExpanded ? 'expanded' : ''}`}>
-                        <td>
-                          <button 
-                            className="expand-btn"
-                            onClick={() => toggleRowExpansion(assignment.assignmentId)}
-                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                          >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`expand-icon ${isExpanded ? 'rotated' : ''}`}>
-                              <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                          </button>
-                        </td>
-                        <td>
-                          <strong className="assignment-id">#{assignment.assignmentId}</strong>
-                        </td>
-                        <td>{assignment.jobId}</td>
-                        <td className="customer-name-cell">{job ? getCustomerName(job.customerId) : '-'}</td>
-                        <td>
-                          <span className={`status-badge ${getStatusBadgeClass(assignment.status)}`}>
-                            {assignment.status}
-                          </span>
-                        </td>
-                        <td>{new Date(assignment.assignedDate).toLocaleDateString()}</td>
-                        <td>
-                          <div className="actions-cell-hybrid">
-                            {/* Settle Button - for Assigned status */}
-                            {assignment.status === 'Assigned' && user?.role === 'Waff Clerk' && (
-                              <button
-                                className="btn-settle-primary"
-                                onClick={() => openSettleModal(assignment)}
-                                title="Settle this petty cash assignment"
-                              >
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                  <polyline points="20 6 9 17 4 12"/>
-                                </svg>
-                                Settle
-                              </button>
+                  const groupMap = new Map();
+                  assignments.forEach(a => {
+                    const gid = a.groupId || `${a.jobId}_${a.assignedTo}`;
+                    console.log(`Assignment ${a.assignmentId}: jobId=${a.jobId}, assignedTo=${a.assignedTo}, groupId=${a.groupId}, calculated=${gid}`);
+                    if (!groupMap.has(gid)) groupMap.set(gid, []);
+                    groupMap.get(gid).push(a);
+                  });
+                  const groups = Array.from(groupMap.entries());
+                  
+                  console.log('Total groups:', groups.length);
+                  console.log('Groups:', groups.map(([gid, assigns]) => ({ groupId: gid, count: assigns.length, ids: assigns.map(a => a.assignmentId) })));
+                  console.log('=== END DEBUG ===');
+
+                  return groups.map(([groupId, groupAssignments]) => {
+                    const first = groupAssignments[0];
+                    const job = jobs.find(j => j.jobId === first.jobId);
+                    const isGroupExpanded = expandedRows.has(groupId);
+                    const isMulti = groupAssignments.length > 1;
+
+                    // Group-level aggregates
+                    const totalAssigned = groupAssignments.reduce((s, a) => s + parseFloat(a.assignedAmount || 0), 0);
+                    const totalSpent = groupAssignments.reduce((s, a) => s + parseFloat(a.actualSpent || 0), 0);
+                    const totalBalance = totalAssigned > totalSpent ? totalAssigned - totalSpent : 0;
+                    const totalOver = totalSpent > totalAssigned ? totalSpent - totalAssigned : 0;
+                    const allSettled = groupAssignments.every(a => ['Settled','Settled/Approved','Settled/Rejected','Balance Returned','Overdue Collected','Closed'].includes(a.status));
+                    const anyAssigned = groupAssignments.some(a => a.status === 'Assigned');
+                    // Status priority: most advanced status wins for the group display
+                    const statusPriority = ['Assigned','Settled','Settled/Rejected','Pending Approval','Balance Returned','Overdue Collected','Settled/Approved','Closed'];
+                    const groupStatus = isMulti
+                      ? (() => {
+                          if (anyAssigned) return 'Assigned';
+                          // Pick the highest-priority status among all assignments
+                          let best = groupAssignments[0].status;
+                          for (const a of groupAssignments) {
+                            const ai = statusPriority.indexOf(a.status);
+                            const bi = statusPriority.indexOf(best);
+                            if (ai > bi) best = a.status;
+                          }
+                          return best;
+                        })()
+                      : groupAssignments[0].status;
+                    // Collect all settlement items across all assignments in the group
+                    const allSettlementItems = groupAssignments.flatMap(a => a.settlementItems || []);
+                    // Balance/Over buttons: only show for Settled or Settled/Rejected (not after Balance Returned/Approved)
+                    const canReturnBalance = !anyAssigned && user?.role === 'Waff Clerk'
+                      && (groupStatus === 'Settled' || groupStatus === 'Settled/Rejected')
+                      && (isMulti ? totalBalance > 0 : first.balanceAmount > 0);
+                    const canCollectOverdue = !anyAssigned && user?.role === 'Waff Clerk'
+                      && (groupStatus === 'Settled' || groupStatus === 'Settled/Rejected')
+                      && (isMulti ? totalOver > 0 : first.overAmount > 0);
+
+                    return (
+                      <React.Fragment key={groupId}>
+                        {/* Group Header Row */}
+                        <tr className={`assignment-row ${isGroupExpanded ? 'expanded' : ''} ${isMulti ? 'group-row' : ''}`}>
+                          <td>
+                            <button
+                              className="expand-btn"
+                              onClick={() => {
+                                const newExpanded = new Set(expandedRows);
+                                if (newExpanded.has(groupId)) newExpanded.delete(groupId);
+                                else newExpanded.add(groupId);
+                                setExpandedRows(newExpanded);
+                              }}
+                              aria-label={isGroupExpanded ? 'Collapse' : 'Expand'}
+                            >
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`expand-icon ${isGroupExpanded ? 'rotated' : ''}`}>
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                              </svg>
+                            </button>
+                          </td>
+                          <td>
+                            {isMulti ? (
+                              <strong className="assignment-id">#{first.assignmentId}</strong>
+                            ) : (
+                              <strong className="assignment-id">#{first.assignmentId}</strong>
                             )}
-
-                            {/* Eye Icon - View Details */}
-                            {(assignment.status === 'Settled' || assignment.status === 'Pending Approval' || assignment.status === 'Settled/Approved' || assignment.status === 'Settled/Rejected' || assignment.status === 'Balance Returned' || assignment.status === 'Overdue Collected') && (
-                              <button
-                                className="btn-view-eye"
-                                onClick={() => toggleRowExpansion(assignment.assignmentId)}
-                                title={isExpanded ? 'Hide Details' : 'View Details'}
-                              >
-                                {isExpanded ? (
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                                    <line x1="1" y1="1" x2="23" y2="23"/>
-                                  </svg>
-                                ) : (
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                    <circle cx="12" cy="12" r="3"/>
-                                  </svg>
-                                )}
-                              </button>
+                          </td>
+                          <td className="job-cusdec-cell">
+                            {job && job.cusdecNumber ? (
+                              <span>{first.jobId} / {job.cusdecNumber}</span>
+                            ) : (
+                              <span>{first.jobId}</span>
                             )}
-
-                            {/* Return Balance Button */}
-                            {(assignment.status === 'Settled' || assignment.status === 'Settled/Rejected') && user?.role === 'Waff Clerk' && assignment.balanceAmount > 0 && (
-                              <button
-                                className="btn-modern btn-success"
-                                onClick={() => openSettlementModal(assignment, 'BALANCE_RETURN')}
-                                title="Return balance cash to management"
-                              >
-                                Return Balance
-                              </button>
-                            )}
-                            
-                            {/* Collect Overdue Button */}
-                            {(assignment.status === 'Settled' || assignment.status === 'Settled/Rejected') && user?.role === 'Waff Clerk' && assignment.overAmount > 0 && (
-                              <button
-                                className="btn-modern btn-warning"
-                                onClick={() => openSettlementModal(assignment, 'OVERDUE_COLLECTION')}
-                                title="Collect overdue cash from management"
-                              >
-                                Collect Overdue
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      
-                      {/* Expanded Details Row */}
-                      {isExpanded && (
-                        <tr className="expanded-details-row">
-                          <td colSpan="7">
-                            <div className="expanded-content">
-
-                              {/* Financial Summary Strip */}
-                              <div className="financial-summary-strip">
-                                <div className="fin-stat-item">
-                                  <span className="fin-stat-label">Assigned Amount</span>
-                                  <span className="fin-stat-value">LKR {formatAmount(assignment.assignedAmount)}</span>
-                                </div>
-                                <div className="fin-stat-divider" />
-                                <div className="fin-stat-item">
-                                  <span className="fin-stat-label">Actual Spent</span>
-                                  <span className="fin-stat-value">{assignment.actualSpent ? `LKR ${formatAmount(assignment.actualSpent)}` : '—'}</span>
-                                </div>
-
-                                {/* Balance to Return — only show when not yet resolved */}
-                                {assignment.balanceAmount > 0 && assignment.status !== 'Balance Returned' && assignment.status !== 'Settled/Approved' && (
-                                  <>
-                                    <div className="fin-stat-divider" />
-                                    <div className="fin-stat-item">
-                                      <span className="fin-stat-label">Balance to Return</span>
-                                      <span className="fin-stat-value positive">LKR {formatAmount(assignment.balanceAmount)}</span>
-                                    </div>
-                                  </>
-                                )}
-
-                                {/* Over Amount — only show when not yet resolved */}
-                                {assignment.overAmount > 0 && assignment.status !== 'Overdue Collected' && assignment.status !== 'Settled/Approved' && (
-                                  <>
-                                    <div className="fin-stat-divider" />
-                                    <div className="fin-stat-item">
-                                      <span className="fin-stat-label">Over Amount</span>
-                                      <span className="fin-stat-value negative">LKR {formatAmount(assignment.overAmount)}</span>
-                                    </div>
-                                  </>
-                                )}
-
-                                {/* After approval — show resolved state in plain black like Assigned Amount */}
-                                {(assignment.status === 'Balance Returned' || (assignment.status === 'Settled/Approved' && assignment.balanceAmount > 0)) && (
-                                  <>
-                                    <div className="fin-stat-divider" />
-                                    <div className="fin-stat-item">
-                                      <span className="fin-stat-label">Balance Returned</span>
-                                      <span className="fin-stat-value">LKR {formatAmount(assignment.balanceAmount)}</span>
-                                    </div>
-                                  </>
-                                )}
-                                {(assignment.status === 'Overdue Collected' || (assignment.status === 'Settled/Approved' && assignment.overAmount > 0)) && (
-                                  <>
-                                    <div className="fin-stat-divider" />
-                                    <div className="fin-stat-item">
-                                      <span className="fin-stat-label">Overdue Collected</span>
-                                      <span className="fin-stat-value">LKR {formatAmount(assignment.overAmount)}</span>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-
-                              {/* Settlement Items Table */}
-                              {assignment.settlementItems && assignment.settlementItems.length > 0 && (
-                                <div className="settlement-items-section">
-                                  <div className="settlement-items-header">
-                                    <span className="settlement-items-title">Settlement Items</span>
-                                    <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-                                      <span className="settlement-items-count">{assignment.settlementItems.length} item{assignment.settlementItems.length !== 1 ? 's' : ''}</span>
-                                      {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
-                                        <button
-                                          className="btn-add-inline-item"
-                                          onClick={async () => {
-                                            const invoiceGenerated = await checkInvoiceGenerated(assignment.jobId);
-                                            if (invoiceGenerated) {
-                                              setMessage('❌ Cannot add - Invoice already generated');
-                                              setTimeout(() => setMessage(''), 3000);
-                                              return;
-                                            }
-                                            setInlineAddingRow(assignment.assignmentId);
-                                            setInlineNewItem({ itemName: '', actualCost: '', hasBill: false });
-                                          }}
-                                        >
-                                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                          Add New Pay Item
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="settlement-review-table">
-                                    <div className={`settlement-table-header ${assignment.status === 'Settled' && user?.role === 'Waff Clerk' ? 'with-actions' : ''}`}>
-                                      <div className="settlement-header-cell settlement-num-col">#</div>
-                                      <div className="settlement-header-cell settlement-name-col">Item Name</div>
-                                      <div className="settlement-header-cell settlement-type-col">Type</div>
-                                      <div className="settlement-header-cell settlement-bill-col">Bill</div>
-                                      <div className="settlement-header-cell settlement-amount-col">Actual Cost</div>
-                                      {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
-                                        <div className="settlement-header-cell settlement-actions-col">Actions</div>
-                                      )}
-                                    </div>
-                                    <div className="settlement-table-body">
-                                      {assignment.settlementItems.map((item, idx) => {
-                                        const isEditing = inlineEditingItem?.assignmentId === assignment.assignmentId && inlineEditingItem?.itemId === item.settlementItemId;
-                                        return (
-                                          <div key={idx} className={`settlement-table-row ${isEditing ? 'editing-row' : ''} ${assignment.status === 'Settled' && user?.role === 'Waff Clerk' ? 'with-actions' : ''}`}>
-
-                                            <div className="settlement-table-cell settlement-num-col settlement-num">{idx + 1}</div>
-                                            <div className="settlement-table-cell settlement-name-col">
-                                              {isEditing ? (
-                                                <input
-                                                  className="inline-edit-field"
-                                                  value={inlineEditName}
-                                                  onChange={e => setInlineEditName(e.target.value)}
-                                                  autoFocus
-                                                />
-                                              ) : item.itemName}
-                                            </div>
-                                            <div className="settlement-table-cell settlement-type-col">
-                                              <span className={`type-badge ${item.isCustomItem ? 'custom' : 'template'}`}>
-                                                {item.isCustomItem ? 'Custom' : 'Template'}
-                                              </span>
-                                            </div>
-                                            <div className="settlement-table-cell settlement-bill-col">
-                                              {item.hasBill ? (
-                                                <span className="bill-badge-small has-bill">
-                                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                                  Bill
-                                                </span>
-                                              ) : (
-                                                <span className="bill-badge-small no-bill">No Bill</span>
-                                              )}
-                                            </div>
-                                            <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
-                                              {isEditing ? (
-                                                <input
-                                                  className="inline-edit-field inline-edit-amount"
-                                                  type="number"
-                                                  step="0.01"
-                                                  value={inlineEditCost}
-                                                  onChange={e => setInlineEditCost(e.target.value)}
-                                                  onKeyDown={e => { if (e.key === 'Enter') saveInlineEdit(assignment.assignmentId); if (e.key === 'Escape') cancelInlineEdit(); }}
-                                                />
-                                              ) : `LKR ${formatAmount(item.actualCost)}`}
-                                            </div>
-                                            {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
-                                              <div className="settlement-table-cell settlement-actions-col">
-                                                {isEditing ? (
-                                                  <div className="inline-action-btns">
-                                                    <button className="inline-btn-save" onClick={() => saveInlineEdit(assignment.assignmentId)} title="Save">
-                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                                    </button>
-                                                    <button className="inline-btn-cancel" onClick={cancelInlineEdit} title="Cancel">
-                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                    </button>
-                                                  </div>
-                                                ) : (
-                                                  <div className="inline-action-btns">
-                                                    <button className="inline-btn-edit" onClick={async () => {
-                                                      const invoiceGenerated = await checkInvoiceGenerated(assignment.jobId);
-                                                      if (invoiceGenerated) { setMessage('❌ Invoice already generated'); setTimeout(() => setMessage(''), 3000); return; }
-                                                      startInlineEdit(assignment.assignmentId, item);
-                                                    }} title="Edit item">
-                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                                      </svg>
-                                                    </button>
-                                                    <button className="inline-btn-delete" onClick={() => deleteInlineItem(assignment.assignmentId, item)} title="Delete item">
-                                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <polyline points="3 6 5 6 21 6"/>
-                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                                      </svg>
-                                                    </button>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-
-                                      {/* Add New Item Row */}
-                                      {inlineAddingRow === assignment.assignmentId && (
-                                        <div className="settlement-table-row new-item-row with-actions">
-                                          <div className="settlement-table-cell settlement-num-col settlement-num">
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                          </div>
-                                          <div className="settlement-table-cell settlement-name-col">
-                                            <input
-                                              className="inline-edit-field"
-                                              placeholder="Item name"
-                                              value={inlineNewItem.itemName}
-                                              onChange={e => setInlineNewItem({...inlineNewItem, itemName: e.target.value})}
-                                              autoFocus
-                                            />
-                                          </div>
-                                          <div className="settlement-table-cell settlement-type-col">
-                                            <span className="type-badge custom">Custom</span>
-                                          </div>
-                                          <div className="settlement-table-cell settlement-bill-col">
-                                            <label className="inline-bill-check">
-                                              <input type="checkbox" checked={inlineNewItem.hasBill} onChange={e => setInlineNewItem({...inlineNewItem, hasBill: e.target.checked})} />
-                                              Bill
-                                            </label>
-                                          </div>
-                                          <div className="settlement-table-cell settlement-amount-col">
-                                            <input
-                                              className="inline-edit-field inline-edit-amount"
-                                              type="number"
-                                              step="0.01"
-                                              placeholder="0.00"
-                                              value={inlineNewItem.actualCost}
-                                              onChange={e => setInlineNewItem({...inlineNewItem, actualCost: e.target.value})}
-                                              onKeyDown={e => { if (e.key === 'Enter') saveInlineNewItem(assignment.assignmentId); if (e.key === 'Escape') { setInlineAddingRow(null); setInlineNewItem({ itemName: '', actualCost: '', hasBill: false }); } }}
-                                            />
-                                          </div>
-                                          <div className="settlement-table-cell settlement-actions-col">
-                                            <div className="inline-action-btns">
-                                              <button className="inline-btn-save" onClick={() => saveInlineNewItem(assignment.assignmentId)} title="Save new item">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                              </button>
-                                              <button className="inline-btn-cancel" onClick={() => { setInlineAddingRow(null); setInlineNewItem({ itemName: '', actualCost: '', hasBill: false }); }} title="Cancel">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      <div className={`settlement-table-row settlement-total-row ${assignment.status === 'Settled' && user?.role === 'Waff Clerk' ? 'with-actions' : ''}`}>
-                                        <div className="settlement-table-cell settlement-num-col"></div>
-                                        <div className="settlement-table-cell settlement-name-col"><strong>Total</strong></div>
-                                        <div className="settlement-table-cell settlement-type-col"></div>
-                                        <div className="settlement-table-cell settlement-bill-col"></div>
-                                        <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
-                                          <strong>LKR {formatAmount(assignment.settlementItems.reduce((sum, i) => sum + parseFloat(i.actualCost || 0), 0))}</strong>
-                                        </div>
-                                        {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && (
-                                          <div className="settlement-table-cell settlement-actions-col"></div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
+                          </td>
+                          <td className="customer-name-cell">{job ? getCustomerName(job.customerId) : '-'}</td>
+                          <td className="assigned-to-cell">
+                            <span className="assigned-to-name">{first.assignedToName || first.assignedTo || '-'}</span>
+                          </td>
+                          <td>
+                            <span className={`status-badge ${getStatusBadgeClass(groupStatus)}`}>
+                              {groupStatus}
+                            </span>
+                          </td>
+                          <td><strong>LKR {formatAmount(totalAssigned)}</strong></td>
+                          <td>{new Date(first.assignedDate).toLocaleDateString()}</td>
+                          <td>
+                            <div className="actions-cell-hybrid">
+                              {/* Unified action logic for both single and grouped assignments */}
+                              {anyAssigned && user?.role === 'Waff Clerk' && (
+                                <button className="btn-settle-primary" onClick={() => {
+                                  const settlementAssignment = {
+                                    ...first,
+                                    assignedAmount: totalAssigned,
+                                    isGroupedSettlement: isMulti,
+                                    groupAssignments: groupAssignments
+                                  };
+                                  openSettleModal(settlementAssignment);
+                                }} title="Settle petty cash">
+                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                  Settle
+                                </button>
                               )}
-
-                              {(!assignment.settlementItems || assignment.settlementItems.length === 0) && (
-                                <div className="no-settlement-items">
-                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                    <polyline points="14 2 14 8 20 8"></polyline>
-                                  </svg>
-                                  <p>No settlement items recorded</p>
-                                </div>
+                              {!anyAssigned && user?.role === 'Waff Clerk' && groupStatus === 'Pending Approval' && (
+                                <span className="pending-approval-badge">
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                  Pending Approval
+                                </span>
                               )}
-
-                            </div>{/* end expanded-content */}
+                              {canReturnBalance && (
+                                <button className="btn-modern btn-success" onClick={() => {
+                                  const assignmentForModal = isMulti
+                                    ? { ...first, balanceAmount: totalBalance, overAmount: totalOver, groupAssignmentIds: groupAssignments.map(a => a.assignmentId) }
+                                    : first;
+                                  openSettlementModal(assignmentForModal, 'BALANCE_RETURN');
+                                }}>Return Balance</button>
+                              )}
+                              {canCollectOverdue && (
+                                <button className="btn-modern btn-warning" onClick={() => {
+                                  const assignmentForModal = isMulti
+                                    ? { ...first, balanceAmount: totalBalance, overAmount: totalOver, groupAssignmentIds: groupAssignments.map(a => a.assignmentId) }
+                                    : first;
+                                  openSettlementModal(assignmentForModal, 'OVERDUE_COLLECTION');
+                                }}>Collect Overdue</button>
+                              )}
+                              {!anyAssigned && (
+                                <button className="btn-view-eye" onClick={() => {
+                                  const newExpanded = new Set(expandedRows);
+                                  if (newExpanded.has(groupId)) newExpanded.delete(groupId);
+                                  else newExpanded.add(groupId);
+                                  setExpandedRows(newExpanded);
+                                }} title={isGroupExpanded ? 'Hide Details' : 'View Details'}>
+                                  {isGroupExpanded ? (
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                  ) : (
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                  )}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+
+                        {/* Expanded: for multi-assignment groups, show sub-assignments in a professional table */}
+                        {isGroupExpanded && isMulti && (
+                          <tr className="sub-assignments-container-row">
+                            <td colSpan="8" style={{padding: 0, backgroundColor: '#f8f9fa'}}>
+                              <div className="sub-assignments-wrapper">
+
+                                {/* Sub-Assignments simple table: ID, Amount, Date only */}
+                                <div className="sub-assignments-header">
+                                  <h4>Sub-Assignments</h4>
+                                  <span className="sub-count">{groupAssignments.length} assignments</span>
+                                </div>
+                                <table className="sub-assignments-table">
+                                  <thead>
+                                    <tr>
+                                      <th style={{width: '30%'}}>Assignment ID</th>
+                                      <th style={{width: '35%'}}>Assigned Amount</th>
+                                      <th style={{width: '35%'}}>Assigned Date</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {groupAssignments.map((assignment, index) => {
+                                      const subAssignmentId = `#${first.assignmentId}-${index + 1}`;
+                                      return (
+                                        <tr key={assignment.assignmentId} className="sub-assignment-row">
+                                          <td><strong className="sub-assignment-id">{subAssignmentId}</strong></td>
+                                          <td className="amount-cell"><strong>LKR {formatAmount(assignment.assignedAmount)}</strong></td>
+                                          <td className="date-cell">{new Date(assignment.assignedDate).toLocaleDateString()}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                    {/* Totals Row */}
+                                    <tr className="sub-totals-row">
+                                      <td><strong>TOTAL</strong></td>
+                                      <td className="amount-cell"><strong>LKR {formatAmount(totalAssigned)}</strong></td>
+                                      <td></td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+
+                                {/* Group Financial Summary — shown after settling */}
+                                {allSettled && (
+                                  <div style={{marginTop: '1.5rem'}}>
+                                    <div className="financial-summary-strip">
+                                      <div className="fin-stat-item">
+                                        <span className="fin-stat-label">Total Assigned</span>
+                                        <span className="fin-stat-value">LKR {formatAmount(totalAssigned)}</span>
+                                      </div>
+                                      <div className="fin-stat-divider" />
+                                      <div className="fin-stat-item">
+                                        <span className="fin-stat-label">Total Spent</span>
+                                        <span className="fin-stat-value">{totalSpent > 0 ? `LKR ${formatAmount(totalSpent)}` : '—'}</span>
+                                      </div>
+                                      {/* Balance to Return — only before approval/close */}
+                                      {totalBalance > 0 && !['Balance Returned', 'Settled/Approved', 'Closed'].includes(groupStatus) && (
+                                        <>
+                                          <div className="fin-stat-divider" />
+                                          <div className="fin-stat-item">
+                                            <span className="fin-stat-label">Balance to Return</span>
+                                            <span className="fin-stat-value positive">LKR {formatAmount(totalBalance)}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                      {/* Balance Returned — after approval or close */}
+                                      {totalBalance > 0 && ['Balance Returned', 'Settled/Approved', 'Closed'].includes(groupStatus) && (
+                                        <>
+                                          <div className="fin-stat-divider" />
+                                          <div className="fin-stat-item">
+                                            <span className="fin-stat-label">Balance Returned</span>
+                                            <span className="fin-stat-value">LKR {formatAmount(totalBalance)}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                      {/* Over Amount — only before collection/close */}
+                                      {totalOver > 0 && !['Overdue Collected', 'Settled/Approved', 'Closed'].includes(groupStatus) && (
+                                        <>
+                                          <div className="fin-stat-divider" />
+                                          <div className="fin-stat-item">
+                                            <span className="fin-stat-label">Over Amount</span>
+                                            <span className="fin-stat-value negative">LKR {formatAmount(totalOver)}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                      {/* Overdue Collected — after collection or close */}
+                                      {totalOver > 0 && ['Overdue Collected', 'Settled/Approved', 'Closed'].includes(groupStatus) && (
+                                        <>
+                                          <div className="fin-stat-divider" />
+                                          <div className="fin-stat-item">
+                                            <span className="fin-stat-label">Overdue Collected</span>
+                                            <span className="fin-stat-value">LKR {formatAmount(totalOver)}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {/* Settlement Items across all assignments */}
+                                    {allSettlementItems.length > 0 && (
+                                      <div className="settlement-items-section" style={{marginTop: '1rem'}}>
+                                        <div className="settlement-items-header">
+                                          <span className="settlement-items-title">Settlement Items</span>
+                                          <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                            <span className="settlement-items-count">{allSettlementItems.length} item{allSettlementItems.length !== 1 ? 's' : ''}</span>
+                                            {user?.role === 'Waff Clerk' && !invoicedJobIds.has(first.jobId) && (
+                                              <button className="btn-add-inline-item" onClick={() => {
+                                                setInlineAddingRow(first.assignmentId);
+                                                setInlineNewItem({ itemName: '', actualCost: '', hasBill: false });
+                                              }}>
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                                Add New Pay Item
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="settlement-review-table">
+                                          {(() => {
+                                            const canEdit = user?.role === 'Waff Clerk' && !invoicedJobIds.has(first.jobId);
+                                            return (
+                                              <>
+                                                <div className={`settlement-table-header ${canEdit ? 'with-actions' : ''}`}>
+                                                  <div className="settlement-header-cell settlement-num-col">#</div>
+                                                  <div className="settlement-header-cell settlement-name-col">Item Name</div>
+                                                  <div className="settlement-header-cell settlement-type-col">Type</div>
+                                                  <div className="settlement-header-cell settlement-bill-col">Bill</div>
+                                                  <div className="settlement-header-cell settlement-amount-col">Actual Cost</div>
+                                                  {canEdit && <div className="settlement-header-cell settlement-actions-col">Actions</div>}
+                                                </div>
+                                                <div className="settlement-table-body">
+                                                  {allSettlementItems.map((item, idx) => {
+                                                    const isEditing = inlineEditingItem?.assignmentId === item.assignmentId && inlineEditingItem?.itemId === item.settlementItemId;
+                                                    return (
+                                                      <div key={idx} className={`settlement-table-row ${isEditing ? 'editing-row' : ''} ${canEdit ? 'with-actions' : ''}`}>
+                                                        <div className="settlement-table-cell settlement-num-col settlement-num">{idx + 1}</div>
+                                                        <div className="settlement-table-cell settlement-name-col">
+                                                          {isEditing ? <input className="inline-edit-field" value={inlineEditName} onChange={e => setInlineEditName(e.target.value)} autoFocus /> : item.itemName}
+                                                        </div>
+                                                        <div className="settlement-table-cell settlement-type-col">
+                                                          <span className={`type-badge ${item.isCustomItem ? 'custom' : 'template'}`}>{item.isCustomItem ? 'Custom' : 'Template'}</span>
+                                                        </div>
+                                                        <div className="settlement-table-cell settlement-bill-col">
+                                                          {item.hasBill
+                                                            ? <span className="bill-badge-small has-bill"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>Bill</span>
+                                                            : <span className="bill-badge-small no-bill">No Bill</span>}
+                                                        </div>
+                                                        <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
+                                                          {isEditing
+                                                            ? <input className="inline-edit-field inline-edit-amount" type="number" step="0.01" value={inlineEditCost} onChange={e => setInlineEditCost(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveInlineEdit(item.assignmentId); if (e.key === 'Escape') cancelInlineEdit(); }} />
+                                                            : `LKR ${formatAmount(item.actualCost)}`}
+                                                        </div>
+                                                        {canEdit && (
+                                                          <div className="settlement-table-cell settlement-actions-col">
+                                                            {isEditing ? (
+                                                              <div className="inline-action-btns">
+                                                                <button className="inline-btn-save" onClick={() => saveInlineEdit(item.assignmentId)} title="Save"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>
+                                                                <button className="inline-btn-cancel" onClick={cancelInlineEdit} title="Cancel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                                              </div>
+                                                            ) : (
+                                                              <div className="inline-action-btns">
+                                                                <button className="inline-btn-edit" onClick={async () => {
+                                                                  const inv = await checkInvoiceGenerated(first.jobId);
+                                                                  if (inv) { setMessage('❌ Invoice already generated'); setTimeout(() => setMessage(''), 3000); return; }
+                                                                  startInlineEdit(item.assignmentId, item);
+                                                                }} title="Edit item">
+                                                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                                </button>
+                                                                {item.isCustomItem && (
+                                                                  <button className="inline-btn-delete" onClick={() => deleteInlineItem(item.assignmentId, item)} title="Delete item">
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                                                  </button>
+                                                                )}
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })}
+                                                  {/* Inline add new item row */}
+                                                  {inlineAddingRow === first.assignmentId && (
+                                                    <div className="settlement-table-row new-item-row with-actions">
+                                                      <div className="settlement-table-cell settlement-num-col settlement-num"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+                                                      <div className="settlement-table-cell settlement-name-col"><input className="inline-edit-field" placeholder="Item name" value={inlineNewItem.itemName} onChange={e => setInlineNewItem({...inlineNewItem, itemName: e.target.value})} autoFocus /></div>
+                                                      <div className="settlement-table-cell settlement-type-col"><span className="type-badge custom">Custom</span></div>
+                                                      <div className="settlement-table-cell settlement-bill-col"><label className="inline-bill-check"><input type="checkbox" checked={inlineNewItem.hasBill} onChange={e => setInlineNewItem({...inlineNewItem, hasBill: e.target.checked})} />Bill</label></div>
+                                                      <div className="settlement-table-cell settlement-amount-col"><input className="inline-edit-field inline-edit-amount" type="number" step="0.01" placeholder="0.00" value={inlineNewItem.actualCost} onChange={e => setInlineNewItem({...inlineNewItem, actualCost: e.target.value})} onKeyDown={e => { if (e.key === 'Enter') saveInlineNewItem(first.assignmentId); if (e.key === 'Escape') { setInlineAddingRow(null); setInlineNewItem({ itemName: '', actualCost: '', hasBill: false }); } }} /></div>
+                                                      <div className="settlement-table-cell settlement-actions-col">
+                                                        <div className="inline-action-btns">
+                                                          <button className="inline-btn-save" onClick={() => saveInlineNewItem(first.assignmentId)} title="Save"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>
+                                                          <button className="inline-btn-cancel" onClick={() => { setInlineAddingRow(null); setInlineNewItem({ itemName: '', actualCost: '', hasBill: false }); }} title="Cancel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  )}
+                                                  {/* Total row */}
+                                                  <div className={`settlement-table-row settlement-total-row ${canEdit ? 'with-actions' : ''}`}>
+                                                    <div className="settlement-table-cell settlement-num-col"></div>
+                                                    <div className="settlement-table-cell settlement-name-col"><strong>Total</strong></div>
+                                                    <div className="settlement-table-cell settlement-type-col"></div>
+                                                    <div className="settlement-table-cell settlement-bill-col"></div>
+                                                    <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
+                                                      <strong>LKR {formatAmount(allSettlementItems.reduce((sum, i) => sum + parseFloat(i.actualCost || 0), 0))}</strong>
+                                                    </div>
+                                                    {canEdit && <div className="settlement-table-cell settlement-actions-col"></div>}
+                                                  </div>
+                                                </div>
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Single assignment expanded details */}
+                        {isGroupExpanded && !isMulti && renderExpandedDetails(first)}
+                      </React.Fragment>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>
         )}
       </div>
-
       {/* Assign Petty Cash Modal */}
       {showAssignModal && (
         <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>

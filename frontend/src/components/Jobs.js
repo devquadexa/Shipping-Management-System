@@ -441,7 +441,7 @@ function Jobs() {
             <table className="jobs-table">
             <thead>
               <tr>
-                <th>Job ID</th>
+                <th>Job ID / CUSDEC Number</th>
                 <th>Customer</th>
                 <th>Category</th>
                 <th>Open Date</th>
@@ -454,7 +454,13 @@ function Jobs() {
               {filteredJobs.map(job => (
                 <React.Fragment key={job.jobId}>
                   <tr className={expandedRow === job.jobId ? 'expanded' : ''}>
-                    <td data-label="Job ID"><span className="job-id">{job.jobId || '-'}</span></td>
+                    <td data-label="Job ID / CUSDEC Number" className="job-cusdec-cell">
+                      {job.cusdecNumber ? (
+                        <span>{job.jobId || '-'} / {job.cusdecNumber}</span>
+                      ) : (
+                        <span className="job-id">{job.jobId || '-'}</span>
+                      )}
+                    </td>
                     <td data-label="Customer">{getCustomerName(job.customerId)}</td>
                     <td data-label="Category">
                       {job.shipmentCategory ? (

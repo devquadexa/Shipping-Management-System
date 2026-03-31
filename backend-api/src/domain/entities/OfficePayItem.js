@@ -11,6 +11,7 @@ class OfficePayItem {
     this.paidBy = data.paidBy;
     this.paidByName = data.paidByName; // User's full name
     this.paymentDate = data.paymentDate;
+    this.hasBill = data.hasBill !== undefined ? Boolean(data.hasBill) : false; // Whether a bill/receipt exists
     this.createdDate = data.createdDate;
     this.updatedDate = data.updatedDate;
   }
@@ -57,6 +58,7 @@ class OfficePayItem {
       paidBy: this.paidBy,
       paidByName: this.paidByName,
       paymentDate: this.paymentDate,
+      hasBill: this.hasBill,
       createdDate: this.createdDate,
       updatedDate: this.updatedDate
     };

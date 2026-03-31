@@ -17,7 +17,8 @@ class PettyCashAssignment {
     shipmentCategory,
     customerId,
     assignedToName,
-    assignedByName
+    assignedByName,
+    groupId
   }) {
     this.assignmentId = assignmentId;
     this.jobId = jobId;
@@ -31,12 +32,16 @@ class PettyCashAssignment {
     this.balanceAmount = balanceAmount;
     this.overAmount = overAmount;
     this.notes = notes;
-    this.settlementItems = settlementItems || [];
+    this.settlementItems = (settlementItems || []).map(item => ({
+      ...item,
+      hasBill: item.hasBill === true || item.hasBill === 1 || item.hasBill === '1'
+    }));
     this.readOnlyPredefinedItems = readOnlyPredefinedItems || [];
     this.shipmentCategory = shipmentCategory;
     this.customerId = customerId;
     this.assignedToName = assignedToName;
     this.assignedByName = assignedByName;
+    this.groupId = groupId || `${jobId}_${assignedTo}`;
   }
 
   toJSON() {
@@ -58,7 +63,8 @@ class PettyCashAssignment {
       shipmentCategory: this.shipmentCategory,
       customerId: this.customerId,
       assignedToName: this.assignedToName,
-      assignedByName: this.assignedByName
+      assignedByName: this.assignedByName,
+      groupId: this.groupId
     };
   }
 }
