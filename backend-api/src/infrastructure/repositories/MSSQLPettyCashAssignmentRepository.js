@@ -11,6 +11,15 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
   async create(assignmentData) {
     try {
       const pool = await this.getConnection();
+
+      // Ensure groupId column exists
+      await pool.request().query(`
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PettyCashAssignments') AND name = 'groupId')
+          ALTER TABLE PettyCashAssignments ADD groupId NVARCHAR(100) NULL;
+      `);
+
+      // groupId = provided groupId OR existing group for this job+user OR new one
+      const groupId = assignmentData.groupId || `${assignmentData.jobId}_${assignmentData.assignedTo}`;
       
       // Insert assignment
       const result = await pool.request()
@@ -19,10 +28,11 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         .input('assignedBy', this.sql.VarChar, assignmentData.assignedBy)
         .input('assignedAmount', this.sql.Decimal(18, 2), assignmentData.assignedAmount)
         .input('notes', this.sql.NVarChar, assignmentData.notes || null)
+        .input('groupId', this.sql.NVarChar, groupId)
         .query(`
-          INSERT INTO PettyCashAssignments (jobId, assignedTo, assignedBy, assignedAmount, notes)
+          INSERT INTO PettyCashAssignments (jobId, assignedTo, assignedBy, assignedAmount, notes, groupId)
           OUTPUT INSERTED.*
-          VALUES (@jobId, @assignedTo, @assignedBy, @assignedAmount, @notes)
+          VALUES (@jobId, @assignedTo, @assignedBy, @assignedAmount, @notes, @groupId)
         `);
       
       // Update job status
@@ -34,7 +44,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           WHERE jobId = @jobId
         `);
       
-      return new PettyCashAssignment(result.recordset[0]);
+      return new PettyCashAssignment({ ...result.recordset[0], groupId });
     } catch (error) {
       console.error('Error creating petty cash assignment:', error);
       throw error;
@@ -47,7 +57,21 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       const result = await pool.request()
         .query(`
           SELECT 
-            pca.*,
+            pca.assignmentId,
+            pca.jobId,
+            pca.assignedTo,
+            pca.assignedBy,
+            pca.assignedAmount,
+            pca.assignedDate,
+            pca.status,
+            pca.settlementDate,
+            pca.actualSpent,
+            pca.balanceAmount,
+            pca.overAmount,
+            pca.notes,
+            pca.parentAssignmentId,
+            pca.isMainAssignment,
+            ISNULL(pca.groupId, pca.jobId + '_' + pca.assignedTo) as groupId,
             j.shipmentCategory,
             j.customerId,
             assignedToUser.fullName as assignedToName,
@@ -84,7 +108,21 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         .input('userId', this.sql.VarChar, userId)
         .query(`
           SELECT 
-            pca.*,
+            pca.assignmentId,
+            pca.jobId,
+            pca.assignedTo,
+            pca.assignedBy,
+            pca.assignedAmount,
+            pca.assignedDate,
+            pca.status,
+            pca.settlementDate,
+            pca.actualSpent,
+            pca.balanceAmount,
+            pca.overAmount,
+            pca.notes,
+            pca.parentAssignmentId,
+            pca.isMainAssignment,
+            ISNULL(pca.groupId, pca.jobId + '_' + pca.assignedTo) as groupId,
             j.shipmentCategory,
             j.customerId,
             assignedByUser.fullName as assignedByName
@@ -207,7 +245,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
             si.itemName,
             si.actualCost,
             si.isCustomItem,
-            ISNULL(si.hasBill, 0) as hasBill,
+            si.hasBill,
             si.paidBy,
             u.fullName as paidByName,
             u.email as paidByEmail
@@ -425,7 +463,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           UPDATE PettyCashAssignments
           SET status = 'Closed'
           WHERE jobId = @jobId
-            AND status NOT IN ('Closed')
+            AND status NOT IN ('Closed', 'Balance Returned', 'Overdue Collected', 'Settled/Approved')
         `);
     } catch (error) {
       console.error('Error closing petty cash assignments for job:', error);
@@ -765,6 +803,153 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       return { actualSpent, balanceAmount, overAmount };
     } catch (error) {
       console.error('Error recalculating assignment totals:', error);
+      throw error;
+    }
+  }
+
+  // ===== PARENT-CHILD ASSIGNMENT METHODS =====
+  
+  async createSubAssignment(assignmentData) {
+    try {
+      const pool = await this.getConnection();
+      
+      const result = await pool.request()
+        .input('jobId', this.sql.VarChar, assignmentData.jobId)
+        .input('assignedTo', this.sql.VarChar, assignmentData.assignedTo)
+        .input('assignedBy', this.sql.VarChar, assignmentData.assignedBy)
+        .input('assignedAmount', this.sql.Decimal(18, 2), assignmentData.assignedAmount)
+        .input('notes', this.sql.NVarChar, assignmentData.notes || null)
+        .input('groupId', this.sql.NVarChar, assignmentData.groupId)
+        .input('parentAssignmentId', this.sql.Int, assignmentData.parentAssignmentId)
+        .input('isMainAssignment', this.sql.Bit, 0)
+        .query(`
+          INSERT INTO PettyCashAssignments (
+            jobId, assignedTo, assignedBy, assignedAmount, notes, groupId, 
+            parentAssignmentId, isMainAssignment
+          )
+          OUTPUT INSERTED.*
+          VALUES (
+            @jobId, @assignedTo, @assignedBy, @assignedAmount, @notes, @groupId,
+            @parentAssignmentId, @isMainAssignment
+          )
+        `);
+      
+      return result.recordset[0];
+    } catch (error) {
+      console.error('Error creating sub-assignment:', error);
+      throw error;
+    }
+  }
+
+  async getMainAssignments(userId = null) {
+    try {
+      const pool = await this.getConnection();
+      
+      let query = `
+        SELECT 
+          pca.*,
+          ISNULL(pca.groupId, pca.jobId + '_' + pca.assignedTo) as groupId,
+          j.shipmentCategory,
+          j.customerId,
+          assignedToUser.fullName as assignedToName,
+          assignedByUser.fullName as assignedByName
+        FROM PettyCashAssignments pca
+        LEFT JOIN Jobs j ON pca.jobId = j.jobId
+        LEFT JOIN Users assignedToUser ON pca.assignedTo = assignedToUser.userId
+        LEFT JOIN Users assignedByUser ON pca.assignedBy = assignedByUser.userId
+        WHERE pca.isMainAssignment = 1
+      `;
+      
+      if (userId) {
+        query += ` AND pca.assignedTo = @userId`;
+      }
+      
+      query += ` ORDER BY pca.assignedDate DESC`;
+      
+      const request = pool.request();
+      if (userId) {
+        request.input('userId', this.sql.VarChar, userId);
+      }
+      
+      const result = await request.query(query);
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching main assignments:', error);
+      throw error;
+    }
+  }
+
+  async getSubAssignments(parentAssignmentId) {
+    try {
+      const pool = await this.getConnection();
+      
+      const result = await pool.request()
+        .input('parentAssignmentId', this.sql.Int, parentAssignmentId)
+        .query(`
+          SELECT 
+            pca.*,
+            assignedByUser.fullName as assignedByName
+          FROM PettyCashAssignments pca
+          LEFT JOIN Users assignedByUser ON pca.assignedBy = assignedByUser.userId
+          WHERE pca.parentAssignmentId = @parentAssignmentId
+          ORDER BY pca.assignedDate ASC
+        `);
+      
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching sub-assignments:', error);
+      throw error;
+    }
+  }
+
+  async getTotalAssignedAmount(mainAssignmentId) {
+    try {
+      const pool = await this.getConnection();
+      
+      const result = await pool.request()
+        .input('mainAssignmentId', this.sql.Int, mainAssignmentId)
+        .query(`
+          SELECT 
+            SUM(assignedAmount) as totalAmount
+          FROM PettyCashAssignments
+          WHERE assignmentId = @mainAssignmentId 
+             OR parentAssignmentId = @mainAssignmentId
+        `);
+      
+      return parseFloat(result.recordset[0].totalAmount || 0);
+    } catch (error) {
+      console.error('Error calculating total assigned amount:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update assignment status and clear the resolved amount after management approval.
+   * settlementType: 'BALANCE_RETURN' clears balanceAmount, 'OVERDUE_COLLECTION' clears overAmount.
+   */
+  async updateStatusAndClearAmount(assignmentId, newStatus, settlementType) {
+    try {
+      const pool = await this.getConnection();
+      
+      let clearField = '';
+      if (settlementType === 'BALANCE_RETURN') {
+        clearField = ', balanceAmount = 0';
+      } else if (settlementType === 'OVERDUE_COLLECTION') {
+        clearField = ', overAmount = 0';
+      }
+
+      await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
+        .input('status', this.sql.NVarChar, newStatus)
+        .query(`
+          UPDATE PettyCashAssignments
+          SET status = @status${clearField}
+          WHERE assignmentId = @assignmentId
+        `);
+
+      return await this.getById(assignmentId);
+    } catch (error) {
+      console.error('Error in updateStatusAndClearAmount:', error);
       throw error;
     }
   }

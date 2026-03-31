@@ -1,7 +1,7 @@
 /* Jobs Page Styles - Professional Corporate Design */
 
 .jobs-page {
-  max-width: 1600px;
+  max-width: 1800px;
   margin: 0 auto;
   padding: 2rem;
 }
@@ -226,6 +226,19 @@
   background: #f3f4f6;
   padding: 4px 8px;
   border-radius: 4px;
+}
+
+/* Job ID / CUSDEC Number Cell */
+.job-cusdec-cell {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #101036;
+  white-space: nowrap;
+}
+
+.job-cusdec-cell span {
+  display: inline-block;
 }
 
 /* Status Badges */
@@ -967,6 +980,11 @@ div.modal div.job-form div.action-buttons,
   .job-id {
     font-size: 0.85rem;
     display: inline-block;
+  }
+
+  .job-cusdec-cell {
+    font-size: 0.85rem;
+    white-space: normal;
   }
 
   .category-badge {
