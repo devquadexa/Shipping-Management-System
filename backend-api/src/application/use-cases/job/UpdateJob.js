@@ -47,6 +47,21 @@ class UpdateJob {
           throw new Error('Invalid date format for openDate');
         }
       }
+
+      // Handle date conversion if cusdecDate is provided
+      let processedCusdecDate = existingJob.cusdecDate;
+      if (jobData.cusdecDate !== undefined && jobData.cusdecDate !== null && jobData.cusdecDate !== '') {
+        try {
+          processedCusdecDate = new Date(jobData.cusdecDate);
+          if (isNaN(processedCusdecDate.getTime())) {
+            throw new Error('Invalid date format for cusdecDate');
+          }
+          console.log('UpdateJob.execute - processed cusdecDate:', processedCusdecDate);
+        } catch (dateError) {
+          console.error('UpdateJob.execute - CUSDEC date conversion error:', dateError);
+          throw new Error('Invalid date format for cusdecDate');
+        }
+      }
       
       // Create updated job object with existing values as defaults
       const updatedJob = {
@@ -54,6 +69,7 @@ class UpdateJob {
         customerId: existingJob.customerId,
         blNumber: jobData.blNumber !== undefined ? (jobData.blNumber || null) : existingJob.blNumber,
         cusdecNumber: jobData.cusdecNumber !== undefined ? (jobData.cusdecNumber || null) : existingJob.cusdecNumber,
+        cusdecDate: jobData.cusdecDate !== undefined ? (jobData.cusdecDate ? processedCusdecDate : null) : existingJob.cusdecDate,
         openDate: jobData.openDate !== undefined ? processedOpenDate : existingJob.openDate,
         shipmentCategory: jobData.shipmentCategory !== undefined ? jobData.shipmentCategory : existingJob.shipmentCategory,
         chassisNumber: jobData.chassisNumber !== undefined ? (jobData.chassisNumber || null) : existingJob.chassisNumber,
