@@ -20,6 +20,37 @@ function Billing() {
   const isVehicleShipmentCategory = (category) => {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
   };
+
+  const formatDateDDMMYYYY = (dateValue) => {
+    if (!dateValue) return '';
+
+    const normalized = String(dateValue).split('T')[0];
+    const dateParts = normalized.split('-');
+    if (dateParts.length === 3) {
+      const [year, month, day] = dateParts;
+      return `${day}/${month}/${year}`;
+    }
+
+    const parsed = new Date(dateValue);
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleDateString('en-GB');
+  };
+
+  const formatCusdecNumberForDisplay = (value) => {
+    const rawValue = (value || '').trim();
+    if (!rawValue) return '';
+
+    const cleaned = rawValue.replace(/^i\s*-\s*/i, '').trim();
+    return cleaned ? `I-${cleaned}` : '';
+  };
+
+  const formatCusdecWithDate = (cusdecNumber, cusdecDate) => {
+    const formattedNumber = formatCusdecNumberForDisplay(cusdecNumber);
+    if (!formattedNumber) return '-';
+
+    const formattedDate = formatDateDDMMYYYY(cusdecDate);
+    return formattedDate ? `${formattedNumber} of ${formattedDate}` : formattedNumber;
+  };
+
   const [bills, setBills] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -1220,7 +1251,7 @@ function Billing() {
         <div class="details-section">
           <div class="detail-row">
             <div class="detail-label">Cusdec No</div>
-            <div class="detail-value">: ${job.cusdecNumber || '-'}</div>
+            <div class="detail-value">: ${formatCusdecWithDate(job.cusdecNumber, job.cusdecDate)}</div>
           </div>
           <div class="detail-row">
             <div class="detail-label">Exporter</div>
@@ -1384,7 +1415,7 @@ function Billing() {
                   <div className="info-row">
                     <span className="info-label">CUSDEC Number: {(!selectedJob.cusdecNumber || selectedJob.cusdecNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
                     <span className={`info-value ${(!selectedJob.cusdecNumber || selectedJob.cusdecNumber.trim() === '') ? 'missing-value' : ''}`}>
-                      {selectedJob.cusdecNumber || '-'}
+                      {formatCusdecWithDate(selectedJob.cusdecNumber, selectedJob.cusdecDate)}
                     </span>
                   </div>
                   <div className="info-row">

@@ -1274,6 +1274,11 @@ div.modal div.job-form div.action-buttons,
   margin-bottom: 0.75rem;
 }
 
+/* Keep customer, assignee, and open date in one line with a smaller date slot */
+.basic-info-row {
+  grid-template-columns: minmax(280px, 1.4fr) minmax(280px, 1.4fr) minmax(180px, 0.8fr);
+}
+
 /* Red asterisk for required fields */
 .required {
   color: #dc2626;
