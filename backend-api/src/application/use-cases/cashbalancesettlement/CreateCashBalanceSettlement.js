@@ -44,11 +44,16 @@ class CreateCashBalanceSettlement {
     // Save to database
     const createdSettlement = await this.cashBalanceSettlementRepository.create(settlement);
 
-    // Update related assignment statuses to "Pending Approval"
+    // Update related assignment statuses to appropriate "Pending Approval" status
     if (relatedAssignments && relatedAssignments.length > 0) {
+      // Determine the pending status based on settlement type
+      const pendingStatus = settlementType === 'BALANCE_RETURN' 
+        ? 'Pending Approval / Balance' 
+        : 'Pending Approval / Over Due';
+      
       for (const assignmentId of relatedAssignments) {
         try {
-          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, 'Pending Approval');
+          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, pendingStatus);
         } catch (error) {
           console.error(`Failed to update assignment ${assignmentId} status:`, error);
           // Don't throw - settlement was created successfully, just log the error

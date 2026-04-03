@@ -58,12 +58,21 @@ app.use('/api/transporters', transporterRoutes);
 app.use('/api/cash-balance-settlements', cashBalanceSettlementRoutes(container));
 app.use('/api/old-invoices', oldInvoiceRoutes(container));
 
-app.get('/', (req, res) => {
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../../frontend/build')));
+
+// API health check
+app.get('/api', (req, res) => {
   res.json({ 
     message: 'Super Shine Cargo Service API',
     architecture: 'Clean Architecture',
     version: '2.0.0'
   });
+});
+
+// Serve React app for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../frontend/build', 'index.html'));
 });
 
 app.listen(PORT, () => {

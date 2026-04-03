@@ -90,6 +90,54 @@
   border: 1px solid #6ee7b7;
 }
 
+/* New Status: Balance To Be Return (Green) */
+.status-balance-to-return {
+  background: #d1fae5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+  font-weight: 700;
+}
+
+/* New Status: Over Due (Red) */
+.status-overdue {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  font-weight: 700;
+}
+
+/* New Status: Pending Approval / Balance */
+.status-pending-approval-balance {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  font-weight: 600;
+}
+
+/* New Status: Pending Approval / Over Due */
+.status-pending-approval-overdue {
+  background: #fed7aa;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+  font-weight: 600;
+}
+
+/* New Status: Settled / Balance Returned */
+.status-settled-balance-returned {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+  font-weight: 600;
+}
+
+/* New Status: Settled / Over Due Collected */
+.status-settled-overdue-collected {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  font-weight: 600;
+}
+
 .status-returned {
   background: #e0e7ff;
   color: #3730a3;
@@ -3884,4 +3932,151 @@ input[type="number"] {
   .btn-view-small {
     display: none;
   }
+}
+
+/* Search and Filter Bar */
+.search-filter-bar {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem 2rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 300px;
+  max-width: 600px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem; /* Moved closer to edge */
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-input::placeholder {
+  color: #9ca3af;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.filter-box {
+  position: relative;
+  min-width: 220px;
+}
+
+.filter-icon {
+  position: absolute;
+  left: 0.75rem; /* Moved closer to edge */
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.filter-select {
+  width: 100%;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.filter-select option {
+  padding: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .search-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-box,
+  .filter-box {
+    min-width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Collapsible Section Headers */
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.collapsible-header:hover {
+  background: #f3f4f6;
+}
+
+.collapse-arrow {
+  color: #6b7280;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.collapse-arrow.collapsed {
+  transform: rotate(-90deg);
 }
