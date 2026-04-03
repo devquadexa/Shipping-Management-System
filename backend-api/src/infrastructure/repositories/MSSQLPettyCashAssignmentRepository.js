@@ -18,6 +18,17 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           ALTER TABLE PettyCashAssignments ADD groupId NVARCHAR(100) NULL;
       `);
 
+      // Ensure status column is wide enough for new status values (e.g. 'Pending Approval / Balance' = 26 chars)
+      await pool.request().query(`
+        IF EXISTS (
+          SELECT * FROM sys.columns 
+          WHERE object_id = OBJECT_ID('PettyCashAssignments') 
+            AND name = 'status' 
+            AND max_length < 100
+        )
+          ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(50) NOT NULL;
+      `);
+
       // groupId = provided groupId OR existing group for this job+user OR new one
       const groupId = assignmentData.groupId || `${assignmentData.jobId}_${assignmentData.assignedTo}`;
       
@@ -54,6 +65,18 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
   async getAll() {
     try {
       const pool = await this.getConnection();
+
+      // Ensure status column is wide enough for new status values
+      await pool.request().query(`
+        IF EXISTS (
+          SELECT * FROM sys.columns 
+          WHERE object_id = OBJECT_ID('PettyCashAssignments') 
+            AND name = 'status' 
+            AND max_length < 100
+        )
+          ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(50) NOT NULL;
+      `);
+
       const result = await pool.request()
         .query(`
           SELECT 
@@ -371,12 +394,36 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         const balanceAmount = assignedAmount > actualSpent ? assignedAmount - actualSpent : 0;
         const overAmount = actualSpent > assignedAmount ? actualSpent - assignedAmount : 0;
         
-        console.log('settle - calculated totals:', { actualSpent, assignedAmount, balanceAmount, overAmount });
+        console.log('settle - calculated totals:', { 
+          actualSpent, 
+          assignedAmount, 
+          balanceAmount, 
+          overAmount,
+          actualSpentType: typeof actualSpent,
+          assignedAmountType: typeof assignedAmount,
+          comparison: assignedAmount > actualSpent ? 'assigned > spent (BALANCE)' : 'spent > assigned (OVERDUE)'
+        });
         
-        // Update assignment status to Settled
+        // Determine status automatically based on balance/overdue
+        // Use Number() to ensure proper comparison
+        let newStatus = 'Settled';
+        const balanceNum = Number(balanceAmount);
+        const overNum = Number(overAmount);
+        
+        if (balanceNum > 0) {
+          newStatus = 'Balance To Be Return';
+          console.log('settle - Setting status to Balance To Be Return, balanceNum:', balanceNum);
+        } else if (overNum > 0) {
+          newStatus = 'Over Due';
+          console.log('settle - Setting status to Over Due, overNum:', overNum);
+        }
+        
+        console.log('settle - auto-determined status:', newStatus);
+        
+        // Update assignment with calculated amounts and automatic status
         const updateResult = await transaction.request()
           .input('assignmentId', this.sql.Int, assignmentId)
-          .input('status', this.sql.NVarChar, 'Settled')
+          .input('status', this.sql.NVarChar, newStatus)
           .input('actualSpent', this.sql.Decimal(18, 2), actualSpent)
           .input('balanceAmount', this.sql.Decimal(18, 2), balanceAmount)
           .input('overAmount', this.sql.Decimal(18, 2), overAmount)
@@ -392,13 +439,27 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         
         console.log('settle - assignment updated, rowsAffected:', updateResult.rowsAffected);
         
-        // Update job status only if ALL assignments for this job are settled
+        // Update job status only if ALL assignments for this job are settled or in final states
         const unsettledCount = await transaction.request()
           .input('jobId', this.sql.VarChar, assignment.jobId)
           .query(`
             SELECT COUNT(*) as unsettledCount
             FROM PettyCashAssignments
-            WHERE jobId = @jobId AND status NOT IN ('Settled', 'Settled/Approved', 'Settled/Rejected', 'Balance Returned', 'Overdue Collected')
+            WHERE jobId = @jobId 
+              AND status NOT IN (
+                'Settled', 
+                'Balance To Be Return', 
+                'Over Due', 
+                'Pending Approval / Balance', 
+                'Pending Approval / Over Due', 
+                'Settled / Balance Returned', 
+                'Settled / Over Due Collected', 
+                'Closed',
+                'Settled/Approved', 
+                'Settled/Rejected', 
+                'Balance Returned', 
+                'Overdue Collected'
+              )
           `);
         
         console.log('settle - unsettledCount:', unsettledCount.recordset[0].unsettledCount);
@@ -463,7 +524,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           UPDATE PettyCashAssignments
           SET status = 'Closed'
           WHERE jobId = @jobId
-            AND status NOT IN ('Closed', 'Balance Returned', 'Overdue Collected', 'Settled/Approved')
+            AND status NOT IN ('Closed')
         `);
     } catch (error) {
       console.error('Error closing petty cash assignments for job:', error);

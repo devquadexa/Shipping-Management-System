@@ -18,6 +18,13 @@ function PettyCash() {
   const [userBalances, setUserBalances] = useState({});
   const [jobAssignments, setJobAssignments] = useState({}); // Store job assignments
   
+  // Search and Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Collapsible section states
+  const [assignmentsCollapsed, setAssignmentsCollapsed] = useState(false);
+  
   // Assignment Modal
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignFormData, setAssignFormData] = useState({
@@ -407,6 +414,14 @@ function PettyCash() {
   const openSettleModal = async (assignment) => {
     console.log('Opening settle modal for assignment:', assignment);
     setSelectedAssignment(assignment);
+    
+    // Determine if settlement can be edited (before invoice generation)
+    const canEdit = !invoicedJobIds.has(assignment.jobId) && 
+                    (assignment.status === 'Settled' || 
+                     assignment.status === 'Balance To Be Return' || 
+                     assignment.status === 'Over Due');
+    setCanEditSettlement(canEdit);
+    console.log('Can edit settlement:', canEdit);
     
     // Load existing settlement items for THIS assignment
     let existingItems = [];
@@ -1049,6 +1064,14 @@ function PettyCash() {
     switch (status) {
       case 'Assigned': return 'status-assigned';
       case 'Settled': return 'status-settled';
+      case 'Balance To Be Return': return 'status-balance-to-return';
+      case 'Over Due': return 'status-overdue';
+      case 'Pending Approval / Balance': return 'status-pending-approval-balance';
+      case 'Pending Approval / Over Due': return 'status-pending-approval-overdue';
+      case 'Settled / Balance Returned': return 'status-settled-balance-returned';
+      case 'Settled / Over Due Collected': return 'status-settled-overdue-collected';
+      case 'Closed': return 'status-closed';
+      // Legacy statuses for backward compatibility
       case 'Settled/Approved': return 'status-approved';
       case 'Settled/Rejected': return 'status-rejected';
       case 'Returned': return 'status-returned';
@@ -1056,9 +1079,40 @@ function PettyCash() {
       case 'Pending Approval': return 'status-pending-approval';
       case 'Balance Returned': return 'status-balance-returned';
       case 'Overdue Collected': return 'status-overdue-collected';
-      case 'Closed': return 'status-closed';
       default: return 'status-assigned';
     }
+  };
+
+  // Get filtered assignments count
+  const getFilteredCount = () => {
+    return assignments.filter(assignment => {
+      // Status filter
+      if (statusFilter !== 'all' && assignment.status !== statusFilter) {
+        return false;
+      }
+      
+      // Search filter
+      if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        const job = jobs.find(j => j.jobId === assignment.jobId);
+        const customerName = job ? getCustomerName(job.customerId).toLowerCase() : '';
+        const cusdecNumber = job?.cusdecNumber?.toLowerCase() || '';
+        const jobId = assignment.jobId.toLowerCase();
+        const assignedToName = (assignment.assignedToName || assignment.assignedTo || '').toLowerCase();
+        
+        const matchesSearch = 
+          jobId.includes(searchLower) ||
+          customerName.includes(searchLower) ||
+          cusdecNumber.includes(searchLower) ||
+          assignedToName.includes(searchLower);
+        
+        if (!matchesSearch) {
+          return false;
+        }
+      }
+      
+      return true;
+    }).length;
   };
 
   // Toggle row expansion
@@ -1278,7 +1332,7 @@ function PettyCash() {
                 <span className="settlement-items-title">Settlement Items</span>
                 <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
                   <span className="settlement-items-count">{assignment.settlementItems.length} item{assignment.settlementItems.length !== 1 ? 's' : ''}</span>
-                  {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId) && (
+                  {(assignment.status === 'Settled' || assignment.status === 'Balance To Be Return' || assignment.status === 'Over Due') && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId) && (
                     <button className="btn-add-inline-item" onClick={() => {
                       setInlineAddingRow(assignment.assignmentId);
                       setInlineNewItem({ itemName: '', actualCost: '', hasBill: false });
@@ -1291,7 +1345,7 @@ function PettyCash() {
               </div>
               <div className="settlement-review-table">
                 {(() => {
-                  const canEditItems = assignment.status === 'Settled' && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId);
+                  const canEditItems = (assignment.status === 'Settled' || assignment.status === 'Balance To Be Return' || assignment.status === 'Over Due') && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId);
                   return (
                     <>
                       <div className={`settlement-table-header ${canEditItems ? 'with-actions' : ''}`}>
@@ -1501,11 +1555,74 @@ function PettyCash() {
       )}
 
       <div className="card">
-        <div className="card-header">
-          <h2>Petty Cash Assignments ({assignments.length})</h2>
+        <div className="card-header collapsible-header" onClick={() => setAssignmentsCollapsed(c => !c)}>
+          <h2>
+            Petty Cash Assignments 
+            {(searchTerm || statusFilter !== 'all') ? (
+              <span> ({getFilteredCount()} of {assignments.length})</span>
+            ) : (
+              <span> ({assignments.length})</span>
+            )}
+          </h2>
+          <svg
+            className={`collapse-arrow ${assignmentsCollapsed ? 'collapsed' : ''}`}
+            width="20" height="20" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" strokeWidth="2.5"
+          >
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
         </div>
         
-        {assignments.length === 0 ? (
+        {/* Search and Filter Bar */}
+        {!assignmentsCollapsed && <div className="search-filter-bar">
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+            {searchTerm && (
+              <button 
+                className="clear-search-btn" 
+                onClick={() => setSearchTerm('')}
+                title="Clear search"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            )}
+          </div>
+          
+          <div className="filter-box">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Statuses</option>
+              <option value="Assigned">Assigned</option>
+              <option value="Settled">Settled</option>
+              <option value="Balance To Be Return">Balance To Be Return</option>
+              <option value="Over Due">Over Due</option>
+              <option value="Pending Approval">Pending Approval</option>
+              <option value="Pending Approval / Balance">Pending Approval / Balance</option>
+              <option value="Pending Approval / Over Due">Pending Approval / Over Due</option>
+              <option value="Balance Returned">Balance Returned</option>
+              <option value="Overdue Collected">Overdue Collected</option>
+              <option value="Settled / Balance Returned">Settled / Balance Returned</option>
+              <option value="Settled / Over Due Collected">Settled / Over Due Collected</option>
+              <option value="Settled/Approved">Settled/Approved</option>
+              <option value="Settled/Rejected">Settled/Rejected</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+        </div>}
+        
+        {!assignmentsCollapsed && (assignments.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">
               <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -1538,8 +1655,38 @@ function PettyCash() {
                   console.log('Total assignments:', assignments.length);
                   console.log('Assignments data:', assignments);
                   
+                  // Filter assignments based on search term and status
+                  const filteredAssignments = assignments.filter(assignment => {
+                    // Status filter
+                    if (statusFilter !== 'all' && assignment.status !== statusFilter) {
+                      return false;
+                    }
+                    
+                    // Search filter
+                    if (searchTerm.trim()) {
+                      const searchLower = searchTerm.toLowerCase();
+                      const job = jobs.find(j => j.jobId === assignment.jobId);
+                      const customerName = job ? getCustomerName(job.customerId).toLowerCase() : '';
+                      const cusdecNumber = job?.cusdecNumber?.toLowerCase() || '';
+                      const jobId = assignment.jobId.toLowerCase();
+                      const assignedToName = (assignment.assignedToName || assignment.assignedTo || '').toLowerCase();
+                      
+                      const matchesSearch = 
+                        jobId.includes(searchLower) ||
+                        customerName.includes(searchLower) ||
+                        cusdecNumber.includes(searchLower) ||
+                        assignedToName.includes(searchLower);
+                      
+                      if (!matchesSearch) {
+                        return false;
+                      }
+                    }
+                    
+                    return true;
+                  });
+                  
                   const groupMap = new Map();
-                  assignments.forEach(a => {
+                  filteredAssignments.forEach(a => {
                     const gid = a.groupId || `${a.jobId}_${a.assignedTo}`;
                     console.log(`Assignment ${a.assignmentId}: jobId=${a.jobId}, assignedTo=${a.assignedTo}, groupId=${a.groupId}, calculated=${gid}`);
                     if (!groupMap.has(gid)) groupMap.set(gid, []);
@@ -1550,6 +1697,39 @@ function PettyCash() {
                   console.log('Total groups:', groups.length);
                   console.log('Groups:', groups.map(([gid, assigns]) => ({ groupId: gid, count: assigns.length, ids: assigns.map(a => a.assignmentId) })));
                   console.log('=== END DEBUG ===');
+                  
+                  // Show "no results" message if filtered list is empty
+                  if (groups.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan="9" style={{textAlign: 'center', padding: '2rem'}}>
+                          <div className="empty-state">
+                            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                              <circle cx="11" cy="11" r="8"></circle>
+                              <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <p style={{marginTop: '1rem', color: '#6b7280'}}>
+                              {searchTerm || statusFilter !== 'all' 
+                                ? 'No assignments match your search criteria' 
+                                : 'No assignments found'}
+                            </p>
+                            {(searchTerm || statusFilter !== 'all') && (
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{marginTop: '1rem'}}
+                                onClick={() => {
+                                  setSearchTerm('');
+                                  setStatusFilter('all');
+                                }}
+                              >
+                                Clear Filters
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
 
                   return groups.map(([groupId, groupAssignments]) => {
                     const first = groupAssignments[0];
@@ -1562,10 +1742,38 @@ function PettyCash() {
                     const totalSpent = groupAssignments.reduce((s, a) => s + parseFloat(a.actualSpent || 0), 0);
                     const totalBalance = totalAssigned > totalSpent ? totalAssigned - totalSpent : 0;
                     const totalOver = totalSpent > totalAssigned ? totalSpent - totalAssigned : 0;
-                    const allSettled = groupAssignments.every(a => ['Settled','Settled/Approved','Settled/Rejected','Balance Returned','Overdue Collected','Closed'].includes(a.status));
+                    const allSettled = groupAssignments.every(a => [
+                      'Settled',
+                      'Balance To Be Return',
+                      'Over Due',
+                      'Pending Approval / Balance',
+                      'Pending Approval / Over Due',
+                      'Settled / Balance Returned',
+                      'Settled / Over Due Collected',
+                      'Settled/Approved',
+                      'Settled/Rejected',
+                      'Balance Returned',
+                      'Overdue Collected',
+                      'Closed'
+                    ].includes(a.status));
                     const anyAssigned = groupAssignments.some(a => a.status === 'Assigned');
                     // Status priority: most advanced status wins for the group display
-                    const statusPriority = ['Assigned','Settled','Settled/Rejected','Pending Approval','Balance Returned','Overdue Collected','Settled/Approved','Closed'];
+                    const statusPriority = [
+                      'Assigned',
+                      'Settled',
+                      'Balance To Be Return',
+                      'Over Due',
+                      'Settled/Rejected',
+                      'Pending Approval',
+                      'Pending Approval / Balance',
+                      'Pending Approval / Over Due',
+                      'Balance Returned',
+                      'Overdue Collected',
+                      'Settled / Balance Returned',
+                      'Settled / Over Due Collected',
+                      'Settled/Approved',
+                      'Closed'
+                    ];
                     const groupStatus = isMulti
                       ? (() => {
                           if (anyAssigned) return 'Assigned';
@@ -1583,10 +1791,10 @@ function PettyCash() {
                     const allSettlementItems = groupAssignments.flatMap(a => a.settlementItems || []);
                     // Balance/Over buttons: only show for Settled or Settled/Rejected (not after Balance Returned/Approved)
                     const canReturnBalance = !anyAssigned && user?.role === 'Waff Clerk'
-                      && (groupStatus === 'Settled' || groupStatus === 'Settled/Rejected')
+                      && (groupStatus === 'Settled' || groupStatus === 'Balance To Be Return' || groupStatus === 'Settled/Rejected')
                       && (isMulti ? totalBalance > 0 : first.balanceAmount > 0);
                     const canCollectOverdue = !anyAssigned && user?.role === 'Waff Clerk'
-                      && (groupStatus === 'Settled' || groupStatus === 'Settled/Rejected')
+                      && (groupStatus === 'Settled' || groupStatus === 'Over Due' || groupStatus === 'Settled/Rejected')
                       && (isMulti ? totalOver > 0 : first.overAmount > 0);
 
                     return (
@@ -1651,14 +1859,18 @@ function PettyCash() {
                                   Settle
                                 </button>
                               )}
-                              {!anyAssigned && user?.role === 'Waff Clerk' && groupStatus === 'Pending Approval' && (
+                              {!anyAssigned && user?.role === 'Waff Clerk' && (
+                                groupStatus === 'Pending Approval' ||
+                                groupStatus === 'Pending Approval / Balance' ||
+                                groupStatus === 'Pending Approval / Over Due'
+                              ) && (
                                 <span className="pending-approval-badge">
                                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                                   Pending Approval
                                 </span>
                               )}
                               {canReturnBalance && (
-                                <button className="btn-modern btn-success" onClick={() => {
+                                <button className="btn-return-balance btn-action" onClick={() => {
                                   const assignmentForModal = isMulti
                                     ? { ...first, balanceAmount: totalBalance, overAmount: totalOver, groupAssignmentIds: groupAssignments.map(a => a.assignmentId) }
                                     : first;
@@ -1666,7 +1878,7 @@ function PettyCash() {
                                 }}>Return Balance</button>
                               )}
                               {canCollectOverdue && (
-                                <button className="btn-modern btn-warning" onClick={() => {
+                                <button className="btn-collect-overdue btn-action" onClick={() => {
                                   const assignmentForModal = isMulti
                                     ? { ...first, balanceAmount: totalBalance, overAmount: totalOver, groupAssignmentIds: groupAssignments.map(a => a.assignmentId) }
                                     : first;
@@ -1744,7 +1956,13 @@ function PettyCash() {
                                         <span className="fin-stat-value">{totalSpent > 0 ? `LKR ${formatAmount(totalSpent)}` : '—'}</span>
                                       </div>
                                       {/* Balance to Return — only before approval/close */}
-                                      {totalBalance > 0 && !['Balance Returned', 'Settled/Approved', 'Closed'].includes(groupStatus) && (
+                                      {totalBalance > 0 && ![
+                                        'Balance Returned',
+                                        'Settled / Balance Returned',
+                                        'Pending Approval / Balance',
+                                        'Settled/Approved',
+                                        'Closed'
+                                      ].includes(groupStatus) && (
                                         <>
                                           <div className="fin-stat-divider" />
                                           <div className="fin-stat-item">
@@ -1754,7 +1972,12 @@ function PettyCash() {
                                         </>
                                       )}
                                       {/* Balance Returned — after approval or close */}
-                                      {totalBalance > 0 && ['Balance Returned', 'Settled/Approved', 'Closed'].includes(groupStatus) && (
+                                      {totalBalance > 0 && [
+                                        'Balance Returned',
+                                        'Settled / Balance Returned',
+                                        'Settled/Approved',
+                                        'Closed'
+                                      ].includes(groupStatus) && (
                                         <>
                                           <div className="fin-stat-divider" />
                                           <div className="fin-stat-item">
@@ -1764,7 +1987,13 @@ function PettyCash() {
                                         </>
                                       )}
                                       {/* Over Amount — only before collection/close */}
-                                      {totalOver > 0 && !['Overdue Collected', 'Settled/Approved', 'Closed'].includes(groupStatus) && (
+                                      {totalOver > 0 && ![
+                                        'Overdue Collected',
+                                        'Settled / Over Due Collected',
+                                        'Pending Approval / Over Due',
+                                        'Settled/Approved',
+                                        'Closed'
+                                      ].includes(groupStatus) && (
                                         <>
                                           <div className="fin-stat-divider" />
                                           <div className="fin-stat-item">
@@ -1774,7 +2003,12 @@ function PettyCash() {
                                         </>
                                       )}
                                       {/* Overdue Collected — after collection or close */}
-                                      {totalOver > 0 && ['Overdue Collected', 'Settled/Approved', 'Closed'].includes(groupStatus) && (
+                                      {totalOver > 0 && [
+                                        'Overdue Collected',
+                                        'Settled / Over Due Collected',
+                                        'Settled/Approved',
+                                        'Closed'
+                                      ].includes(groupStatus) && (
                                         <>
                                           <div className="fin-stat-divider" />
                                           <div className="fin-stat-item">
@@ -1917,7 +2151,7 @@ function PettyCash() {
               </tbody>
             </table>
           </div>
-        )}
+        ))}
       </div>
       {/* Assign Petty Cash Modal */}
       {showAssignModal && (
@@ -2059,7 +2293,19 @@ function PettyCash() {
               </div>
             </div>
 
-            {(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? (
+            {(selectedAssignment.status === 'Settled' || 
+              selectedAssignment.status === 'Balance To Be Return' || 
+              selectedAssignment.status === 'Over Due' || 
+              selectedAssignment.status === 'Pending Approval / Balance' || 
+              selectedAssignment.status === 'Pending Approval / Over Due' || 
+              selectedAssignment.status === 'Settled / Balance Returned' || 
+              selectedAssignment.status === 'Settled / Over Due Collected' || 
+              selectedAssignment.status === 'Pending Approval' || 
+              selectedAssignment.status === 'Settled/Approved' || 
+              selectedAssignment.status === 'Settled/Rejected' || 
+              selectedAssignment.status === 'Balance Returned' || 
+              selectedAssignment.status === 'Overdue Collected' ||
+              selectedAssignment.status === 'Closed') ? (
               <div className="settlement-items-view">
                 <h3>Settlement Items {!canEditSettlement && '(Read-Only)'}</h3>
                 {canEditSettlement && (
@@ -2625,6 +2871,7 @@ const ManagementSettlementSection = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [actionLoading, setActionLoading] = useState({});
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     fetchSettlements();
@@ -2745,14 +2992,20 @@ const ManagementSettlementSection = ({ user }) => {
 
   return (
     <div className="card management-settlements">
-      <div className="card-header">
+      <div className="card-header collapsible-header" onClick={() => setCollapsed(c => !c)}>
         <h2>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="header-icon">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>
-          </svg>
           Cash Balance Settlement Management
         </h2>
+        <svg
+          className={`collapse-arrow ${collapsed ? 'collapsed' : ''}`}
+          width="20" height="20" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" strokeWidth="2.5"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
       </div>
+
+      {!collapsed && (<>
 
       {message && (
         <div className={`alert ${message.includes('Error') || message.includes('Failed') ? 'alert-error' : 'alert-success'}`}>
@@ -2885,6 +3138,7 @@ const ManagementSettlementSection = ({ user }) => {
           </div>
         )}
       </div>
+      </>)}
     </div>
   );
 };

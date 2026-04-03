@@ -523,19 +523,30 @@ input[type="number"] {
 
 .saved-pay-items {
   margin-top: 1.5rem;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
+/* Header: dark navy gradient matching screenshot */
 .pay-items-review-header {
   background: linear-gradient(135deg, #101036 0%, #1e40af 100%);
   color: white;
-  padding: 1.5rem;
-  border-radius: 8px 8px 0 0;
-  margin-bottom: 0;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.review-header-icon {
+  font-size: 1.2rem;
+  color: #93c5fd;
+  flex-shrink: 0;
 }
 
 .pay-items-review-header h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.1rem;
+  margin: 0 0 0.2rem 0;
+  font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -543,147 +554,269 @@ input[type="number"] {
 
 .review-subtitle {
   margin: 0;
-  font-size: 0.9rem;
-  opacity: 0.9;
+  font-size: 0.8rem;
+  opacity: 0.85;
   font-style: italic;
 }
 
-/* Pay Items Review Table - Grid-based for perfect alignment */
+/* Remove icon from header */
+.review-header-icon {
+  display: none;
+}
+
+/* Main table — colgroup defines column widths for ALL rows including tfoot */
 .pay-items-review-table {
   width: 100%;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 1.5rem;
+  border-collapse: collapse;
+  table-layout: fixed;
   background: white;
+  margin-bottom: 0;
 }
 
-.table-header {
-  display: grid;
-  grid-template-columns: 38% 18% 10% 20% 14%;
-  background: #f0f4ff;
-  border-bottom: 2px solid #e0e0e0;
-}
-
-.header-cell {
-  padding: 0.75rem;
-  font-weight: 600;
-  color: #101036;
+/* All cells — base padding */
+.pay-items-review-table th,
+.pay-items-review-table td {
+  padding: 0.7rem 1rem;
   font-size: 0.9rem;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.header-cell:last-child {
+.pay-items-review-table th:last-child,
+.pay-items-review-table td:last-child {
   border-right: none;
 }
 
-.description-header {
+/* Description column — left aligned */
+.pay-items-review-table .col-description {
   text-align: left;
-  padding-left: 0.75rem;
 }
 
-.amount-header {
+/* Amount columns — right aligned, monospace */
+.pay-items-review-table .col-amount {
   text-align: right;
-  padding-right: 1rem;
+  font-family: 'Courier New', monospace;
 }
 
-.table-body {
-  display: flex;
-  flex-direction: column;
+/* Actions column — centered */
+.pay-items-review-table .col-actions {
+  text-align: center;
+  padding: 0.5rem 0.75rem;
 }
 
-.table-row {
-  display: grid;
-  grid-template-columns: 38% 18% 10% 20% 14%;
-  border-bottom: 1px solid #e0e0e0;
+/* Header row */
+.pay-items-review-table thead tr {
+  background: #dbeafe;
+  border-bottom: 2px solid #93c5fd;
 }
 
-.table-row:last-child {
-  border-bottom: none;
+.pay-items-review-table thead th {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #1e3a8a;
+  text-transform: none;
+  letter-spacing: 0;
+  border-right: 1px solid #bfdbfe;
 }
 
-.table-cell {
-  padding: 0.75rem;
+.pay-items-review-table thead th:last-child {
+  border-right: none;
+}
+
+/* Body rows */
+.pay-items-review-table tbody .pay-item-row {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background 0.15s;
+}
+
+.pay-items-review-table tbody .pay-item-row:hover {
+  background: #f8faff;
+}
+
+.pay-items-review-table tbody td {
   font-size: 0.9rem;
-  border-right: 1px solid #e0e0e0;
+  color: #374151;
+  border-right: 1px solid #e5e7eb;
+}
+
+.pay-items-review-table tbody td:last-child {
+  border-right: none;
+}
+
+/* Action buttons */
+.action-btns {
   display: flex;
+  gap: 5px;
+  justify-content: center;
   align-items: center;
 }
 
-.table-cell:last-child {
+.action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.edit-btn {
+  background: #fff7ed;
+  color: #ea580c;
+  border: 1px solid #fed7aa;
+}
+
+.edit-btn:hover {
+  background: #ea580c;
+  color: white;
+}
+
+.remove-btn {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.remove-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+
+.save-btn {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  font-weight: 700;
+}
+
+.save-btn:hover { background: #16a34a; color: white; }
+
+.cancel-btn {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  font-weight: 700;
+}
+
+.cancel-btn:hover { background: #dc2626; color: white; }
+
+.inline-edit-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+  text-align: right;
+  outline: none;
+}
+
+/* Footer rows */
+.pay-items-review-table tfoot td {
+  border-right: 1px solid #e5e7eb;
+}
+
+.pay-items-review-table tfoot td:last-child {
   border-right: none;
 }
 
-.description-cell {
-  text-align: left;
-  justify-content: flex-start;
-  padding-left: 0.75rem;
-}
-
-.amount-cell {
-  text-align: right;
-  justify-content: flex-end;
-  padding-right: 1rem;
-  font-family: 'Courier New', monospace;
-  font-weight: 500;
-}
-
-.total-row {
-  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+/* Total row */
+.pay-items-review-table .total-row {
+  background: #eef2ff;
   border-top: 2px solid #101036;
   border-bottom: 2px solid #101036;
 }
 
-.total-row .table-cell {
-  padding: 1rem 0.75rem;
-  font-weight: 700;
-  color: #101036;
+.pay-items-review-table .total-row td {
   font-size: 0.95rem;
+  color: #101036;
+  font-weight: 700;
 }
 
-.total-row .description-cell {
-  padding-left: 0.75rem;
-}
-
-.total-row .amount-cell {
-  padding-right: 1rem;
+.pay-items-review-table .total-row .col-amount {
   font-family: 'Courier New', monospace;
 }
 
-.profit-row {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-  border-bottom: 2px solid #059669;
+/* Profit margin row */
+.pay-items-review-table .profit-row {
+  background: #f0fdf4;
+  border-bottom: 1px solid #bbf7d0;
 }
 
-.profit-row .table-cell {
-  padding: 1rem 0.75rem;
-  font-weight: 700;
-  color: #101036;
+.pay-items-review-table .profit-row td {
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.profit-amount.profit-positive {
+  color: #16a34a;
+}
+
+.profit-amount.profit-negative {
+  color: #dc2626;
+}
+
+/* Invoice Summary header row */
+.pay-items-review-table .summary-header-row {
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+}
+
+.pay-items-review-table .summary-header-row td {
+  font-size: 0.85rem;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 0.6rem 1rem;
+}
+
+/* Gross total row */
+.pay-items-review-table .gross-total-row {
+  background: #f9fafb;
+}
+
+.pay-items-review-table .gross-total-row td {
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+/* Advance payment row */
+.pay-items-review-table .advance-payment-row {
+  background: #f9fafb;
+}
+
+.advance-deduction {
+  color: #dc2626;
+}
+
+/* Net total row — green like screenshot */
+.pay-items-review-table .net-total-row {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+}
+
+.pay-items-review-table .net-total-row td {
+  color: white;
   font-size: 0.95rem;
+  padding: 0.85rem 1rem;
 }
 
-.profit-row .description-cell {
-  padding-left: 0.75rem;
+.net-total-divider {
+  border-left: 1px solid rgba(255,255,255,0.3) !important;
 }
 
-.profit-row .amount-cell {
-  padding-right: 1rem;
+.net-total-amount {
   font-family: 'Courier New', monospace;
-}
-
-.profit-positive {
-  color: #388e3c;
-  font-weight: 600;
-}
-
-.profit-negative {
-  color: #d32f2f;
-  font-weight: 600;
+  font-size: 1rem !important;
 }
 
 .generate-bill-section {
   text-align: center;
-  padding-top: 1rem;
+  padding: 1.25rem 0 0.5rem;
 }
 
 .no-items {
@@ -1155,89 +1288,36 @@ input[type="number"] {
   }
 
   .pay-items-review-table {
-    display: block;
+    display: table;
+    font-size: 0.75rem;
   }
 
-  .table-header {
-    display: none;
-  }
-
-  .table-body {
-    display: block;
+  .pay-items-review-table .col-description,
+  .pay-items-review-table .col-amount,
+  .pay-items-review-table .col-actions {
+    padding: 0.5rem 0.4rem;
   }
 
   .table-row {
-    display: block;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.75rem;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    /* old div-based rule — no longer used */
   }
 
-  .table-row.total-row {
-    background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
-    border-color: #c7d2fe;
-  }
-
+  .table-row.total-row,
   .table-row.profit-row {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    border-color: #86efac;
+    /* old div-based rule — no longer used */
   }
 
-  .table-cell {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.4rem 0;
-    border-bottom: 1px solid #f3f4f6;
-    border-right: none;
-  }
-
-  .table-cell:last-child {
-    border-bottom: none;
-  }
-
-  .table-cell::before {
-    content: attr(data-label);
-    font-weight: 600;
-    color: #6b7280;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    flex-shrink: 0;
-  }
-
-  .description-cell::before {
-    content: "Description";
-  }
-
-  .amount-cell:nth-child(2)::before {
-    content: "Actual Cost";
-  }
-
-  .amount-cell:nth-child(3)::before {
-    content: "Billing Amount";
-  }
-
-  .total-row .description-cell::before {
-    content: "";
-  }
-
-  .profit-row .description-cell::before {
-    content: "";
-  }
-
+  .table-cell,
+  .table-cell:last-child,
+  .table-cell::before,
+  .description-cell::before,
+  .amount-cell:nth-child(2)::before,
+  .amount-cell:nth-child(3)::before,
+  .total-row .description-cell::before,
+  .profit-row .description-cell::before,
   .total-row .description-cell,
   .profit-row .description-cell {
-    display: block;
-    justify-content: flex-start;
-    font-weight: 700;
-    color: #101036;
-    border-bottom: 2px solid #d1d5db;
-    padding-bottom: 0.5rem;
-    margin-bottom: 0.25rem;
-    text-align: left;
+    /* old div-based rules — no longer used */
   }
 }
 
@@ -1613,106 +1693,6 @@ input[type="number"] {
   font-weight: 500;
 }
 
-/* Advance Payment Summary Rows */
-.advance-summary-row {
-  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%) !important;
-  border-top: 2px solid #101036 !important;
-  border-bottom: 1px solid #d1d5db !important;
-}
-
-.advance-summary-label {
-  color: #101036 !important;
-  font-weight: 700 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.gross-total-row {
-  background: rgba(16, 16, 54, 0.05) !important;
-}
-
-.gross-total-label {
-  color: #374151;
-  font-weight: 600;
-  padding-left: 1rem !important;
-}
-
-.gross-total-amount {
-  color: #101036;
-  font-weight: 700;
-}
-
-.advance-payment-row {
-  background: #f9fafb !important;
-}
-
-.advance-payment-label {
-  color: #374151;
-  font-weight: 600;
-  padding-left: 1rem !important;
-}
-
-.advance-deduction {
-  color: #374151 !important;
-  font-weight: 700;
-}
-
-.net-total-row {
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
-  color: white !important;
-  border-top: 2px solid #059669 !important;
-  border-bottom: 2px solid #059669 !important;
-}
-
-.net-total-label {
-  color: white !important;
-  font-weight: 700 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.final-amount {
-  color: white !important;
-  font-weight: 700 !important;
-  font-size: 1.1rem;
-}
-
-/* Enhanced table styling for advance payment */
-.pay-items-review-table .table-row:hover {
-  background: rgba(16, 16, 54, 0.02);
-}
-
-.advance-summary-row:hover,
-.gross-total-row:hover,
-.advance-payment-row:hover,
-.net-total-row:hover {
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-/* Professional spacing for advance payment sections */
-.advance-summary-row .table-cell,
-.gross-total-row .table-cell,
-.advance-payment-row .table-cell,
-.net-total-row .table-cell {
-  padding: 0.75rem 1rem;
-}
-
-/* Responsive design for advance payment */
-@media (max-width: 768px) {
-  .advance-summary-label,
-  .gross-total-label,
-  .advance-payment-label,
-  .net-total-label {
-    font-size: 0.9rem;
-  }
-  
-  .gross-total-amount,
-  .advance-deduction,
-  .final-amount {
-    font-size: 1rem;
-  }
-}
 /* Pay Items Actions Column Styles */
 .actions-header {
   width: 120px;
@@ -1936,38 +1916,6 @@ input[type="number"] {
   }
 }
 
-/* Enhanced pay items review table grid for actions column */
-.pay-items-review-table .table-header {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 120px;
-  gap: 1rem;
-}
-
-.pay-items-review-table .table-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 120px;
-  gap: 1rem;
-  align-items: center;
-}
-
-/* When no actions column (for non-admin users) */
-.pay-items-review-table.no-actions .table-header {
-  grid-template-columns: 2fr 1fr 1fr;
-}
-
-.pay-items-review-table.no-actions .table-row {
-  grid-template-columns: 2fr 1fr 1fr;
-}
-
-@media (max-width: 768px) {
-  .pay-items-review-table .table-header {
-    grid-template-columns: 1fr;
-  }
-  
-  .pay-items-review-table .table-row {
-    grid-template-columns: 1fr;
-  }
-}
 /* Manager Notice Styles */
 .manager-notice {
   display: flex;
@@ -2397,8 +2345,4 @@ input[type="number"] {
   border: 1px solid #e5e7eb;
 }
 
-/* No-actions variant: hide actions column from grid */
-.pay-items-review-table.no-actions .table-header,
-.pay-items-review-table.no-actions .table-row {
-  grid-template-columns: 40% 22% 12% 26%;
-}
+/* No-actions variant: columns still align via table-layout: fixed */
