@@ -1817,32 +1817,32 @@ function PettyCash() {
                               </svg>
                             </button>
                           </td>
-                          <td>
+                          <td data-label="Assignment ID">
                             {isMulti ? (
                               <strong className="assignment-id">#{first.assignmentId}</strong>
                             ) : (
                               <strong className="assignment-id">#{first.assignmentId}</strong>
                             )}
                           </td>
-                          <td className="job-cusdec-cell">
+                          <td className="job-cusdec-cell" data-label="Job ID / CUSDEC">
                             {job && job.cusdecNumber ? (
                               <span>{first.jobId} / {job.cusdecNumber}</span>
                             ) : (
                               <span>{first.jobId}</span>
                             )}
                           </td>
-                          <td className="customer-name-cell">{job ? getCustomerName(job.customerId) : '-'}</td>
-                          <td className="assigned-to-cell">
+                          <td className="customer-name-cell" data-label="Customer">{job ? getCustomerName(job.customerId) : '-'}</td>
+                          <td className="assigned-to-cell" data-label="Assigned To">
                             <span className="assigned-to-name">{first.assignedToName || first.assignedTo || '-'}</span>
                           </td>
-                          <td>
+                          <td data-label="Status">
                             <span className={`status-badge ${getStatusBadgeClass(groupStatus)}`}>
                               {groupStatus}
                             </span>
                           </td>
-                          <td><strong>LKR {formatAmount(totalAssigned)}</strong></td>
-                          <td>{new Date(first.assignedDate).toLocaleDateString()}</td>
-                          <td>
+                          <td data-label="Total Assigned"><strong>LKR {formatAmount(totalAssigned)}</strong></td>
+                          <td data-label="Assigned Date">{new Date(first.assignedDate).toLocaleDateString()}</td>
+                          <td data-label="Actions">
                             <div className="actions-cell-hybrid">
                               {/* Unified action logic for both single and grouped assignments */}
                               {anyAssigned && user?.role === 'Waff Clerk' && (
