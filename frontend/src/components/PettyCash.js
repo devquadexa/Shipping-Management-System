@@ -1389,9 +1389,12 @@ function PettyCash() {
                                     </div>
                                   ) : (
                                     <div className="inline-action-btns">
-                                      <button className="inline-btn-edit" onClick={async () => {
-                                        const inv = await checkInvoiceGenerated(assignment.jobId);
-                                        if (inv) { setMessage('❌ Invoice already generated'); setTimeout(() => setMessage(''), 3000); return; }
+                                      <button className="inline-btn-edit" onClick={() => {
+                                        if (invoicedJobIds.has(assignment.jobId)) { 
+                                          setMessage('❌ Invoice already generated'); 
+                                          setTimeout(() => setMessage(''), 3000); 
+                                          return; 
+                                        }
                                         startInlineEdit(assignment.assignmentId, item);
                                       }} title="Edit item">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1776,6 +1779,9 @@ function PettyCash() {
                     const groupStatus = isMulti
                       ? (() => {
                           if (anyAssigned) return 'Assigned';
+                          // Check if any assignment is Closed (invoice generated - bill created)
+                          const hasClosed = groupAssignments.some(a => a.status === 'Closed');
+                          if (hasClosed) return 'Closed';
                           // Check if any assignment has a pending approval status
                           const hasPendingApproval = groupAssignments.some(a => 
                             a.status === 'Pending Approval / Balance' || 
@@ -1806,19 +1812,23 @@ function PettyCash() {
                         })()
                       : groupAssignments[0].status;
                     // Collect all settlement items across all assignments in the group
-                    const allSettlementItems = groupAssignments.flatMap(a => a.settlementItems || []);
-                    // Balance/Over buttons: only show for Settled or Settled/Rejected (not after Balance Returned/Approved)
+                    const allSettlementItems = groupAssignments.flatMap(a => 
+                      (a.settlementItems || []).map(item => ({ ...item, assignmentId: a.assignmentId }))
+                    );
+                    // Balance/Over buttons: only show for Settled or Settled/Rejected (not after Balance Returned/Approved or Closed)
                     const canReturnBalance = !anyAssigned && user?.role === 'Waff Clerk'
                       && (groupStatus === 'Settled' || groupStatus === 'Balance To Be Return' || groupStatus === 'Settled/Rejected')
                       && groupStatus !== 'Pending Approval / Balance'
                       && groupStatus !== 'Pending Approval / Over Due'
                       && groupStatus !== 'Pending Approval'
+                      && groupStatus !== 'Closed'
                       && (isMulti ? totalBalance > 0 : first.balanceAmount > 0);
                     const canCollectOverdue = !anyAssigned && user?.role === 'Waff Clerk'
                       && (groupStatus === 'Settled' || groupStatus === 'Over Due' || groupStatus === 'Settled/Rejected')
                       && groupStatus !== 'Pending Approval / Balance'
                       && groupStatus !== 'Pending Approval / Over Due'
                       && groupStatus !== 'Pending Approval'
+                      && groupStatus !== 'Closed'
                       && (isMulti ? totalOver > 0 : first.overAmount > 0);
 
                     return (
@@ -2078,9 +2088,12 @@ function PettyCash() {
                                                               </div>
                                                             ) : (
                                                               <div className="inline-action-btns">
-                                                                <button className="inline-btn-edit" onClick={async () => {
-                                                                  const inv = await checkInvoiceGenerated(first.jobId);
-                                                                  if (inv) { setMessage('❌ Invoice already generated'); setTimeout(() => setMessage(''), 3000); return; }
+                                                                <button className="inline-btn-edit" onClick={() => {
+                                                                  if (invoicedJobIds.has(first.jobId)) {
+                                                                    setMessage('❌ Invoice already generated');
+                                                                    setTimeout(() => setMessage(''), 3000);
+                                                                    return;
+                                                                  }
                                                                   startInlineEdit(item.assignmentId, item);
                                                                 }} title="Edit item">
                                                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
