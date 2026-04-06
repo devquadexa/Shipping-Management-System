@@ -138,5 +138,12 @@ module.exports = (container) => {
     (req, res) => controller.closeAssignment(req, res)
   );
 
+  // Recalculate/fix status for a settled assignment (Admin/Super Admin/Manager)
+  router.patch('/:id/recalculate-status',
+    auth,
+    checkRole('Admin', 'Super Admin', 'Manager'),
+    (req, res) => controller.recalculateStatus(req, res)
+  );
+
   return router;
 };

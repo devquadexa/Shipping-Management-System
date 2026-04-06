@@ -31,7 +31,7 @@ class ApproveCashBalanceSettlement {
 
     // Update related assignment statuses after management approval
     if (settlement.relatedAssignments && settlement.relatedAssignments.length > 0) {
-      // Set final status based on settlement type
+      // Set status based on settlement type
       const finalStatus = settlement.settlementType === 'BALANCE_RETURN'
         ? 'Settled / Balance Returned'
         : 'Settled / Over Due Collected';

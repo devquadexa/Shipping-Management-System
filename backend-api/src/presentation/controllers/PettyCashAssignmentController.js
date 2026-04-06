@@ -369,6 +369,18 @@ class PettyCashAssignmentController {
       res.status(500).json({ message: 'Error fetching sub-assignments' });
     }
   }
+
+  async recalculateStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const pettyCashAssignmentRepository = this.container.resolve('pettyCashAssignmentRepository');
+      const updated = await pettyCashAssignmentRepository.recalculateStatus(parseInt(id));
+      res.json({ message: 'Status recalculated', assignment: updated });
+    } catch (error) {
+      console.error('Error in recalculateStatus:', error);
+      res.status(500).json({ message: error.message || 'Error recalculating status' });
+    }
+  }
 }
 
 module.exports = PettyCashAssignmentController;
