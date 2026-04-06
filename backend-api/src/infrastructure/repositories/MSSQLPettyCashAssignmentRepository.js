@@ -26,7 +26,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
             AND name = 'status' 
             AND max_length < 100
         )
-          ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(50) NOT NULL;
+          ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(100) NOT NULL;
       `);
 
       // groupId = provided groupId OR existing group for this job+user OR new one
@@ -74,7 +74,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
             AND name = 'status' 
             AND max_length < 100
         )
-          ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(50) NOT NULL;
+          ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(100) NOT NULL;
       `);
 
       const result = await pool.request()
@@ -389,7 +389,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
             WHERE assignmentId = @assignmentId
           `);
         
-        const actualSpent = allItemsResult.recordset[0].totalSpent || 0;
+        const actualSpent = parseFloat(allItemsResult.recordset[0].totalSpent) || 0;
         const assignedAmount = parseFloat(assignment.assignedAmount);
         const balanceAmount = assignedAmount > actualSpent ? assignedAmount - actualSpent : 0;
         const overAmount = actualSpent > assignedAmount ? actualSpent - assignedAmount : 0;
@@ -510,6 +510,76 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       return await this.getById(assignmentId);
     } catch (error) {
       console.error('Error updating assignment status:', error);
+      throw error;
+    }
+  }
+
+  // Recalculate and fix status for a settled assignment based on balanceAmount/overAmount
+  async recalculateStatus(assignmentId) {
+    try {
+      const pool = await this.getConnection();
+      const result = await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
+        .query(`
+          SELECT assignmentId, status, assignedAmount, actualSpent, balanceAmount, overAmount
+          FROM PettyCashAssignments
+          WHERE assignmentId = @assignmentId
+        `);
+
+      if (!result.recordset.length) throw new Error('Assignment not found');
+
+      const row = result.recordset[0];
+      const balanceAmount = parseFloat(row.balanceAmount) || 0;
+      const overAmount = parseFloat(row.overAmount) || 0;
+      const assignedAmount = parseFloat(row.assignedAmount) || 0;
+      const actualSpent = parseFloat(row.actualSpent) || 0;
+
+      // Only recalculate if the assignment has been settled (has actualSpent)
+      const settledStatuses = ['Settled', 'Balance To Be Return', 'Over Due'];
+      if (!settledStatuses.includes(row.status)) {
+        return await this.getById(assignmentId);
+      }
+
+      let correctStatus = 'Settled';
+      if (balanceAmount > 0) {
+        correctStatus = 'Balance To Be Return';
+      } else if (overAmount > 0) {
+        correctStatus = 'Over Due';
+      }
+
+      // Also recalculate from scratch if amounts seem wrong
+      if (actualSpent > 0 && assignedAmount > 0) {
+        const recalcBalance = assignedAmount > actualSpent ? assignedAmount - actualSpent : 0;
+        const recalcOver = actualSpent > assignedAmount ? actualSpent - assignedAmount : 0;
+        if (recalcBalance > 0) correctStatus = 'Balance To Be Return';
+        else if (recalcOver > 0) correctStatus = 'Over Due';
+        else correctStatus = 'Settled';
+
+        // Update amounts too if they were wrong
+        await pool.request()
+          .input('assignmentId', this.sql.Int, assignmentId)
+          .input('status', this.sql.NVarChar, correctStatus)
+          .input('balanceAmount', this.sql.Decimal(18, 2), recalcBalance)
+          .input('overAmount', this.sql.Decimal(18, 2), recalcOver)
+          .query(`
+            UPDATE PettyCashAssignments
+            SET status = @status, balanceAmount = @balanceAmount, overAmount = @overAmount
+            WHERE assignmentId = @assignmentId
+          `);
+      } else {
+        await pool.request()
+          .input('assignmentId', this.sql.Int, assignmentId)
+          .input('status', this.sql.NVarChar, correctStatus)
+          .query(`
+            UPDATE PettyCashAssignments
+            SET status = @status
+            WHERE assignmentId = @assignmentId
+          `);
+      }
+
+      return await this.getById(assignmentId);
+    } catch (error) {
+      console.error('Error recalculating assignment status:', error);
       throw error;
     }
   }
@@ -847,21 +917,31 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       const balanceAmount = Math.max(0, assignedAmount - actualSpent);
       const overAmount = Math.max(0, actualSpent - assignedAmount);
       
-      // Update assignment
+      // Determine correct status based on amounts
+      let newStatus = 'Settled';
+      if (balanceAmount > 0) {
+        newStatus = 'Balance To Be Return';
+      } else if (overAmount > 0) {
+        newStatus = 'Over Due';
+      }
+      
+      // Update assignment with recalculated amounts AND status
       await pool.request()
         .input('assignmentId', this.sql.Int, assignmentId)
         .input('actualSpent', this.sql.Decimal(18, 2), actualSpent)
         .input('balanceAmount', this.sql.Decimal(18, 2), balanceAmount)
         .input('overAmount', this.sql.Decimal(18, 2), overAmount)
+        .input('status', this.sql.NVarChar, newStatus)
         .query(`
           UPDATE PettyCashAssignments
           SET actualSpent = @actualSpent,
               balanceAmount = @balanceAmount,
-              overAmount = @overAmount
+              overAmount = @overAmount,
+              status = @status
           WHERE assignmentId = @assignmentId
         `);
       
-      return { actualSpent, balanceAmount, overAmount };
+      return { actualSpent, balanceAmount, overAmount, status: newStatus };
     } catch (error) {
       console.error('Error recalculating assignment totals:', error);
       throw error;

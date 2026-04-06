@@ -34,10 +34,16 @@ class GetGroupedAssignments {
       grouped[gid].assignments.push(assignment);
       grouped[gid].totalAssigned += parseFloat(assignment.assignedAmount || 0);
       grouped[gid].totalSpent += parseFloat(assignment.actualSpent || 0);
-      grouped[gid].totalBalance += parseFloat(assignment.balanceAmount || 0);
-      grouped[gid].totalOver += parseFloat(assignment.overAmount || 0);
 
-      if (assignment.status !== 'Settled' && assignment.status !== 'Settled/Approved') {
+      if (assignment.status !== 'Settled' && 
+          assignment.status !== 'Balance To Be Return' && 
+          assignment.status !== 'Over Due' &&
+          assignment.status !== 'Pending Approval / Balance' &&
+          assignment.status !== 'Pending Approval / Over Due' &&
+          assignment.status !== 'Pending Approval' &&
+          assignment.status !== 'Settled/Approved' &&
+          assignment.status !== 'Settled / Balance Returned' &&
+          assignment.status !== 'Settled / Over Due Collected') {
         grouped[gid].allSettled = false;
         grouped[gid].hasUnsettled = true;
       }
@@ -49,6 +55,49 @@ class GetGroupedAssignments {
         grouped[gid].groupStatus = 'Settled';
       } else if (grouped[gid].groupStatus === 'Settled' && grouped[gid].allSettled) {
         grouped[gid].groupStatus = 'Settled';
+      }
+    });
+
+    // Calculate group balance/over from totals (not sum of individual balances)
+    Object.values(grouped).forEach(group => {
+      group.totalBalance = Math.max(0, group.totalAssigned - group.totalSpent);
+      group.totalOver = Math.max(0, group.totalSpent - group.totalAssigned);
+      
+      // Check if any assignment has a pending approval status
+      const hasPendingApproval = group.assignments.some(a => 
+        a.status === 'Pending Approval / Balance' || 
+        a.status === 'Pending Approval / Over Due' ||
+        a.status === 'Pending Approval'
+      );
+      
+      // Check if all assignments have the same approved status
+      const allBalanceReturned = group.assignments.every(a => a.status === 'Settled / Balance Returned');
+      const allOverDueCollected = group.assignments.every(a => a.status === 'Settled / Over Due Collected');
+      const allApproved = group.assignments.every(a => a.status === 'Settled/Approved');
+      
+      // Determine group status based on pending approval first, then approved statuses, then group totals
+      if (hasPendingApproval) {
+        // Find the specific pending approval status
+        const pendingAssignment = group.assignments.find(a => 
+          a.status === 'Pending Approval / Balance' || 
+          a.status === 'Pending Approval / Over Due' ||
+          a.status === 'Pending Approval'
+        );
+        group.groupStatus = pendingAssignment.status;
+      } else if (allBalanceReturned) {
+        group.groupStatus = 'Settled / Balance Returned';
+      } else if (allOverDueCollected) {
+        group.groupStatus = 'Settled / Over Due Collected';
+      } else if (allApproved) {
+        group.groupStatus = 'Settled/Approved';
+      } else if (group.hasUnsettled) {
+        group.groupStatus = 'Assigned';
+      } else if (group.totalBalance > 0) {
+        group.groupStatus = 'Balance To Be Return';
+      } else if (group.totalOver > 0) {
+        group.groupStatus = 'Over Due';
+      } else {
+        group.groupStatus = 'Settled';
       }
     });
 

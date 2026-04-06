@@ -1637,7 +1637,6 @@ function PettyCash() {
             <table className="assignments-table-modern">
               <thead>
                 <tr>
-                  <th style={{width: '50px'}}></th>
                   <th>Assignment ID</th>
                   <th>Job ID / CUSDEC Number</th>
                   <th style={{minWidth: '220px'}}>Customer</th>
@@ -1777,14 +1776,33 @@ function PettyCash() {
                     const groupStatus = isMulti
                       ? (() => {
                           if (anyAssigned) return 'Assigned';
-                          // Pick the highest-priority status among all assignments
-                          let best = groupAssignments[0].status;
-                          for (const a of groupAssignments) {
-                            const ai = statusPriority.indexOf(a.status);
-                            const bi = statusPriority.indexOf(best);
-                            if (ai > bi) best = a.status;
+                          // Check if any assignment has a pending approval status
+                          const hasPendingApproval = groupAssignments.some(a => 
+                            a.status === 'Pending Approval / Balance' || 
+                            a.status === 'Pending Approval / Over Due' ||
+                            a.status === 'Pending Approval'
+                          );
+                          if (hasPendingApproval) {
+                            // Return the specific pending approval status if found
+                            const pendingAssignment = groupAssignments.find(a => 
+                              a.status === 'Pending Approval / Balance' || 
+                              a.status === 'Pending Approval / Over Due' ||
+                              a.status === 'Pending Approval'
+                            );
+                            return pendingAssignment.status;
                           }
-                          return best;
+                          // Check if all assignments have the same approved status
+                          const allBalanceReturned = groupAssignments.every(a => a.status === 'Settled / Balance Returned');
+                          const allOverDueCollected = groupAssignments.every(a => a.status === 'Settled / Over Due Collected');
+                          const allApproved = groupAssignments.every(a => a.status === 'Settled/Approved');
+                          if (allBalanceReturned) return 'Settled / Balance Returned';
+                          if (allOverDueCollected) return 'Settled / Over Due Collected';
+                          if (allApproved) return 'Settled/Approved';
+                          // Determine status based on group totals, not individual statuses
+                          if (totalBalance > 0) return 'Balance To Be Return';
+                          if (totalOver > 0) return 'Over Due';
+                          // If all settled and no balance/over, return 'Settled'
+                          return 'Settled';
                         })()
                       : groupAssignments[0].status;
                     // Collect all settlement items across all assignments in the group
@@ -1792,31 +1810,21 @@ function PettyCash() {
                     // Balance/Over buttons: only show for Settled or Settled/Rejected (not after Balance Returned/Approved)
                     const canReturnBalance = !anyAssigned && user?.role === 'Waff Clerk'
                       && (groupStatus === 'Settled' || groupStatus === 'Balance To Be Return' || groupStatus === 'Settled/Rejected')
+                      && groupStatus !== 'Pending Approval / Balance'
+                      && groupStatus !== 'Pending Approval / Over Due'
+                      && groupStatus !== 'Pending Approval'
                       && (isMulti ? totalBalance > 0 : first.balanceAmount > 0);
                     const canCollectOverdue = !anyAssigned && user?.role === 'Waff Clerk'
                       && (groupStatus === 'Settled' || groupStatus === 'Over Due' || groupStatus === 'Settled/Rejected')
+                      && groupStatus !== 'Pending Approval / Balance'
+                      && groupStatus !== 'Pending Approval / Over Due'
+                      && groupStatus !== 'Pending Approval'
                       && (isMulti ? totalOver > 0 : first.overAmount > 0);
 
                     return (
                       <React.Fragment key={groupId}>
                         {/* Group Header Row */}
                         <tr className={`assignment-row ${isGroupExpanded ? 'expanded' : ''} ${isMulti ? 'group-row' : ''}`}>
-                          <td>
-                            <button
-                              className="expand-btn"
-                              onClick={() => {
-                                const newExpanded = new Set(expandedRows);
-                                if (newExpanded.has(groupId)) newExpanded.delete(groupId);
-                                else newExpanded.add(groupId);
-                                setExpandedRows(newExpanded);
-                              }}
-                              aria-label={isGroupExpanded ? 'Collapse' : 'Expand'}
-                            >
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`expand-icon ${isGroupExpanded ? 'rotated' : ''}`}>
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                              </svg>
-                            </button>
-                          </td>
                           <td data-label="Assignment ID">
                             {isMulti ? (
                               <strong className="assignment-id">#{first.assignmentId}</strong>
@@ -1859,16 +1867,6 @@ function PettyCash() {
                                   Settle
                                 </button>
                               )}
-                              {!anyAssigned && user?.role === 'Waff Clerk' && (
-                                groupStatus === 'Pending Approval' ||
-                                groupStatus === 'Pending Approval / Balance' ||
-                                groupStatus === 'Pending Approval / Over Due'
-                              ) && (
-                                <span className="pending-approval-badge">
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                  Pending Approval
-                                </span>
-                              )}
                               {canReturnBalance && (
                                 <button className="btn-return-balance btn-action" onClick={() => {
                                   const assignmentForModal = isMulti
@@ -1885,20 +1883,19 @@ function PettyCash() {
                                   openSettlementModal(assignmentForModal, 'OVERDUE_COLLECTION');
                                 }}>Collect Overdue</button>
                               )}
-                              {!anyAssigned && (
-                                <button className="btn-view-eye" onClick={() => {
-                                  const newExpanded = new Set(expandedRows);
-                                  if (newExpanded.has(groupId)) newExpanded.delete(groupId);
-                                  else newExpanded.add(groupId);
-                                  setExpandedRows(newExpanded);
-                                }} title={isGroupExpanded ? 'Hide Details' : 'View Details'}>
-                                  {isGroupExpanded ? (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                                  ) : (
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                  )}
-                                </button>
-                              )}
+                              {/* Always show eye icon for viewing details */}
+                              <button className="btn-view-eye" onClick={() => {
+                                const newExpanded = new Set(expandedRows);
+                                if (newExpanded.has(groupId)) newExpanded.delete(groupId);
+                                else newExpanded.add(groupId);
+                                setExpandedRows(newExpanded);
+                              }} title={isGroupExpanded ? 'Hide Details' : 'View Details'}>
+                                {isGroupExpanded ? (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                ) : (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                )}
+                              </button>
                             </div>
                           </td>
                         </tr>

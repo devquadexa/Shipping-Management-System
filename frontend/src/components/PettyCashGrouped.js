@@ -313,8 +313,8 @@ function PettyCashGrouped() {
         ) : (
           groups.map(group => (
             <div key={group.groupId} className="group-card">
-              <div className="group-header" onClick={() => toggleGroupExpansion(group.groupId)}>
-                <div className="group-info">
+              <div className="group-header">
+                <div className="group-info" style={{ flex: 1 }}>
                   <div className="group-title">
                     <span className="group-job-id">{group.jobId}</span>
                     <span className="group-separator">•</span>
@@ -339,7 +339,14 @@ function PettyCashGrouped() {
                       <span className="summary-value">LKR {formatAmount(group.totalSpent)}</span>
                     </div>
                   )}
-                  <button className="expand-btn">
+                  <button 
+                    className="expand-btn" 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      toggleGroupExpansion(group.groupId); 
+                    }}
+                    title={expandedGroups.has(group.groupId) ? "Collapse details" : "Expand details"}
+                  >
                     <svg 
                       width="20" 
                       height="20" 
