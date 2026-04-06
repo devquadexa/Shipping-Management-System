@@ -169,9 +169,10 @@ class PettyCashAssignmentController {
         return res.status(403).json({ message: 'You can only edit your own settlement items' });
       }
       
-      // 3. Verify assignment is in "Settled" status
-      if (assignment.status !== 'Settled') {
-        return res.status(400).json({ message: 'Can only edit items in Settled status' });
+      // 3. Verify assignment is in editable status (Settled or related statuses)
+      const editableStatuses = ['Settled', 'Balance To Be Return', 'Over Due', 'Settled/Rejected', 'Balance Returned', 'Overdue Collected'];
+      if (!editableStatuses.includes(assignment.status)) {
+        return res.status(400).json({ message: `Can only edit items in ${editableStatuses.join(', ')} status. Current status: ${assignment.status}` });
       }
       
       // 4. Check if invoice has been generated for this job
@@ -222,9 +223,10 @@ class PettyCashAssignmentController {
         return res.status(403).json({ message: 'You can only delete your own settlement items' });
       }
       
-      // 3. Verify assignment is in "Settled" status
-      if (assignment.status !== 'Settled') {
-        return res.status(400).json({ message: 'Can only delete items in Settled status' });
+      // 3. Verify assignment is in editable status (Settled or related statuses)
+      const editableStatuses = ['Settled', 'Balance To Be Return', 'Over Due', 'Settled/Rejected', 'Balance Returned', 'Overdue Collected'];
+      if (!editableStatuses.includes(assignment.status)) {
+        return res.status(400).json({ message: `Can only delete items in ${editableStatuses.join(', ')} status. Current status: ${assignment.status}` });
       }
       
       // 4. Check if invoice has been generated for this job

@@ -53,20 +53,9 @@ class JobController {
       const job = await this.createJob.execute(jobData);
       console.log('create - job created:', job);
       
-      // Automatically add "Advance Payment (cash)" pay item with 5000
-      try {
-        console.log('create - adding automatic advance payment pay item');
-        const advancePayItemData = {
-          description: 'Advance Payment (cash)',
-          amount: 5000,
-          billingAmount: 5000
-        };
-        await this.addPayItemUseCase.execute(job.jobId, advancePayItemData, req.user.userId);
-        console.log('create - advance payment pay item added successfully');
-      } catch (payItemError) {
-        console.error('Error adding automatic advance payment pay item:', payItemError);
-        // Continue even if pay item addition fails
-      }
+      // NOTE: Removed automatic addition of a default advance payment pay item.
+      // Advance payments should be recorded explicitly via the advance payment
+      // endpoints or added by the client when appropriate.
       
       // Handle multiple user assignments if provided
       if (req.body.assignedUsers && Array.isArray(req.body.assignedUsers) && req.body.assignedUsers.length > 0) {
