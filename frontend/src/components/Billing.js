@@ -1722,7 +1722,7 @@ function Billing() {
                       </tbody>
                       <tfoot>
                         {/* Total Row */}
-                        <tr className="total-row">
+                        <tr className="">
                           <td className="col-description"><strong>Total</strong></td>
                           <td className="col-amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></td>
                           <td className="col-amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></td>
