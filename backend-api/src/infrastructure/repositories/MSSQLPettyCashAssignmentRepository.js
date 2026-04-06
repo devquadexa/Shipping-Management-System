@@ -11,6 +11,26 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
   async create(assignmentData) {
     try {
       const pool = await this.getConnection();
+
+      // Ensure groupId column exists
+      await pool.request().query(`
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PettyCashAssignments') AND name = 'groupId')
+          ALTER TABLE PettyCashAssignments ADD groupId NVARCHAR(100) NULL;
+      `);
+
+      // Ensure status column is wide enough for new status values (e.g. 'Pending Approval / Balance' = 26 chars)
+      await pool.request().query(`
+        IF EXISTS (
+          SELECT * FROM sys.columns 
+          WHERE object_id = OBJECT_ID('PettyCashAssignments') 
+            AND name = 'status' 
+            AND max_length < 100
+        )
+          ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(100) NOT NULL;
+      `);
+
+      // groupId = provided groupId OR existing group for this job+user OR new one
+      const groupId = assignmentData.groupId || `${assignmentData.jobId}_${assignmentData.assignedTo}`;
       
       // Insert assignment
       const result = await pool.request()
@@ -19,10 +39,11 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         .input('assignedBy', this.sql.VarChar, assignmentData.assignedBy)
         .input('assignedAmount', this.sql.Decimal(18, 2), assignmentData.assignedAmount)
         .input('notes', this.sql.NVarChar, assignmentData.notes || null)
+        .input('groupId', this.sql.NVarChar, groupId)
         .query(`
-          INSERT INTO PettyCashAssignments (jobId, assignedTo, assignedBy, assignedAmount, notes)
+          INSERT INTO PettyCashAssignments (jobId, assignedTo, assignedBy, assignedAmount, notes, groupId)
           OUTPUT INSERTED.*
-          VALUES (@jobId, @assignedTo, @assignedBy, @assignedAmount, @notes)
+          VALUES (@jobId, @assignedTo, @assignedBy, @assignedAmount, @notes, @groupId)
         `);
       
       // Update job status
@@ -34,7 +55,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           WHERE jobId = @jobId
         `);
       
-      return new PettyCashAssignment(result.recordset[0]);
+      return new PettyCashAssignment({ ...result.recordset[0], groupId });
     } catch (error) {
       console.error('Error creating petty cash assignment:', error);
       throw error;
@@ -44,10 +65,36 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
   async getAll() {
     try {
       const pool = await this.getConnection();
+
+      // Ensure status column is wide enough for new status values
+      await pool.request().query(`
+        IF EXISTS (
+          SELECT * FROM sys.columns 
+          WHERE object_id = OBJECT_ID('PettyCashAssignments') 
+            AND name = 'status' 
+            AND max_length < 100
+        )
+          ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(100) NOT NULL;
+      `);
+
       const result = await pool.request()
         .query(`
           SELECT 
-            pca.*,
+            pca.assignmentId,
+            pca.jobId,
+            pca.assignedTo,
+            pca.assignedBy,
+            pca.assignedAmount,
+            pca.assignedDate,
+            pca.status,
+            pca.settlementDate,
+            pca.actualSpent,
+            pca.balanceAmount,
+            pca.overAmount,
+            pca.notes,
+            pca.parentAssignmentId,
+            pca.isMainAssignment,
+            ISNULL(pca.groupId, pca.jobId + '_' + pca.assignedTo) as groupId,
             j.shipmentCategory,
             j.customerId,
             assignedToUser.fullName as assignedToName,
@@ -84,7 +131,21 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         .input('userId', this.sql.VarChar, userId)
         .query(`
           SELECT 
-            pca.*,
+            pca.assignmentId,
+            pca.jobId,
+            pca.assignedTo,
+            pca.assignedBy,
+            pca.assignedAmount,
+            pca.assignedDate,
+            pca.status,
+            pca.settlementDate,
+            pca.actualSpent,
+            pca.balanceAmount,
+            pca.overAmount,
+            pca.notes,
+            pca.parentAssignmentId,
+            pca.isMainAssignment,
+            ISNULL(pca.groupId, pca.jobId + '_' + pca.assignedTo) as groupId,
             j.shipmentCategory,
             j.customerId,
             assignedByUser.fullName as assignedByName
@@ -207,7 +268,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
             si.itemName,
             si.actualCost,
             si.isCustomItem,
-            ISNULL(si.hasBill, 0) as hasBill,
+            si.hasBill,
             si.paidBy,
             u.fullName as paidByName,
             u.email as paidByEmail
@@ -328,17 +389,41 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
             WHERE assignmentId = @assignmentId
           `);
         
-        const actualSpent = allItemsResult.recordset[0].totalSpent || 0;
+        const actualSpent = parseFloat(allItemsResult.recordset[0].totalSpent) || 0;
         const assignedAmount = parseFloat(assignment.assignedAmount);
         const balanceAmount = assignedAmount > actualSpent ? assignedAmount - actualSpent : 0;
         const overAmount = actualSpent > assignedAmount ? actualSpent - assignedAmount : 0;
         
-        console.log('settle - calculated totals:', { actualSpent, assignedAmount, balanceAmount, overAmount });
+        console.log('settle - calculated totals:', { 
+          actualSpent, 
+          assignedAmount, 
+          balanceAmount, 
+          overAmount,
+          actualSpentType: typeof actualSpent,
+          assignedAmountType: typeof assignedAmount,
+          comparison: assignedAmount > actualSpent ? 'assigned > spent (BALANCE)' : 'spent > assigned (OVERDUE)'
+        });
         
-        // Update assignment status to Settled
+        // Determine status automatically based on balance/overdue
+        // Use Number() to ensure proper comparison
+        let newStatus = 'Settled';
+        const balanceNum = Number(balanceAmount);
+        const overNum = Number(overAmount);
+        
+        if (balanceNum > 0) {
+          newStatus = 'Balance To Be Return';
+          console.log('settle - Setting status to Balance To Be Return, balanceNum:', balanceNum);
+        } else if (overNum > 0) {
+          newStatus = 'Over Due';
+          console.log('settle - Setting status to Over Due, overNum:', overNum);
+        }
+        
+        console.log('settle - auto-determined status:', newStatus);
+        
+        // Update assignment with calculated amounts and automatic status
         const updateResult = await transaction.request()
           .input('assignmentId', this.sql.Int, assignmentId)
-          .input('status', this.sql.NVarChar, 'Settled')
+          .input('status', this.sql.NVarChar, newStatus)
           .input('actualSpent', this.sql.Decimal(18, 2), actualSpent)
           .input('balanceAmount', this.sql.Decimal(18, 2), balanceAmount)
           .input('overAmount', this.sql.Decimal(18, 2), overAmount)
@@ -354,13 +439,27 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         
         console.log('settle - assignment updated, rowsAffected:', updateResult.rowsAffected);
         
-        // Update job status only if ALL assignments for this job are settled
+        // Update job status only if ALL assignments for this job are settled or in final states
         const unsettledCount = await transaction.request()
           .input('jobId', this.sql.VarChar, assignment.jobId)
           .query(`
             SELECT COUNT(*) as unsettledCount
             FROM PettyCashAssignments
-            WHERE jobId = @jobId AND status NOT IN ('Settled', 'Settled/Approved', 'Settled/Rejected', 'Balance Returned', 'Overdue Collected')
+            WHERE jobId = @jobId 
+              AND status NOT IN (
+                'Settled', 
+                'Balance To Be Return', 
+                'Over Due', 
+                'Pending Approval / Balance', 
+                'Pending Approval / Over Due', 
+                'Settled / Balance Returned', 
+                'Settled / Over Due Collected', 
+                'Closed',
+                'Settled/Approved', 
+                'Settled/Rejected', 
+                'Balance Returned', 
+                'Overdue Collected'
+              )
           `);
         
         console.log('settle - unsettledCount:', unsettledCount.recordset[0].unsettledCount);
@@ -411,6 +510,76 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       return await this.getById(assignmentId);
     } catch (error) {
       console.error('Error updating assignment status:', error);
+      throw error;
+    }
+  }
+
+  // Recalculate and fix status for a settled assignment based on balanceAmount/overAmount
+  async recalculateStatus(assignmentId) {
+    try {
+      const pool = await this.getConnection();
+      const result = await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
+        .query(`
+          SELECT assignmentId, status, assignedAmount, actualSpent, balanceAmount, overAmount
+          FROM PettyCashAssignments
+          WHERE assignmentId = @assignmentId
+        `);
+
+      if (!result.recordset.length) throw new Error('Assignment not found');
+
+      const row = result.recordset[0];
+      const balanceAmount = parseFloat(row.balanceAmount) || 0;
+      const overAmount = parseFloat(row.overAmount) || 0;
+      const assignedAmount = parseFloat(row.assignedAmount) || 0;
+      const actualSpent = parseFloat(row.actualSpent) || 0;
+
+      // Only recalculate if the assignment has been settled (has actualSpent)
+      const settledStatuses = ['Settled', 'Balance To Be Return', 'Over Due'];
+      if (!settledStatuses.includes(row.status)) {
+        return await this.getById(assignmentId);
+      }
+
+      let correctStatus = 'Settled';
+      if (balanceAmount > 0) {
+        correctStatus = 'Balance To Be Return';
+      } else if (overAmount > 0) {
+        correctStatus = 'Over Due';
+      }
+
+      // Also recalculate from scratch if amounts seem wrong
+      if (actualSpent > 0 && assignedAmount > 0) {
+        const recalcBalance = assignedAmount > actualSpent ? assignedAmount - actualSpent : 0;
+        const recalcOver = actualSpent > assignedAmount ? actualSpent - assignedAmount : 0;
+        if (recalcBalance > 0) correctStatus = 'Balance To Be Return';
+        else if (recalcOver > 0) correctStatus = 'Over Due';
+        else correctStatus = 'Settled';
+
+        // Update amounts too if they were wrong
+        await pool.request()
+          .input('assignmentId', this.sql.Int, assignmentId)
+          .input('status', this.sql.NVarChar, correctStatus)
+          .input('balanceAmount', this.sql.Decimal(18, 2), recalcBalance)
+          .input('overAmount', this.sql.Decimal(18, 2), recalcOver)
+          .query(`
+            UPDATE PettyCashAssignments
+            SET status = @status, balanceAmount = @balanceAmount, overAmount = @overAmount
+            WHERE assignmentId = @assignmentId
+          `);
+      } else {
+        await pool.request()
+          .input('assignmentId', this.sql.Int, assignmentId)
+          .input('status', this.sql.NVarChar, correctStatus)
+          .query(`
+            UPDATE PettyCashAssignments
+            SET status = @status
+            WHERE assignmentId = @assignmentId
+          `);
+      }
+
+      return await this.getById(assignmentId);
+    } catch (error) {
+      console.error('Error recalculating assignment status:', error);
       throw error;
     }
   }
@@ -748,23 +917,180 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       const balanceAmount = Math.max(0, assignedAmount - actualSpent);
       const overAmount = Math.max(0, actualSpent - assignedAmount);
       
-      // Update assignment
+      // Determine correct status based on amounts
+      let newStatus = 'Settled';
+      if (balanceAmount > 0) {
+        newStatus = 'Balance To Be Return';
+      } else if (overAmount > 0) {
+        newStatus = 'Over Due';
+      }
+      
+      // Update assignment with recalculated amounts AND status
       await pool.request()
         .input('assignmentId', this.sql.Int, assignmentId)
         .input('actualSpent', this.sql.Decimal(18, 2), actualSpent)
         .input('balanceAmount', this.sql.Decimal(18, 2), balanceAmount)
         .input('overAmount', this.sql.Decimal(18, 2), overAmount)
+        .input('status', this.sql.NVarChar, newStatus)
         .query(`
           UPDATE PettyCashAssignments
           SET actualSpent = @actualSpent,
               balanceAmount = @balanceAmount,
-              overAmount = @overAmount
+              overAmount = @overAmount,
+              status = @status
           WHERE assignmentId = @assignmentId
         `);
       
-      return { actualSpent, balanceAmount, overAmount };
+      return { actualSpent, balanceAmount, overAmount, status: newStatus };
     } catch (error) {
       console.error('Error recalculating assignment totals:', error);
+      throw error;
+    }
+  }
+
+  // ===== PARENT-CHILD ASSIGNMENT METHODS =====
+  
+  async createSubAssignment(assignmentData) {
+    try {
+      const pool = await this.getConnection();
+      
+      const result = await pool.request()
+        .input('jobId', this.sql.VarChar, assignmentData.jobId)
+        .input('assignedTo', this.sql.VarChar, assignmentData.assignedTo)
+        .input('assignedBy', this.sql.VarChar, assignmentData.assignedBy)
+        .input('assignedAmount', this.sql.Decimal(18, 2), assignmentData.assignedAmount)
+        .input('notes', this.sql.NVarChar, assignmentData.notes || null)
+        .input('groupId', this.sql.NVarChar, assignmentData.groupId)
+        .input('parentAssignmentId', this.sql.Int, assignmentData.parentAssignmentId)
+        .input('isMainAssignment', this.sql.Bit, 0)
+        .query(`
+          INSERT INTO PettyCashAssignments (
+            jobId, assignedTo, assignedBy, assignedAmount, notes, groupId, 
+            parentAssignmentId, isMainAssignment
+          )
+          OUTPUT INSERTED.*
+          VALUES (
+            @jobId, @assignedTo, @assignedBy, @assignedAmount, @notes, @groupId,
+            @parentAssignmentId, @isMainAssignment
+          )
+        `);
+      
+      return result.recordset[0];
+    } catch (error) {
+      console.error('Error creating sub-assignment:', error);
+      throw error;
+    }
+  }
+
+  async getMainAssignments(userId = null) {
+    try {
+      const pool = await this.getConnection();
+      
+      let query = `
+        SELECT 
+          pca.*,
+          ISNULL(pca.groupId, pca.jobId + '_' + pca.assignedTo) as groupId,
+          j.shipmentCategory,
+          j.customerId,
+          assignedToUser.fullName as assignedToName,
+          assignedByUser.fullName as assignedByName
+        FROM PettyCashAssignments pca
+        LEFT JOIN Jobs j ON pca.jobId = j.jobId
+        LEFT JOIN Users assignedToUser ON pca.assignedTo = assignedToUser.userId
+        LEFT JOIN Users assignedByUser ON pca.assignedBy = assignedByUser.userId
+        WHERE pca.isMainAssignment = 1
+      `;
+      
+      if (userId) {
+        query += ` AND pca.assignedTo = @userId`;
+      }
+      
+      query += ` ORDER BY pca.assignedDate DESC`;
+      
+      const request = pool.request();
+      if (userId) {
+        request.input('userId', this.sql.VarChar, userId);
+      }
+      
+      const result = await request.query(query);
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching main assignments:', error);
+      throw error;
+    }
+  }
+
+  async getSubAssignments(parentAssignmentId) {
+    try {
+      const pool = await this.getConnection();
+      
+      const result = await pool.request()
+        .input('parentAssignmentId', this.sql.Int, parentAssignmentId)
+        .query(`
+          SELECT 
+            pca.*,
+            assignedByUser.fullName as assignedByName
+          FROM PettyCashAssignments pca
+          LEFT JOIN Users assignedByUser ON pca.assignedBy = assignedByUser.userId
+          WHERE pca.parentAssignmentId = @parentAssignmentId
+          ORDER BY pca.assignedDate ASC
+        `);
+      
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching sub-assignments:', error);
+      throw error;
+    }
+  }
+
+  async getTotalAssignedAmount(mainAssignmentId) {
+    try {
+      const pool = await this.getConnection();
+      
+      const result = await pool.request()
+        .input('mainAssignmentId', this.sql.Int, mainAssignmentId)
+        .query(`
+          SELECT 
+            SUM(assignedAmount) as totalAmount
+          FROM PettyCashAssignments
+          WHERE assignmentId = @mainAssignmentId 
+             OR parentAssignmentId = @mainAssignmentId
+        `);
+      
+      return parseFloat(result.recordset[0].totalAmount || 0);
+    } catch (error) {
+      console.error('Error calculating total assigned amount:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update assignment status and clear the resolved amount after management approval.
+   * settlementType: 'BALANCE_RETURN' clears balanceAmount, 'OVERDUE_COLLECTION' clears overAmount.
+   */
+  async updateStatusAndClearAmount(assignmentId, newStatus, settlementType) {
+    try {
+      const pool = await this.getConnection();
+      
+      let clearField = '';
+      if (settlementType === 'BALANCE_RETURN') {
+        clearField = ', balanceAmount = 0';
+      } else if (settlementType === 'OVERDUE_COLLECTION') {
+        clearField = ', overAmount = 0';
+      }
+
+      await pool.request()
+        .input('assignmentId', this.sql.Int, assignmentId)
+        .input('status', this.sql.NVarChar, newStatus)
+        .query(`
+          UPDATE PettyCashAssignments
+          SET status = @status${clearField}
+          WHERE assignmentId = @assignmentId
+        `);
+
+      return await this.getById(assignmentId);
+    } catch (error) {
+      console.error('Error in updateStatusAndClearAmount:', error);
       throw error;
     }
   }

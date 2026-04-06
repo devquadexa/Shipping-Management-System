@@ -74,6 +74,11 @@ const GetUserPettyCashAssignments = require('../../application/use-cases/pettyca
 const GetPettyCashAssignmentByJob = require('../../application/use-cases/pettycashassignment/GetPettyCashAssignmentByJob');
 const SettlePettyCashAssignment = require('../../application/use-cases/pettycashassignment/SettlePettyCashAssignment');
 const GetUserBalancesSummary = require('../../application/use-cases/pettycashassignment/GetUserBalancesSummary');
+const GetGroupedAssignments = require('../../application/use-cases/pettycashassignment/GetGroupedAssignments');
+const SettleGroupedAssignments = require('../../application/use-cases/pettycashassignment/SettleGroupedAssignments');
+const CreateSubAssignment = require('../../application/use-cases/pettycashassignment/CreateSubAssignment');
+const GetAssignmentsWithChildren = require('../../application/use-cases/pettycashassignment/GetAssignmentsWithChildren');
+const GetAggregatedAssignments = require('../../application/use-cases/pettycashassignment/GetAggregatedAssignments');
 
 // Office Pay Item Use Cases
 const CreateOfficePayItem = require('../../application/use-cases/officepayitem/CreateOfficePayItem');
@@ -199,6 +204,11 @@ class Container {
     this.dependencies.getPettyCashAssignmentByJob = new GetPettyCashAssignmentByJob(pettyCashAssignmentRepository);
     this.dependencies.settlePettyCashAssignment = new SettlePettyCashAssignment(pettyCashAssignmentRepository);
     this.dependencies.getUserBalancesSummary = new GetUserBalancesSummary(pettyCashAssignmentRepository);
+    this.dependencies.getGroupedAssignments = new GetGroupedAssignments(pettyCashAssignmentRepository);
+    this.dependencies.settleGroupedAssignments = new SettleGroupedAssignments(pettyCashAssignmentRepository);
+    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository);
+    this.dependencies.getAssignmentsWithChildren = new GetAssignmentsWithChildren(pettyCashAssignmentRepository);
+    this.dependencies.getAggregatedAssignments = new GetAggregatedAssignments(pettyCashAssignmentRepository);
     
     // Office Pay Item use cases
     this.dependencies.createOfficePayItem = new CreateOfficePayItem(officePayItemRepository, jobRepository);

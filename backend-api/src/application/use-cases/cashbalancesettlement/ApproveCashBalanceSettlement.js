@@ -31,19 +31,15 @@ class ApproveCashBalanceSettlement {
 
     // Update related assignment statuses after management approval
     if (settlement.relatedAssignments && settlement.relatedAssignments.length > 0) {
-      // Set final status based on settlement type so the UI knows what was resolved
+      // Set status based on settlement type
       const finalStatus = settlement.settlementType === 'BALANCE_RETURN'
-        ? 'Balance Returned'
-        : 'Overdue Collected';
+        ? 'Settled / Balance Returned'
+        : 'Settled / Over Due Collected';
 
       for (const assignmentId of settlement.relatedAssignments) {
         try {
-          // Update status AND zero out the resolved amount
-          await this.pettyCashAssignmentRepository.updateStatusAndClearAmount(
-            assignmentId,
-            finalStatus,
-            settlement.settlementType
-          );
+          // Update status to final approved status
+          await this.pettyCashAssignmentRepository.updateStatus(assignmentId, finalStatus);
         } catch (error) {
           console.error(`Failed to update assignment ${assignmentId} status:`, error);
         }

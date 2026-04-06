@@ -20,6 +20,58 @@ module.exports = (container) => {
     (req, res) => controller.getAll(req, res)
   );
 
+  // Get grouped assignments (Admin/Super Admin/Manager)
+  router.get('/grouped', 
+    auth, 
+    checkRole('Admin', 'Super Admin', 'Manager'), 
+    (req, res) => controller.getGrouped(req, res)
+  );
+
+  // Get user's grouped assignments (Waff Clerk)
+  router.get('/my-grouped', 
+    auth, 
+    (req, res) => controller.getMyGrouped(req, res)
+  );
+
+  // Get aggregated assignments (Admin/Super Admin/Manager) - ONE row per job+user
+  router.get('/aggregated', 
+    auth, 
+    checkRole('Admin', 'Super Admin', 'Manager'), 
+    (req, res) => controller.getAggregated(req, res)
+  );
+
+  // Get user's aggregated assignments (Waff Clerk) - ONE row per job
+  router.get('/my-aggregated', 
+    auth, 
+    (req, res) => controller.getMyAggregated(req, res)
+  );
+
+  // Get assignments with children (parent-child structure)
+  router.get('/with-children', 
+    auth, 
+    checkRole('Admin', 'Super Admin', 'Manager'), 
+    (req, res) => controller.getWithChildren(req, res)
+  );
+
+  // Get user's assignments with children
+  router.get('/my-with-children', 
+    auth, 
+    (req, res) => controller.getMyWithChildren(req, res)
+  );
+
+  // Create sub-assignment under a parent
+  router.post('/:id/sub-assignment', 
+    auth, 
+    checkRole('Admin', 'Super Admin', 'Manager'), 
+    (req, res) => controller.createSubAssignment(req, res)
+  );
+
+  // Get sub-assignments for a parent
+  router.get('/:id/sub-assignments', 
+    auth, 
+    (req, res) => controller.getSubAssignments(req, res)
+  );
+
   // Get user balances summary (Admin/Super Admin only)
   router.get('/user-balances', 
     auth, 
@@ -66,6 +118,13 @@ module.exports = (container) => {
     (req, res) => controller.deleteSettlementItem(req, res)
   );
 
+  // Settle grouped assignments (settle all assignments in a group at once)
+  // MUST be before /:id/settle to avoid Express matching 'group' as :id
+  router.post('/group/:groupId/settle', 
+    auth, 
+    (req, res) => controller.settleGroup(req, res)
+  );
+
   // Settle assignment (User who was assigned)
   router.post('/:id/settle', 
     auth, 
@@ -77,6 +136,13 @@ module.exports = (container) => {
     auth,
     checkRole('Admin', 'Super Admin', 'Manager'),
     (req, res) => controller.closeAssignment(req, res)
+  );
+
+  // Recalculate/fix status for a settled assignment (Admin/Super Admin/Manager)
+  router.patch('/:id/recalculate-status',
+    auth,
+    checkRole('Admin', 'Super Admin', 'Manager'),
+    (req, res) => controller.recalculateStatus(req, res)
   );
 
   return router;

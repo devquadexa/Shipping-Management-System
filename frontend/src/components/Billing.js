@@ -20,13 +20,44 @@ function Billing() {
   const isVehicleShipmentCategory = (category) => {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
   };
+
+  const formatDateDDMMYYYY = (dateValue) => {
+    if (!dateValue) return '';
+
+    const normalized = String(dateValue).split('T')[0];
+    const dateParts = normalized.split('-');
+    if (dateParts.length === 3) {
+      const [year, month, day] = dateParts;
+      return `${day}/${month}/${year}`;
+    }
+
+    const parsed = new Date(dateValue);
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleDateString('en-GB');
+  };
+
+  const formatCusdecNumberForDisplay = (value) => {
+    const rawValue = (value || '').trim();
+    if (!rawValue) return '';
+
+    const cleaned = rawValue.replace(/^i\s*-\s*/i, '').trim();
+    return cleaned ? `I-${cleaned}` : '';
+  };
+
+  const formatCusdecWithDate = (cusdecNumber, cusdecDate) => {
+    const formattedNumber = formatCusdecNumberForDisplay(cusdecNumber);
+    if (!formattedNumber) return '-';
+
+    const formattedDate = formatDateDDMMYYYY(cusdecDate);
+    return formattedDate ? `${formattedNumber} of ${formattedDate}` : formattedNumber;
+  };
+
   const [bills, setBills] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [message, setMessage] = useState('');
   const [showPayItemsRow, setShowPayItemsRow] = useState(false);
-  const [payItems, setPayItems] = useState([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+  const [payItems, setPayItems] = useState([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
   const [loadingSettlement, setLoadingSettlement] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
@@ -82,7 +113,7 @@ function Billing() {
   const handleJobSelect = async (jobId) => {
     if (!jobId) {
       setSelectedJob(null);
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, paidBy: '', paidByName: '' }]);
+      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false, paidBy: '', paidByName: '' }]);
       setShowPayItemsRow(false);
       return;
     }
@@ -124,6 +155,7 @@ function Billing() {
               sameAmount: false,
               paidBy: item.paidBy,
               paidByName: item.paidByName,
+              hasBill: item.hasBill || false,
               isOfficePayItem: true,
               officePayItemId: item.officePayItemId
             });
@@ -164,6 +196,7 @@ function Billing() {
                       paidBy: item.paidBy || assignment.assignedTo,
                       paidByName: item.paidByName || assignment.assignedToName,
                       isCustomItem: item.isCustomItem,
+                      hasBill: item.hasBill === true || item.hasBill === 1,
                       isPettyCashItem: true
                     });
                   });
@@ -231,7 +264,7 @@ function Billing() {
         } else {
           loadPayItemTemplates(job);
         }
-        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, paidBy: '', paidByName: '' }]);
+        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false, paidBy: '', paidByName: '' }]);
       }
     } catch (error) {
       console.error('Error fetching job:', error);
@@ -261,7 +294,8 @@ function Billing() {
               name: template.itemName,
               actualCost: '',
               billingAmount: '',
-              sameAmount: false
+              sameAmount: false,
+              hasBill: false
             }));
             
             setPayItems(loadedPayItems);
@@ -269,25 +303,25 @@ function Billing() {
             setMessage(`Loaded ${templates.length} default pay items for ${job.shipmentCategory}`);
             setTimeout(() => setMessage(''), 3000);
           } else {
-            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
           }
         }
       } catch (error) {
         console.error('Error loading pay item templates:', error);
-        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
       }
     } else {
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
     }
   };
 
   const addPayItemRow = () => {
-    setPayItems([...payItems, { name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+    setPayItems([...payItems, { name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
   };
 
   const removePayItemRow = (index) => {
     const newPayItems = payItems.filter((_, i) => i !== index);
-    setPayItems(newPayItems.length > 0 ? newPayItems : [{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+    setPayItems(newPayItems.length > 0 ? newPayItems : [{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
   };
 
   const handlePayItemChange = (index, field, value) => {
@@ -346,7 +380,8 @@ function Billing() {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
               },
               body: JSON.stringify({
-                billingAmount: parseFloat(item.billingAmount)
+                billingAmount: parseFloat(item.billingAmount),
+                hasBill: item.hasBill || false
               })
             });
             
@@ -452,7 +487,7 @@ function Billing() {
       }
       
       // Reset the pay items form
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
       
       setTimeout(() => setMessage(''), 5000);
       console.log('=== SAVE PAY ITEMS END ===');
@@ -1216,7 +1251,7 @@ function Billing() {
         <div class="details-section">
           <div class="detail-row">
             <div class="detail-label">Cusdec No</div>
-            <div class="detail-value">: ${job.cusdecNumber || '-'}</div>
+            <div class="detail-value">: ${formatCusdecWithDate(job.cusdecNumber, job.cusdecDate)}</div>
           </div>
           <div class="detail-row">
             <div class="detail-label">Exporter</div>
@@ -1380,7 +1415,7 @@ function Billing() {
                   <div className="info-row">
                     <span className="info-label">CUSDEC Number: {(!selectedJob.cusdecNumber || selectedJob.cusdecNumber.trim() === '') && <span className="required-indicator">*Required</span>}</span>
                     <span className={`info-value ${(!selectedJob.cusdecNumber || selectedJob.cusdecNumber.trim() === '') ? 'missing-value' : ''}`}>
-                      {selectedJob.cusdecNumber || '-'}
+                      {formatCusdecWithDate(selectedJob.cusdecNumber, selectedJob.cusdecDate)}
                     </span>
                   </div>
                   <div className="info-row">
@@ -1472,6 +1507,7 @@ function Billing() {
                           <th>Pay Item Name</th>
                           <th>Actual Cost (LKR)</th>
                           <th>Paid By</th>
+                          <th>Bill</th>
                           <th>Billing Amount (LKR)</th>
                           <th>Same Amount</th>
                           <th>Action</th>
@@ -1516,6 +1552,15 @@ function Billing() {
                                 <span className="paid-by-empty">-</span>
                               )}
                             </td>
+                            <td data-label="Bill" className="checkbox-cell">
+                              <input
+                                type="checkbox"
+                                checked={item.hasBill || false}
+                                onChange={(e) => handlePayItemChange(index, 'hasBill', e.target.checked)}
+                                disabled={!canEditPayItems()}
+                                title={item.hasBill ? "Bill/Receipt exists" : "No bill/receipt"}
+                              />
+                            </td>
                             <td data-label="Billing Amount (LKR)">
                               <input
                                 type="number"
@@ -1553,12 +1598,14 @@ function Billing() {
                           <td className="total-label"><strong>Total</strong></td>
                           <td className="total-amount"><strong>{formatAmount(calculateUnsavedTotals().actualCost)}</strong></td>
                           <td></td>
+                          <td></td>
                           <td className="total-amount"><strong>{formatAmount(calculateUnsavedTotals().billingAmount)}</strong></td>
                           <td></td>
                           <td></td>
                         </tr>
                         <tr className={`profit-row ${calculateUnsavedTotals().profit < 0 ? 'profit-negative-row' : ''}`}>
                           <td className="profit-label"><strong>Profit Margin</strong></td>
+                          <td></td>
                           <td></td>
                           <td></td>
                           <td className={`profit-amount ${calculateUnsavedTotals().profit >= 0 ? 'profit-positive' : 'profit-negative'}`}>
@@ -1582,7 +1629,7 @@ function Billing() {
                         <button 
                           onClick={() => {
                             setShowPayItemsRow(false);
-                            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false }]);
+                            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
                           }} 
                           className="btn btn-secondary"
                         >
@@ -1596,163 +1643,138 @@ function Billing() {
                 {selectedJob.payItems && selectedJob.payItems.length > 0 && (
                   <div className="saved-pay-items">
                     <div className="pay-items-review-header">
-                      <h4>📋 Pay Items Review</h4>
-                      <p className="review-subtitle">Review all pay items before generating invoice</p>
-                      {!canEditPayItems() && (
-                        <div className="manager-notice">
-                          <div className="notice-icon">💼</div>
-                          <div className="notice-text">
-                            <strong>Limited Access:</strong> To modify billing amounts or remove pay items, please contact a Super Admin, Admin, or Manager for assistance.
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className={`pay-items-review-table ${!canEditPayItems() ? 'no-actions' : ''}`}>
-                      <div className="table-header">
-                        <div className="header-cell description-header">Description</div>
-                        <div className="header-cell amount-header">Actual Cost (LKR)</div>
-                        <div className="header-cell amount-header">Billing Amount (LKR)</div>
-                        {canEditPayItems() && (
-                          <div className="header-cell actions-header">Actions</div>
-                        )}
+                      <div>
+                        <h4>PAY ITEMS REVIEW</h4>
+                        <p className="review-subtitle">Review all pay items before generating invoice</p>
                       </div>
-                      <div className="table-body">
+                    </div>
+
+                    <table className="pay-items-review-table">
+                      <colgroup>
+                        {canEditPayItems() ? (
+                          <>
+                            <col style={{width: '50%'}} />
+                            <col style={{width: '20%'}} />
+                            <col style={{width: '20%'}} />
+                            <col style={{width: '10%'}} />
+                          </>
+                        ) : (
+                          <>
+                            <col style={{width: '40%'}} />
+                            <col style={{width: '30%'}} />
+                            <col style={{width: '30%'}} />
+                          </>
+                        )}
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th className="col-description">Description</th>
+                          <th className="col-amount">Actual Cost (LKR)</th>
+                          <th className="col-amount">Billing Amount (LKR)</th>
+                          {canEditPayItems() && <th className="col-actions">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
                         {selectedJob.payItems.map((item, idx) => (
-                          <div key={idx} className="table-row">
-                            <div className="table-cell description-cell">{item.description}</div>
-                            <div className="table-cell amount-cell">{formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}</div>
-                            <div className="table-cell amount-cell">
+                          <tr key={idx} className="pay-item-row">
+                            <td className="col-description">{item.description}</td>
+                            <td className="col-amount">
+                              {formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}
+                            </td>
+                            <td className="col-amount">
                               {editingPayItemIndex === idx ? (
-                                <div className="inline-edit-container">
-                                  <input
-                                    type="text"
-                                    className="inline-edit-input"
-                                    value={editingBillingAmount}
-                                    onChange={(e) => setEditingBillingAmount(e.target.value)}
-                                    onKeyPress={(e) => {
-                                      if (e.key === 'Enter') {
-                                        saveInlineEditedPayItem();
-                                      } else if (e.key === 'Escape') {
-                                        cancelEditingPayItem();
-                                      }
-                                    }}
-                                    autoFocus
-                                  />
-                                </div>
+                                <input
+                                  type="text"
+                                  className="inline-edit-input"
+                                  value={editingBillingAmount}
+                                  onChange={(e) => setEditingBillingAmount(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveInlineEditedPayItem();
+                                    else if (e.key === 'Escape') cancelEditingPayItem();
+                                  }}
+                                  autoFocus
+                                />
                               ) : (
                                 formatAmount(parseFloat(item.billingAmount) || parseFloat(item.amount) || 0)
                               )}
-                            </div>
+                            </td>
                             {canEditPayItems() && (
-                              <div className="table-cell actions-cell">
+                              <td className="col-actions">
                                 {editingPayItemIndex === idx ? (
-                                  <>
-                                    <button
-                                      className="action-btn save-btn"
-                                      onClick={saveInlineEditedPayItem}
-                                      title="Save changes"
-                                    >
-                                      ✓
-                                    </button>
-                                    <button
-                                      className="action-btn cancel-btn"
-                                      onClick={cancelEditingPayItem}
-                                      title="Cancel editing"
-                                    >
-                                      ✗
-                                    </button>
-                                  </>
+                                  <div className="action-btns">
+                                    <button className="action-btn save-btn" onClick={saveInlineEditedPayItem} title="Save">✓</button>
+                                    <button className="action-btn cancel-btn" onClick={cancelEditingPayItem} title="Cancel">✗</button>
+                                  </div>
                                 ) : (
-                                  <>
-                                    <button
-                                      className="action-btn edit-btn"
-                                      onClick={() => startEditingPayItem(idx)}
-                                      title="Edit billing amount"
-                                    >
-                                      ✏️
+                                  <div className="action-btns">
+                                    <button className="action-btn edit-btn" onClick={() => startEditingPayItem(idx)} title="Edit billing amount">
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     </button>
-                                    <button
-                                      className="action-btn remove-btn"
-                                      onClick={() => removePayItem(idx)}
-                                      title="Remove pay item"
-                                    >
-                                      🗑️
+                                    <button className="action-btn remove-btn" onClick={() => removePayItem(idx)} title="Remove">
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                     </button>
-                                  </>
+                                  </div>
                                 )}
-                              </div>
+                              </td>
                             )}
-                          </div>
+                          </tr>
                         ))}
-                        <div className="table-row total-row">
-                          <div className="table-cell description-cell total-label"><strong>Total</strong></div>
-                          <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></div>
-                          <div className="table-cell amount-cell total-amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></div>
-                          {canEditPayItems() && (
-                            <div className="table-cell actions-cell"></div>
-                          )}
-                        </div>
-                        <div className="table-row profit-row">
-                          <div className="table-cell description-cell profit-label"><strong>Profit Margin</strong></div>
-                          <div className="table-cell amount-cell"></div>
-                          <div className="table-cell amount-cell profit-amount">
-                            <strong className={calculateTotals().profit >= 0 ? 'profit-positive' : 'profit-negative'}>
-                              {formatAmount(calculateTotals().profit)}
-                            </strong>
-                          </div>
-                          {canEditPayItems() && (
-                            <div className="table-cell actions-cell"></div>
-                          )}
-                        </div>
-                        {/* Advance Payment Summary */}
-                        <div className="table-row advance-summary-row">
-                          <div className="table-cell description-cell advance-summary-label"><strong>Invoice Summary</strong></div>
-                          <div className="table-cell amount-cell"></div>
-                          <div className="table-cell amount-cell"></div>
-                          {canEditPayItems() && (
-                            <div className="table-cell actions-cell"></div>
-                          )}
-                        </div>
-                        <div className="table-row gross-total-row">
-                          <div className="table-cell description-cell gross-total-label">Gross Total</div>
-                          <div className="table-cell amount-cell"></div>
-                          <div className="table-cell amount-cell gross-total-amount">
-                            <strong>{formatAmount(calculateTotals().grossTotal)}</strong>
-                          </div>
-                          {canEditPayItems() && (
-                            <div className="table-cell actions-cell"></div>
-                          )}
-                        </div>
+                      </tbody>
+                      <tfoot>
+                        {/* Total Row */}
+                        <tr className="total-row">
+                          <td className="col-description"><strong>Total</strong></td>
+                          <td className="col-amount"><strong>{formatAmount(calculateTotals().actualCost)}</strong></td>
+                          <td className="col-amount"><strong>{formatAmount(calculateTotals().billingAmount)}</strong></td>
+                          {canEditPayItems() && <td className="col-actions"></td>}
+                        </tr>
+                        {/* Profit Margin Row */}
+                        <tr className="profit-row">
+                          <td className="col-description"><strong>PROFIT MARGIN</strong></td>
+                          <td className="col-amount"></td>
+                          <td className={`col-amount profit-amount ${calculateTotals().profit >= 0 ? 'profit-positive' : 'profit-negative'}`}>
+                            <strong>{formatAmount(calculateTotals().profit)}</strong>
+                          </td>
+                          {canEditPayItems() && <td className="col-actions"></td>}
+                        </tr>
+                        {/* Invoice Summary Header */}
+                        <tr className="summary-header-row">
+                          <td className="col-description" colSpan={canEditPayItems() ? 4 : 3}><strong>INVOICE SUMMARY</strong></td>
+                        </tr>
+                        {/* Gross Total */}
+                        <tr className="gross-total-row">
+                          <td className="col-description">Gross Total</td>
+                          <td className="col-amount"></td>
+                          <td className="col-amount"><strong>{formatAmount(calculateTotals().grossTotal)}</strong></td>
+                          {canEditPayItems() && <td className="col-actions"></td>}
+                        </tr>
+                        {/* Advance Payment */}
                         {selectedJob.advancePayment > 0 && (
-                          <div className="table-row advance-payment-row">
-                            <div className="table-cell description-cell advance-payment-label">Advance Payment</div>
-                            <div className="table-cell amount-cell"></div>
-                            <div className="table-cell amount-cell advance-payment-amount">
-                              <strong className="advance-deduction">({formatAmount(calculateTotals().advancePayment)})</strong>
-                            </div>
-                            {canEditPayItems() && (
-                              <div className="table-cell actions-cell"></div>
-                            )}
-                          </div>
+                          <tr className="advance-payment-row">
+                            <td className="col-description">Advance Payment</td>
+                            <td className="col-amount"></td>
+                            <td className="col-amount advance-deduction">
+                              <strong>({formatAmount(calculateTotals().advancePayment)})</strong>
+                            </td>
+                            {canEditPayItems() && <td className="col-actions"></td>}
+                          </tr>
                         )}
-                        <div className="table-row net-total-row">
-                          <div className="table-cell description-cell net-total-label"><strong>Net Total (Customer Payable)</strong></div>
-                          <div className="table-cell amount-cell"></div>
-                          <div className="table-cell amount-cell net-total-amount">
-                            <strong className="final-amount">{formatAmount(calculateTotals().netTotal)}</strong>
-                          </div>
-                          {canEditPayItems() && (
-                            <div className="table-cell actions-cell"></div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                        {/* Net Total */}
+                        <tr className="net-total-row">
+                          <td className="col-description"><strong>NET TOTAL (CUSTOMER PAYABLE)</strong></td>
+                          <td className="col-amount net-total-divider"></td>
+                          <td className="col-amount net-total-amount">
+                            <strong>{formatAmount(calculateTotals().netTotal)}</strong>
+                          </td>
+                          {canEditPayItems() && <td className="col-actions"></td>}
+                        </tr>
+                      </tfoot>
+                    </table>
+
                     <div className="generate-bill-section">
                       <button onClick={generateBill} className="btn btn-success btn-large">
                         ✓ Generate Invoice
                       </button>
-                      
-                      {/* Validation Modal */}
                       {showValidationModal && (
                         <div className="validation-modal-overlay" onClick={() => setShowValidationModal(false)}>
                           <div className="validation-modal" onClick={(e) => e.stopPropagation()}>

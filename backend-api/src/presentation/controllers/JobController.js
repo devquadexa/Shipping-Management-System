@@ -26,6 +26,7 @@ class JobController {
         customerId: req.body.customerId,
         blNumber: req.body.blNumber || null,
         cusdecNumber: req.body.cusdecNumber || null,
+        cusdecDate: req.body.cusdecDate || null,
         openDate: req.body.openDate || null,
         shipmentCategory: req.body.shipmentCategory,
         chassisNumber: req.body.chassisNumber || null,
@@ -51,6 +52,10 @@ class JobController {
       // Create the job first
       const job = await this.createJob.execute(jobData);
       console.log('create - job created:', job);
+      
+      // NOTE: Removed automatic addition of a default advance payment pay item.
+      // Advance payments should be recorded explicitly via the advance payment
+      // endpoints or added by the client when appropriate.
       
       // Handle multiple user assignments if provided
       if (req.body.assignedUsers && Array.isArray(req.body.assignedUsers) && req.body.assignedUsers.length > 0) {
@@ -420,6 +425,7 @@ class JobController {
       const jobData = {
         blNumber: req.body.blNumber,
         cusdecNumber: req.body.cusdecNumber,
+        cusdecDate: req.body.cusdecDate,
         openDate: req.body.openDate,
         shipmentCategory: req.body.shipmentCategory,
         chassisNumber: req.body.chassisNumber,

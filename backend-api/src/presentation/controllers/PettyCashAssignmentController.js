@@ -169,9 +169,10 @@ class PettyCashAssignmentController {
         return res.status(403).json({ message: 'You can only edit your own settlement items' });
       }
       
-      // 3. Verify assignment is in "Settled" status
-      if (assignment.status !== 'Settled') {
-        return res.status(400).json({ message: 'Can only edit items in Settled status' });
+      // 3. Verify assignment is in editable status (Settled or related statuses)
+      const editableStatuses = ['Settled', 'Balance To Be Return', 'Over Due', 'Settled/Rejected', 'Balance Returned', 'Overdue Collected'];
+      if (!editableStatuses.includes(assignment.status)) {
+        return res.status(400).json({ message: `Can only edit items in ${editableStatuses.join(', ')} status. Current status: ${assignment.status}` });
       }
       
       // 4. Check if invoice has been generated for this job
@@ -222,9 +223,10 @@ class PettyCashAssignmentController {
         return res.status(403).json({ message: 'You can only delete your own settlement items' });
       }
       
-      // 3. Verify assignment is in "Settled" status
-      if (assignment.status !== 'Settled') {
-        return res.status(400).json({ message: 'Can only delete items in Settled status' });
+      // 3. Verify assignment is in editable status (Settled or related statuses)
+      const editableStatuses = ['Settled', 'Balance To Be Return', 'Over Due', 'Settled/Rejected', 'Balance Returned', 'Overdue Collected'];
+      if (!editableStatuses.includes(assignment.status)) {
+        return res.status(400).json({ message: `Can only delete items in ${editableStatuses.join(', ')} status. Current status: ${assignment.status}` });
       }
       
       // 4. Check if invoice has been generated for this job
@@ -261,6 +263,124 @@ class PettyCashAssignmentController {
     } catch (error) {
       console.error('Error in closeAssignment:', error);
       res.status(500).json({ message: error.message || 'Error closing assignment' });
+    }
+  }
+
+  async getGrouped(req, res) {
+    try {
+      const getGroupedAssignments = this.container.resolve('getGroupedAssignments');
+      const grouped = await getGroupedAssignments.execute();
+      res.json(grouped);
+    } catch (error) {
+      console.error('Error in getGrouped:', error);
+      res.status(500).json({ message: 'Error fetching grouped assignments' });
+    }
+  }
+
+  async getMyGrouped(req, res) {
+    try {
+      const getGroupedAssignments = this.container.resolve('getGroupedAssignments');
+      const grouped = await getGroupedAssignments.execute(req.user.userId);
+      res.json(grouped);
+    } catch (error) {
+      console.error('Error in getMyGrouped:', error);
+      res.status(500).json({ message: 'Error fetching your grouped assignments' });
+    }
+  }
+
+  async settleGroup(req, res) {
+    try {
+      const { groupId } = req.params;
+      const settleGroupedAssignments = this.container.resolve('settleGroupedAssignments');
+      const results = await settleGroupedAssignments.execute(groupId, req.body);
+      res.json({ message: 'Group settled successfully', results });
+    } catch (error) {
+      console.error('Error in settleGroup:', error);
+      res.status(500).json({ message: error.message || 'Error settling group' });
+    }
+  }
+
+  async getAggregated(req, res) {
+    try {
+      const getAggregatedAssignments = this.container.resolve('getAggregatedAssignments');
+      const aggregated = await getAggregatedAssignments.execute();
+      res.json(aggregated);
+    } catch (error) {
+      console.error('Error in getAggregated:', error);
+      res.status(500).json({ message: 'Error fetching aggregated assignments' });
+    }
+  }
+
+  async getMyAggregated(req, res) {
+    try {
+      const getAggregatedAssignments = this.container.resolve('getAggregatedAssignments');
+      const aggregated = await getAggregatedAssignments.execute(req.user.userId);
+      res.json(aggregated);
+    } catch (error) {
+      console.error('Error in getMyAggregated:', error);
+      res.status(500).json({ message: 'Error fetching your aggregated assignments' });
+    }
+  }
+
+  async getWithChildren(req, res) {
+    try {
+      const getAssignmentsWithChildren = this.container.resolve('getAssignmentsWithChildren');
+      const assignments = await getAssignmentsWithChildren.execute();
+      res.json(assignments);
+    } catch (error) {
+      console.error('Error in getWithChildren:', error);
+      res.status(500).json({ message: 'Error fetching assignments with children' });
+    }
+  }
+
+  async getMyWithChildren(req, res) {
+    try {
+      const getAssignmentsWithChildren = this.container.resolve('getAssignmentsWithChildren');
+      const assignments = await getAssignmentsWithChildren.execute(req.user.userId);
+      res.json(assignments);
+    } catch (error) {
+      console.error('Error in getMyWithChildren:', error);
+      res.status(500).json({ message: 'Error fetching your assignments with children' });
+    }
+  }
+
+  async createSubAssignment(req, res) {
+    try {
+      const { id } = req.params;
+      const createSubAssignment = this.container.resolve('createSubAssignment');
+      const subAssignmentData = {
+        ...req.body,
+        assignedBy: req.user.userId
+      };
+      const subAssignment = await createSubAssignment.execute(parseInt(id), subAssignmentData);
+      res.status(201).json(subAssignment);
+    } catch (error) {
+      console.error('Error in createSubAssignment:', error);
+      res.status(500).json({ message: error.message || 'Error creating sub-assignment' });
+    }
+  }
+
+  async getSubAssignments(req, res) {
+    try {
+      const { id } = req.params;
+      const pettyCashAssignmentRepository = this.container.resolve('pettyCashAssignmentRepository');
+      const subAssignments = await pettyCashAssignmentRepository.getSubAssignments(parseInt(id));
+      res.json(subAssignments);
+    } catch (error) {
+      console.error('Error in getSubAssignments:', error);
+      res.status(500).json({ message: 'Error fetching sub-assignments' });
+    }
+  }
+
+  async recalculateStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const pettyCashAssignmentRepository = this.container.resolve('pettyCashAssignmentRepository');
+      const updated = await pettyCashAssignmentRepository.recalculateStatus(parseInt(id));
+      res.json({ message: 'Status recalculated', assignment: updated });
+    } catch (error) {
+      console.error('Error in recalculateStatus:', error);
+      res.status(500).json({ message: error.message || 'Error recalculating status' });
     }
   }
 }

@@ -24,14 +24,15 @@ class MSSQLOfficePayItemRepository extends IOfficePayItemRepository {
         .input('description', this.sql.NVarChar, officePayItem.description)
         .input('actualCost', this.sql.Decimal(18, 2), officePayItem.actualCost)
         .input('paidBy', this.sql.VarChar, officePayItem.paidBy)
+        .input('hasBill', this.sql.Bit, officePayItem.hasBill || false)
         .query(`
           INSERT INTO OfficePayItems (
             officePayItemId, jobId, description, actualCost, 
-            paidBy, paymentDate, createdDate, updatedDate
+            paidBy, hasBill, paymentDate, createdDate, updatedDate
           )
           VALUES (
             @officePayItemId, @jobId, @description, @actualCost,
-            @paidBy, GETDATE(), GETDATE(), GETDATE()
+            @paidBy, @hasBill, GETDATE(), GETDATE(), GETDATE()
           )
         `);
       
@@ -140,6 +141,16 @@ class MSSQLOfficePayItemRepository extends IOfficePayItemRepository {
       if (updateData.actualCost !== undefined) {
         updateFields.push('actualCost = @actualCost');
         request.input('actualCost', this.sql.Decimal(18, 2), updateData.actualCost);
+      }
+      
+      if (updateData.billingAmount !== undefined) {
+        updateFields.push('billingAmount = @billingAmount');
+        request.input('billingAmount', this.sql.Decimal(18, 2), updateData.billingAmount);
+      }
+      
+      if (updateData.hasBill !== undefined) {
+        updateFields.push('hasBill = @hasBill');
+        request.input('hasBill', this.sql.Bit, updateData.hasBill);
       }
       
       updateFields.push('updatedDate = GETDATE()');
