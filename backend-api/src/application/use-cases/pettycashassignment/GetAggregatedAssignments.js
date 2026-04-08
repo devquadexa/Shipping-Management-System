@@ -51,7 +51,8 @@ class GetAggregatedAssignments {
           assignment.status !== 'Pending Approval' &&
           assignment.status !== 'Settled/Approved' &&
           assignment.status !== 'Settled / Balance Returned' &&
-          assignment.status !== 'Settled / Over Due Collected') {
+          assignment.status !== 'Settled / Over Due Collected' &&
+          assignment.status !== 'Full Petty Cash Returned') {
         grouped[key].allSettled = false;
       }
 
