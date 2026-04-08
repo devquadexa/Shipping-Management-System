@@ -138,6 +138,14 @@
   font-weight: 600;
 }
 
+/* New Status: Full Petty Cash Returned (No items paid) */
+.status-full-petty-cash-returned {
+  background: #c7d2fe;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+  font-weight: 700;
+}
+
 .status-returned {
   background: #e0e7ff;
   color: #3730a3;
@@ -460,6 +468,25 @@
   margin-top: 0.5rem;
   font-size: 1.25rem;
   font-weight: 700;
+}
+
+/* Full Return Notice */
+.full-return-notice {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: 4px;
+  color: #92400e;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.full-return-notice svg {
+  flex-shrink: 0;
+  color: #f59e0b;
 }
 
 .settlement-items-view {

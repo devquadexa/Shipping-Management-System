@@ -271,6 +271,9 @@ function PettyCash() {
     'Settled',
     'Settled/Approved',
     'Settled/Rejected',
+    'Settled / Balance Returned',
+    'Settled / Over Due Collected',
+    'Full Petty Cash Returned',
     'Balance Returned',
     'Overdue Collected',
     'Returned',
@@ -279,26 +282,34 @@ function PettyCash() {
 
   const isActiveAssignment = (assignment) => !closedAssignmentStatuses.includes(assignment.status);
 
-  // Show all jobs that have assigned users.
+  // Show all jobs that have assigned users and haven't been billed yet.
   // Availability for assignment is determined per-user by active (non-settled) petty cash entries.
   const getAvailableJobs = () => {
-    return jobs.filter(job => {
+    console.log('=== getAvailableJobs ===');
+    console.log('Total jobs:', jobs.length);
+    console.log('jobAssignments:', jobAssignments);
+    console.log('assignments (petty cash):', assignments.length);
+    console.log('invoicedJobIds:', invoicedJobIds);
+    
+    const available = jobs.filter(job => {
+      // Job must have assigned users
       if (!jobAssignments[job.jobId] || jobAssignments[job.jobId].length === 0) {
+        console.log(`Job ${job.jobId}: FILTERED OUT - no assigned users`);
         return false;
       }
 
-      const jobPettyCashAssignments = assignments.filter(a => a.jobId === job.jobId);
-      const hasAssignments = jobPettyCashAssignments.length > 0;
-      const allAssignmentsClosed = hasAssignments && jobPettyCashAssignments.every(a => !isActiveAssignment(a));
-      const isJobMarkedSettled = job.pettyCashStatus === 'Settled';
-
-      // Do not show jobs that are already fully settled in petty cash flow.
-      if (allAssignmentsClosed || isJobMarkedSettled) {
+      // Job must not have a bill generated
+      if (invoicedJobIds.has(job.jobId)) {
+        console.log(`Job ${job.jobId}: FILTERED OUT - bill already generated`);
         return false;
       }
 
+      console.log(`Job ${job.jobId}: INCLUDED - allowing multiple assignments per job`);
       return true;
     });
+
+    console.log('Available jobs:', available.length);
+    return available;
   };
 
   const getAvailableUsersForJob = (jobId) => {
@@ -359,7 +370,11 @@ function PettyCash() {
   const handleAssignSubmit = async (e) => {
     e.preventDefault();
     
+    console.log('=== handleAssignSubmit START ===');
+    console.log('Form data:', assignFormData);
+    
     if (!assignFormData.jobId || !assignFormData.assignedTo || !assignFormData.assignedAmount) {
+      console.log('Validation failed - missing required fields');
       setMessage('Please fill all required fields');
       setTimeout(() => setMessage(''), 3000);
       return;
@@ -367,6 +382,7 @@ function PettyCash() {
 
     const assignedAmountText = String(assignFormData.assignedAmount).trim();
     if (!/^\d+(\.\d{1,2})?$/.test(assignedAmountText)) {
+      console.log('Validation failed - invalid amount format:', assignedAmountText);
       setMessage('Assigned amount must be a valid number');
       setTimeout(() => setMessage(''), 3000);
       return;
@@ -374,25 +390,42 @@ function PettyCash() {
 
     const assignedAmount = parseFloat(assignedAmountText);
     if (Number.isNaN(assignedAmount) || assignedAmount <= 0) {
+      console.log('Validation failed - invalid amount value:', assignedAmount);
       setMessage('Assigned amount must be greater than 0');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
 
+    console.log('Validation passed, sending request with data:', {
+      jobId: assignFormData.jobId,
+      assignedTo: assignFormData.assignedTo,
+      assignedAmount: assignedAmount,
+      notes: assignFormData.notes
+    });
+
     try {
+      const requestPayload = {
+        ...assignFormData,
+        assignedAmount
+      };
+      console.log('Request payload:', requestPayload);
+      console.log('API endpoint:', `${API_BASE}/api/petty-cash-assignments`);
+      console.log('Token present:', !!localStorage.getItem('token'));
+      
       const response = await fetch(`${API_BASE}/api/petty-cash-assignments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          ...assignFormData,
-          assignedAmount
-        })
+        body: JSON.stringify(requestPayload)
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response OK:', response.ok);
+
       if (response.ok) {
+        console.log('Success! Assignment created');
         setMessage('Petty cash assigned successfully!');
         setShowAssignModal(false);
         setAssignFormData({ jobId: '', assignedTo: '', assignedAmount: '', notes: '' });
@@ -401,14 +434,17 @@ function PettyCash() {
         setTimeout(() => setMessage(''), 3000);
       } else {
         const error = await response.json();
+        console.error('API error response:', error);
         setMessage(error.message || 'Error assigning petty cash');
         setTimeout(() => setMessage(''), 5000);
       }
     } catch (error) {
-      console.error('Error assigning petty cash:', error);
+      console.error('Fetch error:', error);
+      console.error('Error details:', error.message);
       setMessage('Error assigning petty cash');
       setTimeout(() => setMessage(''), 3000);
     }
+    console.log('=== handleAssignSubmit END ===');
   };
 
   const openSettleModal = async (assignment) => {
@@ -927,14 +963,37 @@ function PettyCash() {
   const handleSettleSubmit = async (e) => {
     e.preventDefault();
     
+    /**
+     * SETTLEMENT FLOW:
+     * 1. NORMAL SCENARIO: Clerk enters item amounts -> validItems.length > 0
+     *    - Settlement items are submitted to backend
+     *    - Backend calculates actualSpent from items, determines status
+     * 
+     * 2. FULL RETURN SCENARIO: Clerk submits without entering amounts -> validItems.length === 0
+     *    - User sees confirmation dialog explaining full return
+     *    - If confirmed, empty items array is submitted
+     *    - Backend receives no items, calculates actualSpent = 0
+     *    - Backend sets status to 'Balance To Be Return' with full assigned amount
+     *    - Clerk can request return of entire allocation (e.g., unable to complete job due to illness/leave)
+     */
     const validItems = settlementItems.filter(item => 
       item.itemName && item.actualCost && parseFloat(item.actualCost) > 0 && !item.alreadyPaid
     );
     
+    // If no items with amounts are entered, treat it as a full return request
     if (validItems.length === 0) {
-      setMessage('Please fill in at least one item with name and cost');
-      setTimeout(() => setMessage(''), 3000);
-      return;
+      // Confirm with the user that they're returning the full assigned amount
+      const confirmFullReturn = window.confirm(
+        `You are submitting a full petty cash return request.\n\n` +
+        `Assigned Amount: LKR ${formatAmount(selectedAssignment.assignedAmount)}\n` +
+        `No items will be claimed as expenses.\n\n` +
+        `This will be submitted for approval.\n\n` +
+        `Continue with full return?`
+      );
+      
+      if (!confirmFullReturn) {
+        return;
+      }
     }
 
     const itemsPayload = validItems.map(item => ({
@@ -977,11 +1036,19 @@ function PettyCash() {
 
       if (response.ok) {
         setMessage('Petty cash settled successfully!');
+        // Close modal and clear state first
         setShowSettleModal(false);
         setSelectedAssignment(null);
         setSettlementItems([]);
-        fetchAssignments();
-        fetchJobs();
+        
+        // Refresh data from backend
+        console.log('Settle successful - refreshing assignments and jobs...');
+        await Promise.all([
+          fetchAssignments(),
+          fetchJobs()
+        ]);
+        console.log('Data refresh complete after settlement');
+        
         setTimeout(() => setMessage(''), 3000);
       } else {
         const error = await response.json();
@@ -1070,6 +1137,7 @@ function PettyCash() {
       case 'Pending Approval / Over Due': return 'status-pending-approval-overdue';
       case 'Settled / Balance Returned': return 'status-settled-balance-returned';
       case 'Settled / Over Due Collected': return 'status-settled-overdue-collected';
+      case 'Full Petty Cash Returned': return 'status-full-petty-cash-returned';
       case 'Closed': return 'status-closed';
       // Legacy statuses for backward compatibility
       case 'Settled/Approved': return 'status-approved';
@@ -1285,7 +1353,7 @@ function PettyCash() {
             <div className="fin-stat-divider" />
             <div className="fin-stat-item">
               <span className="fin-stat-label">Actual Spent</span>
-              <span className="fin-stat-value">{assignment.actualSpent ? `LKR ${formatAmount(assignment.actualSpent)}` : '—'}</span>
+              <span className="fin-stat-value">{assignment.actualSpent >= 0 ? `LKR ${formatAmount(assignment.actualSpent)}` : '—'}</span>
             </div>
             {assignment.balanceAmount > 0 && !['Balance Returned', 'Settled/Approved', 'Closed'].includes(assignment.status) && (
               <>
@@ -1801,9 +1869,13 @@ function PettyCash() {
                           const allBalanceReturned = groupAssignments.every(a => a.status === 'Settled / Balance Returned');
                           const allOverDueCollected = groupAssignments.every(a => a.status === 'Settled / Over Due Collected');
                           const allApproved = groupAssignments.every(a => a.status === 'Settled/Approved');
+                          const allFullReturned = groupAssignments.every(a => a.status === 'Full Petty Cash Returned');
+                          
                           if (allBalanceReturned) return 'Settled / Balance Returned';
                           if (allOverDueCollected) return 'Settled / Over Due Collected';
                           if (allApproved) return 'Settled/Approved';
+                          if (allFullReturned) return 'Full Petty Cash Returned';
+                          
                           // Determine status based on group totals, not individual statuses
                           if (totalBalance > 0) return 'Balance To Be Return';
                           if (totalOver > 0) return 'Over Due';
@@ -1822,6 +1894,9 @@ function PettyCash() {
                       && groupStatus !== 'Pending Approval / Over Due'
                       && groupStatus !== 'Pending Approval'
                       && groupStatus !== 'Closed'
+                      && groupStatus !== 'Full Petty Cash Returned'
+                      && groupStatus !== 'Settled / Balance Returned'
+                      && groupStatus !== 'Settled / Over Due Collected'
                       && (isMulti ? totalBalance > 0 : first.balanceAmount > 0);
                     const canCollectOverdue = !anyAssigned && user?.role === 'Waff Clerk'
                       && (groupStatus === 'Settled' || groupStatus === 'Over Due' || groupStatus === 'Settled/Rejected')
@@ -1829,6 +1904,9 @@ function PettyCash() {
                       && groupStatus !== 'Pending Approval / Over Due'
                       && groupStatus !== 'Pending Approval'
                       && groupStatus !== 'Closed'
+                      && groupStatus !== 'Full Petty Cash Returned'
+                      && groupStatus !== 'Settled / Balance Returned'
+                      && groupStatus !== 'Settled / Over Due Collected'
                       && (isMulti ? totalOver > 0 : first.overAmount > 0);
 
                     return (
@@ -2172,6 +2250,10 @@ function PettyCash() {
               <button className="btn-close" onClick={() => setShowAssignModal(false)}>×</button>
             </div>
             <form onSubmit={handleAssignSubmit} className="petty-cash-form">
+              <p className="helper-text info">
+                <strong>Multiple Assignments:</strong> You can assign petty cash to multiple clerks for the same job. If an assignment was previously settled with "Full Petty Cash Returned", "Settled / Balance Returned", or "Settled / Over Due Collected", you can create a new independent assignment. Each assignment is tracked separately.
+              </p>
+              
               <div className="form-group">
                 <label>Select Job <span className="required">*</span></label>
                 <select
@@ -2262,7 +2344,7 @@ function PettyCash() {
         }}>
           <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected') ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
+              <h2>{(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected' || selectedAssignment.status === 'Full Petty Cash Returned') ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
               <button className="btn-close" onClick={() => {
                 setShowSettleModal(false);
                 setSelectedAssignment(null);
@@ -2447,7 +2529,7 @@ function PettyCash() {
             ) : (
               <form onSubmit={handleSettleSubmit} className="settlement-form">
                 <h3>Settlement Items</h3>
-                <p className="helper-text info">Fill in only the items you paid for. Tick the "Bill" checkbox if you have a proof receipt for that item. Items already paid in other assignments are shown as read-only.</p>
+                <p className="helper-text info">Fill in only the items you paid for. Tick the "Bill" checkbox if you have a proof receipt for that item. Items already paid in other assignments are shown as read-only. You can also submit <strong>without entering any amounts</strong> to return the full petty cash allocation.</p>
                 <div className="settlement-items-list">
                   {settlementItems.map((item, index) => (
                     <div key={index} className={`settlement-item-row ${item.alreadyPaid ? 'paid-item-row' : ''} ${item.hasBill ? 'has-bill-row' : ''}`}>
@@ -2564,6 +2646,16 @@ function PettyCash() {
                       </>
                     )}
                   </div>
+                  {settlementItems.filter(i => !i.alreadyPaid).length === 0 && (
+                    <div className="full-return-notice">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px'}}>
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                      </svg>
+                      <span><strong>Full Return:</strong> Submitting without item amounts will return the entire LKR {formatAmount(selectedAssignment.assignedAmount)} and require approval.</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="modal-actions">
