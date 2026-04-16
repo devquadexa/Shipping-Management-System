@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { billingService } from '../api/services/billingService';
 import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
+import { transporterService } from '../api/services/transporterService';
 import API_BASE from '../api/config';
 import '../styles/Billing.css';
 
@@ -54,6 +55,7 @@ function Billing() {
   const [bills, setBills] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [transporters, setTransporters] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [message, setMessage] = useState('');
   const [showPayItemsRow, setShowPayItemsRow] = useState(false);
@@ -81,6 +83,7 @@ function Billing() {
     fetchBills();
     fetchJobs();
     fetchCustomers();
+    fetchTransporters();
   }, []);
 
   const fetchBills = async () => {
@@ -107,6 +110,45 @@ function Billing() {
       setCustomers(data);
     } catch (error) {
       console.error('Error fetching customers:', error);
+    }
+  };
+
+  const fetchTransporters = async () => {
+    try {
+      const data = await transporterService.getAll();
+      setTransporters(data);
+    } catch (error) {
+      console.error('Error fetching transporters:', error);
+    }
+  };
+
+  const handleTransporterChange = async (newTransporterId) => {
+    if (!selectedJob) return;
+
+    try {
+      const transporter = transporters.find(t => t.transporterId === newTransporterId);
+      const transporterName = transporter ? transporter.name : '';
+
+      // Update job with new transporter
+      await jobService.update(selectedJob.jobId, {
+        transporter: transporterName
+      });
+
+      // Update selected job state
+      setSelectedJob({
+        ...selectedJob,
+        transporter: transporterName
+      });
+
+      setMessage('Transporter updated successfully!');
+      setTimeout(() => setMessage(''), 3000);
+
+      // Refresh jobs list
+      fetchJobs();
+    } catch (error) {
+      console.error('Error updating transporter:', error);
+      setMessage('Error updating transporter');
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -1442,9 +1484,18 @@ function Billing() {
                   {selectedJob.hasOwnProperty('transporter') && (
                     <div className="info-row">
                       <span className="info-label">Transporter:</span>
-                      <span className="info-value">
-                        {selectedJob.transporter || '-'}
-                      </span>
+                      <select 
+                        className="info-value transporter-dropdown"
+                        value={transporters.find(t => t.name === selectedJob.transporter)?.transporterId || ''}
+                        onChange={(e) => handleTransporterChange(e.target.value)}
+                      >
+                        <option value="">Select Transporter</option>
+                        {transporters.map(transporter => (
+                          <option key={transporter.transporterId} value={transporter.transporterId}>
+                            {transporter.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
                   <div className="info-row">

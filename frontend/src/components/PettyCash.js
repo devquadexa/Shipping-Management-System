@@ -1809,7 +1809,25 @@ function PettyCash() {
 
                     // Group-level aggregates
                     const totalAssigned = groupAssignments.reduce((s, a) => s + parseFloat(a.assignedAmount || 0), 0);
-                    const totalSpent = groupAssignments.reduce((s, a) => s + parseFloat(a.actualSpent || 0), 0);
+                    
+                    // Collect all settlement items across all assignments in the group
+                    // To handle grouped assignments correctly, we pull items from all assignments but deduplicate them
+                    console.log('--- Aggregating Items (GroupId:', groupId, ') ---');
+                    const allSettlementItems = groupAssignments.flatMap((a) => {
+                      const items = a.settlementItems || [];
+                      return items.map(item => ({ ...item, assignmentId: a.assignmentId }));
+                    }).reduce((acc, item) => {
+                      // Check if item already exists in accumulator to avoid duplication
+                      // Match by name and cost for a robust check
+                      const exists = acc.some(i => i.itemName === item.itemName && parseFloat(i.actualCost) === parseFloat(item.actualCost));
+                      if (!exists) {
+                        acc.push(item);
+                      }
+                      return acc;
+                    }, []);
+                    console.log('Final Aggregated Items:', allSettlementItems);
+
+                    const totalSpent = allSettlementItems.reduce((s, i) => s + parseFloat(i.actualCost || 0), 0);
                     const totalBalance = totalAssigned > totalSpent ? totalAssigned - totalSpent : 0;
                     const totalOver = totalSpent > totalAssigned ? totalSpent - totalAssigned : 0;
                     const allSettled = groupAssignments.every(a => [
@@ -1824,7 +1842,8 @@ function PettyCash() {
                       'Settled/Rejected',
                       'Balance Returned',
                       'Overdue Collected',
-                      'Closed'
+                      'Closed',
+                      'Full Petty Cash Returned'
                     ].includes(a.status));
                     const anyAssigned = groupAssignments.some(a => a.status === 'Assigned');
                     // Status priority: most advanced status wins for the group display
@@ -1883,10 +1902,7 @@ function PettyCash() {
                           return 'Settled';
                         })()
                       : groupAssignments[0].status;
-                    // Collect all settlement items across all assignments in the group
-                    const allSettlementItems = groupAssignments.flatMap(a => 
-                      (a.settlementItems || []).map(item => ({ ...item, assignmentId: a.assignmentId }))
-                    );
+
                     // Balance/Over buttons: only show for Settled or Settled/Rejected (not after Balance Returned/Approved or Closed)
                     const canReturnBalance = !anyAssigned && user?.role === 'Waff Clerk'
                       && (groupStatus === 'Settled' || groupStatus === 'Balance To Be Return' || groupStatus === 'Settled/Rejected')
@@ -2028,7 +2044,7 @@ function PettyCash() {
                                 </table>
 
                                 {/* Group Financial Summary — shown after settling */}
-                                {allSettled && (
+                                {(allSettled || allSettlementItems.length > 0) && (
                                   <div style={{marginTop: '1.5rem'}}>
                                     <div className="financial-summary-strip">
                                       <div className="fin-stat-item">

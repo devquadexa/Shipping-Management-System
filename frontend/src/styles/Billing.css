@@ -2345,4 +2345,29 @@ input[type="number"] {
   border: 1px solid #e5e7eb;
 }
 
+/* Transporter Dropdown Styles */
+.transporter-dropdown {
+  padding: 0.5rem 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #101036;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 200px;
+}
+
+.transporter-dropdown:hover {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+.transporter-dropdown:focus {
+  outline: none;
+  border-color: #0084d4;
+  box-shadow: 0 0 0 3px rgba(0, 132, 212, 0.2);
+}
+
 /* No-actions variant: columns still align via table-layout: fixed */
