@@ -394,6 +394,19 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
                   AND itemName = @itemName
                   AND isCustomItem = 0
               `);
+          } else {
+            // Fix for custom item duplication:
+            // When settling a group, the same custom items might be sent in multiple times.
+            // We should clear the existing custom items for THIS assignment before re-inserting.
+            await transaction.request()
+              .input('assignmentId', this.sql.Int, assignmentId)
+              .input('itemName', this.sql.NVarChar, item.itemName)
+              .query(`
+                DELETE FROM PettyCashSettlementItems
+                WHERE assignmentId = @assignmentId
+                  AND itemName = @itemName
+                  AND isCustomItem = 1
+              `);
           }
           
           console.log('settle - inserting item:', item.itemName, '| hasBill:', item.hasBill);
