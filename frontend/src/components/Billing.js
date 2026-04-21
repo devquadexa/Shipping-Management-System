@@ -1823,7 +1823,7 @@ function Billing() {
                     </table>
 
                     <div className="generate-bill-section">
-                      <button onClick={generateBill} className="btn btn-success btn-large">
+                      <button onClick={generateBill} className="btn btn-primary btn-small">
                         ✓ Generate Invoice
                       </button>
                       {showValidationModal && (

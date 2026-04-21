@@ -1,7 +1,8 @@
 class CreatePettyCashAssignment {
-  constructor(pettyCashAssignmentRepository, billRepository) {
+  constructor(pettyCashAssignmentRepository, billRepository, jobRepository) {
     this.pettyCashAssignmentRepository = pettyCashAssignmentRepository;
     this.billRepository = billRepository;
+    this.jobRepository = jobRepository;
   }
 
   async execute(assignmentData) {
@@ -27,7 +28,17 @@ class CreatePettyCashAssignment {
     // even if there are existing assignments for the same job+user combination.
     // Multiple assignments for the same job+user are grouped together using groupId.
     // This allows creating new assignments after "Full Petty Cash Returned" status.
-    return await this.pettyCashAssignmentRepository.create(assignmentData);
+    const assignment = await this.pettyCashAssignmentRepository.create(assignmentData);
+
+    // Auto-update job status from "Open" to "In Progress" when petty cash is assigned
+    if (this.jobRepository) {
+      const job = await this.jobRepository.findById(assignmentData.jobId);
+      if (job && job.status === 'Open') {
+        await this.jobRepository.updateStatus(assignmentData.jobId, 'In Progress');
+      }
+    }
+
+    return assignment;
   }
 }
 

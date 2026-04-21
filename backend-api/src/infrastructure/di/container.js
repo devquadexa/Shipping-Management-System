@@ -198,7 +198,7 @@ class Container {
     this.dependencies.deletePayItemTemplate = new DeletePayItemTemplate(payItemTemplateRepository);
     
     // Petty Cash Assignment use cases
-    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository, billRepository);
+    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository, billRepository, jobRepository);
     this.dependencies.getAllPettyCashAssignments = new GetAllPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getUserPettyCashAssignments = new GetUserPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getPettyCashAssignmentByJob = new GetPettyCashAssignmentByJob(pettyCashAssignmentRepository);
