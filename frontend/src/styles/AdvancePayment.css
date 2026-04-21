@@ -1,14 +1,11 @@
 /* Advance Payment Component Styles */
 .advance-payment-section {
   padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
 }
 
 .advance-payment-section .section-header {
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
+  display: block;
+  text-align: left;
   margin-bottom: 2rem;
   padding-bottom: 0;
   border-bottom: none;

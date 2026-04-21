@@ -815,7 +815,7 @@ input[type="number"] {
 }
 
 .generate-bill-section {
-  text-align: center;
+  text-align: left;
   padding: 1.25rem 0 0.5rem;
 }
 
