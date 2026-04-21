@@ -210,7 +210,7 @@ function PettyCash() {
   const fetchUsers = async () => {
     try {
       const data = await authService.getUsers();
-      setUsers(data.filter(u => u.role === 'Waff Clerk'));
+      setUsers(data.filter(u => u.role === 'Waff Clerk' || u.role === 'Manager'));
     } catch (error) {
       console.error('Error fetching users:', error);
     }
@@ -1400,7 +1400,7 @@ function PettyCash() {
                 <span className="settlement-items-title">Settlement Items</span>
                 <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
                   <span className="settlement-items-count">{assignment.settlementItems.length} item{assignment.settlementItems.length !== 1 ? 's' : ''}</span>
-                  {(assignment.status === 'Settled' || assignment.status === 'Balance To Be Return' || assignment.status === 'Over Due') && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId) && (
+                  {(assignment.status === 'Settled' || assignment.status === 'Balance To Be Return' || assignment.status === 'Over Due') && (user?.role === 'Waff Clerk' || user?.role === 'Manager') && assignment.assignedTo === user?.userId && !invoicedJobIds.has(assignment.jobId) && (
                     <button className="btn-add-inline-item" onClick={() => {
                       setInlineAddingRow(assignment.assignmentId);
                       setInlineNewItem({ itemName: '', actualCost: '', hasBill: false });
@@ -1413,7 +1413,7 @@ function PettyCash() {
               </div>
               <div className="settlement-review-table">
                 {(() => {
-                  const canEditItems = (assignment.status === 'Settled' || assignment.status === 'Balance To Be Return' || assignment.status === 'Over Due') && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId);
+                  const canEditItems = (assignment.status === 'Settled' || assignment.status === 'Balance To Be Return' || assignment.status === 'Over Due') && (user?.role === 'Waff Clerk' || user?.role === 'Manager') && assignment.assignedTo === user?.userId && !invoicedJobIds.has(assignment.jobId);
                   return (
                     <>
                       <div className={`settlement-table-header ${canEditItems ? 'with-actions' : ''}`}>
@@ -1492,7 +1492,7 @@ function PettyCash() {
                             </div>
                           </div>
                         )}
-                        <div className={`settlement-table-row settlement-total-row ${assignment.status === 'Settled' && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId) ? 'with-actions' : ''}`}>
+                        <div className={`settlement-table-row settlement-total-row ${assignment.status === 'Settled' && (user?.role === 'Waff Clerk' || user?.role === 'Manager') && assignment.assignedTo === user?.userId && !invoicedJobIds.has(assignment.jobId) ? 'with-actions' : ''}`}>
                           <div className="settlement-table-cell settlement-num-col"></div>
                           <div className="settlement-table-cell settlement-name-col"><strong>Total</strong></div>
                           <div className="settlement-table-cell settlement-type-col"></div>
@@ -1500,7 +1500,7 @@ function PettyCash() {
                           <div className="settlement-table-cell settlement-amount-col settlement-amount-value">
                             <strong>LKR {formatAmount(assignment.settlementItems.reduce((sum, i) => sum + parseFloat(i.actualCost || 0), 0))}</strong>
                           </div>
-                          {assignment.status === 'Settled' && user?.role === 'Waff Clerk' && !invoicedJobIds.has(assignment.jobId) && <div className="settlement-table-cell settlement-actions-col"></div>}
+                          {assignment.status === 'Settled' && (user?.role === 'Waff Clerk' || user?.role === 'Manager') && assignment.assignedTo === user?.userId && !invoicedJobIds.has(assignment.jobId) && <div className="settlement-table-cell settlement-actions-col"></div>}
                         </div>
                       </div>
                     </>
@@ -1903,8 +1903,9 @@ function PettyCash() {
                         })()
                       : groupAssignments[0].status;
 
-                    // Balance/Over buttons: only show for Settled or Settled/Rejected (not after Balance Returned/Approved or Closed)
-                    const canReturnBalance = !anyAssigned && user?.role === 'Waff Clerk'
+                    // Balance/Over buttons: only show for Waff Clerks (not Managers)
+                    // Managers get automatic final status after settlement
+                    const canReturnBalance = !anyAssigned && user?.role === 'Waff Clerk' && first.assignedTo === user?.userId
                       && (groupStatus === 'Settled' || groupStatus === 'Balance To Be Return' || groupStatus === 'Settled/Rejected')
                       && groupStatus !== 'Pending Approval / Balance'
                       && groupStatus !== 'Pending Approval / Over Due'
@@ -1914,7 +1915,7 @@ function PettyCash() {
                       && groupStatus !== 'Settled / Balance Returned'
                       && groupStatus !== 'Settled / Over Due Collected'
                       && (isMulti ? totalBalance > 0 : first.balanceAmount > 0);
-                    const canCollectOverdue = !anyAssigned && user?.role === 'Waff Clerk'
+                    const canCollectOverdue = !anyAssigned && user?.role === 'Waff Clerk' && first.assignedTo === user?.userId
                       && (groupStatus === 'Settled' || groupStatus === 'Over Due' || groupStatus === 'Settled/Rejected')
                       && groupStatus !== 'Pending Approval / Balance'
                       && groupStatus !== 'Pending Approval / Over Due'
@@ -1957,7 +1958,8 @@ function PettyCash() {
                           <td data-label="Actions">
                             <div className="actions-cell-hybrid">
                               {/* Unified action logic for both single and grouped assignments */}
-                              {anyAssigned && user?.role === 'Waff Clerk' && (
+                              {/* Show settle button if user is assigned to this petty cash (Waff Clerk or Manager) */}
+                              {anyAssigned && (user?.role === 'Waff Clerk' || user?.role === 'Manager') && first.assignedTo === user?.userId && (
                                 <button className="btn-settle-primary" onClick={() => {
                                   const settlementAssignment = {
                                     ...first,
@@ -2127,7 +2129,7 @@ function PettyCash() {
                                           <span className="settlement-items-title">Settlement Items</span>
                                           <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
                                             <span className="settlement-items-count">{allSettlementItems.length} item{allSettlementItems.length !== 1 ? 's' : ''}</span>
-                                            {user?.role === 'Waff Clerk' && !invoicedJobIds.has(first.jobId) && (
+                                            {(user?.role === 'Waff Clerk' || user?.role === 'Manager') && first.assignedTo === user?.userId && !invoicedJobIds.has(first.jobId) && (
                                               <button className="btn-add-inline-item" onClick={() => {
                                                 setInlineAddingRow(first.assignmentId);
                                                 setInlineNewItem({ itemName: '', actualCost: '', hasBill: false });
@@ -2140,7 +2142,7 @@ function PettyCash() {
                                         </div>
                                         <div className="settlement-review-table">
                                           {(() => {
-                                            const canEdit = user?.role === 'Waff Clerk' && !invoicedJobIds.has(first.jobId);
+                                            const canEdit = (user?.role === 'Waff Clerk' || user?.role === 'Manager') && first.assignedTo === user?.userId && !invoicedJobIds.has(first.jobId);
                                             return (
                                               <>
                                                 <div className={`settlement-table-header ${canEdit ? 'with-actions' : ''}`}>
@@ -2266,10 +2268,6 @@ function PettyCash() {
               <button className="btn-close" onClick={() => setShowAssignModal(false)}>×</button>
             </div>
             <form onSubmit={handleAssignSubmit} className="petty-cash-form">
-              <p className="helper-text info">
-                <strong>Multiple Assignments:</strong> You can assign petty cash to multiple clerks for the same job. If an assignment was previously settled with "Full Petty Cash Returned", "Settled / Balance Returned", or "Settled / Over Due Collected", you can create a new independent assignment. Each assignment is tracked separately.
-              </p>
-              
               <div className="form-group">
                 <label>Select Job <span className="required">*</span></label>
                 <select

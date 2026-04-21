@@ -525,19 +525,39 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         const actualSpentNum = Number(actualSpent);
         const assignedAmountNum = Number(assignedAmount);
         
+        // Get user role from settlementData (passed from controller)
+        const userRole = settlementData.userRole;
+        console.log('settle - userRole:', userRole);
+        
         // Check for Full Petty Cash Returned: no items settled and full amount is being returned
         if (actualSpentNum === 0 && balanceNum === assignedAmountNum) {
           newStatus = 'Full Petty Cash Returned';
           console.log('settle - Setting status to Full Petty Cash Returned (no items paid, full cash returned)');
         } else if (balanceNum > 0) {
-          newStatus = 'Balance To Be Return';
-          console.log('settle - Setting status to Balance To Be Return, balanceNum:', balanceNum);
+          // For Managers, set final status immediately (no approval workflow)
+          if (userRole === 'Manager') {
+            newStatus = 'Settled / Balance Returned';
+            console.log('settle - Manager settlement: Setting status to Settled / Balance Returned (final status)');
+          } else {
+            newStatus = 'Balance To Be Return';
+            console.log('settle - Waff Clerk settlement: Setting status to Balance To Be Return (pending approval)');
+          }
         } else if (overNum > 0) {
-          newStatus = 'Over Due';
-          console.log('settle - Setting status to Over Due, overNum:', overNum);
+          // For Managers, set final status immediately (no approval workflow)
+          if (userRole === 'Manager') {
+            newStatus = 'Settled / Over Due Collected';
+            console.log('settle - Manager settlement: Setting status to Settled / Over Due Collected (final status)');
+          } else {
+            newStatus = 'Over Due';
+            console.log('settle - Waff Clerk settlement: Setting status to Over Due (pending collection)');
+          }
+        } else {
+          // Exact match - status is 'Settled' for both roles
+          newStatus = 'Settled';
+          console.log('settle - Exact match: Setting status to Settled');
         }
         
-        console.log('settle - auto-determined status:', newStatus);
+        console.log('settle - final determined status:', newStatus);
         
         // Update assignment with calculated amounts and automatic status
         const updateResult = await transaction.request()
