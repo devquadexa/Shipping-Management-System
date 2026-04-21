@@ -2,12 +2,14 @@
 
 .office-pay-items-section {
   padding: 2rem;
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
+  width: 100%;
 }
 
 .section-header {
   margin-bottom: 2rem;
+  text-align: left;
 }
 
 .header-content h3 {
@@ -56,6 +58,8 @@
   background: linear-gradient(135deg, #f8f9fa 0%, #f0f1f3 100%);
   border-radius: 8px;
   border: 1px solid #e5e7eb;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .table-title {
@@ -103,6 +107,7 @@
   border: 1px solid #e5e7eb;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  width: 100%;
 }
 
 .billing-table {
@@ -384,6 +389,7 @@
   background: white;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
+  width: 100%;
 }
 
 .empty-icon {

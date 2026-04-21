@@ -29,8 +29,41 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           ALTER TABLE PettyCashAssignments ALTER COLUMN status NVARCHAR(100) NOT NULL;
       `);
 
-      // groupId = provided groupId OR existing group for this job+user OR new one
-      const groupId = assignmentData.groupId || `${assignmentData.jobId}_${assignmentData.assignedTo}`;
+      // Check if there's a previous assignment with "Full Petty Cash Returned" status
+      let groupId = assignmentData.groupId || `${assignmentData.jobId}_${assignmentData.assignedTo}`;
+      
+      if (!assignmentData.groupId) {
+        const lastAssignmentResult = await pool.request()
+          .input('jobId', this.sql.VarChar, assignmentData.jobId)
+          .input('assignedTo', this.sql.VarChar, assignmentData.assignedTo)
+          .query(`
+            SELECT TOP 1 status, groupId
+            FROM PettyCashAssignments
+            WHERE jobId = @jobId AND assignedTo = @assignedTo
+            ORDER BY assignedDate DESC
+          `);
+        
+        if (lastAssignmentResult.recordset.length > 0) {
+          const lastAssignment = lastAssignmentResult.recordset[0];
+          
+          // SPECIAL CASE: If the previous assignment was "Full Petty Cash Returned",
+          // "Settled / Balance Returned", "Settled / Over Due Collected", or "Settled",
+          // create a unique groupId so this becomes an independent group
+          if (lastAssignment.status === 'Full Petty Cash Returned' || 
+              lastAssignment.status === 'Settled / Balance Returned' || 
+              lastAssignment.status === 'Settled / Over Due Collected' ||
+              lastAssignment.status === 'Settled') {
+            // Generate unique groupId with timestamp to ensure independence
+            const timestamp = Date.now();
+            groupId = `${assignmentData.jobId}_${assignmentData.assignedTo}_${timestamp}`;
+            console.log('create - Settled status detected, creating new independent group:', groupId);
+          } else {
+            // Otherwise, use existing groupId to keep them together
+            groupId = lastAssignment.groupId || `${assignmentData.jobId}_${assignmentData.assignedTo}`;
+            console.log('create - Using existing groupId for same job+user:', groupId);
+          }
+        }
+      }
       
       // Insert assignment
       const result = await pool.request()
@@ -46,13 +79,17 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
           VALUES (@jobId, @assignedTo, @assignedBy, @assignedAmount, @notes, @groupId)
         `);
       
-      // Update job status
+      console.log('create - New assignment created with groupId:', groupId);
+      
+      // Update job status only if not already in a settled state
+      // Preserve "Settled" status since settle() will recalculate it after all assignments are settled
       await pool.request()
         .input('jobId', this.sql.VarChar, assignmentData.jobId)
         .query(`
           UPDATE Jobs 
           SET pettyCashStatus = 'Assigned'
-          WHERE jobId = @jobId
+          WHERE jobId = @jobId 
+            AND pettyCashStatus IS NULL
         `);
       
       return new PettyCashAssignment({ ...result.recordset[0], groupId });
@@ -357,6 +394,19 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
                   AND itemName = @itemName
                   AND isCustomItem = 0
               `);
+          } else {
+            // Fix for custom item duplication:
+            // When settling a group, the same custom items might be sent in multiple times.
+            // We should clear the existing custom items for THIS assignment before re-inserting.
+            await transaction.request()
+              .input('assignmentId', this.sql.Int, assignmentId)
+              .input('itemName', this.sql.NVarChar, item.itemName)
+              .query(`
+                DELETE FROM PettyCashSettlementItems
+                WHERE assignmentId = @assignmentId
+                  AND itemName = @itemName
+                  AND isCustomItem = 1
+              `);
           }
           
           console.log('settle - inserting item:', item.itemName, '| hasBill:', item.hasBill);
@@ -381,16 +431,79 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         
         // ALWAYS calculate totals and mark as settled
         // Each assignment is independent - when a Waff Clerk settles their assignment, it's complete
-        const allItemsResult = await transaction.request()
-          .input('assignmentId', this.sql.Int, assignmentId)
-          .query(`
-            SELECT SUM(actualCost) as totalSpent
-            FROM PettyCashSettlementItems
-            WHERE assignmentId = @assignmentId
-          `);
+        // For parent assignments, aggregate settlement items from all sub-assignments
+        let totalSpentResult;
         
-        const actualSpent = parseFloat(allItemsResult.recordset[0].totalSpent) || 0;
-        const assignedAmount = parseFloat(assignment.assignedAmount);
+        if (assignment.isMainAssignment) {
+          // This is a parent assignment - get all sub-assignment IDs
+          console.log('settle - parent assignment detected, fetching sub-assignments');
+          const subAssignmentsResult = await transaction.request()
+            .input('parentAssignmentId', this.sql.Int, assignmentId)
+            .query(`
+              SELECT assignmentId FROM PettyCashAssignments 
+              WHERE parentAssignmentId = @parentAssignmentId
+            `);
+          
+          const subAssignmentIds = subAssignmentsResult.recordset.map(r => r.assignmentId);
+          console.log('settle - sub-assignment IDs:', subAssignmentIds);
+          
+          if (subAssignmentIds.length > 0) {
+            // Sum settlement items from all sub-assignments
+            const placeholders = subAssignmentIds.map((_, i) => `@id${i}`).join(',');
+            let query = `SELECT SUM(actualCost) as totalSpent FROM PettyCashSettlementItems WHERE assignmentId IN (${placeholders})`;
+            
+            let req = transaction.request();
+            subAssignmentIds.forEach((id, i) => {
+              req = req.input(`id${i}`, this.sql.Int, id);
+            });
+            
+            totalSpentResult = await req.query(query);
+            console.log('settle - parent assignment total from all sub-assignments:', totalSpentResult.recordset[0]);
+          } else {
+            // No sub-assignments, just get the parent's own items
+            totalSpentResult = await transaction.request()
+              .input('assignmentId', this.sql.Int, assignmentId)
+              .query(`
+                SELECT SUM(actualCost) as totalSpent
+                FROM PettyCashSettlementItems
+                WHERE assignmentId = @assignmentId
+              `);
+            console.log('settle - parent assignment has no sub-assignments, using own items');
+          }
+        } else {
+          // This is a sub-assignment or standalone assignment - just get its own items
+          totalSpentResult = await transaction.request()
+            .input('assignmentId', this.sql.Int, assignmentId)
+            .query(`
+              SELECT SUM(actualCost) as totalSpent
+              FROM PettyCashSettlementItems
+              WHERE assignmentId = @assignmentId
+            `);
+          console.log('settle - sub-assignment or standalone, using own items');
+        }
+        
+        const actualSpent = parseFloat(totalSpentResult.recordset[0].totalSpent) || 0;
+        
+        // For parent assignments, also aggregate the assigned amounts from all sub-assignments
+        let assignedAmount = parseFloat(assignment.assignedAmount);
+        
+        if (assignment.isMainAssignment) {
+          const subAssignmentsResult = await transaction.request()
+            .input('parentAssignmentId', this.sql.Int, assignmentId)
+            .query(`
+              SELECT SUM(assignedAmount) as totalAssigned FROM PettyCashAssignments 
+              WHERE parentAssignmentId = @parentAssignmentId
+            `);
+          
+          const subAssignmentsTotal = parseFloat(subAssignmentsResult.recordset[0].totalAssigned) || 0;
+          console.log('settle - parent assignment sub-assignments total assigned:', subAssignmentsTotal);
+          
+          if (subAssignmentsTotal > 0) {
+            assignedAmount = subAssignmentsTotal;
+            console.log('settle - using aggregated assigned amount from sub-assignments:', assignedAmount);
+          }
+        }
+        
         const balanceAmount = assignedAmount > actualSpent ? assignedAmount - actualSpent : 0;
         const overAmount = actualSpent > assignedAmount ? actualSpent - assignedAmount : 0;
         
@@ -409,16 +522,42 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         let newStatus = 'Settled';
         const balanceNum = Number(balanceAmount);
         const overNum = Number(overAmount);
+        const actualSpentNum = Number(actualSpent);
+        const assignedAmountNum = Number(assignedAmount);
         
-        if (balanceNum > 0) {
-          newStatus = 'Balance To Be Return';
-          console.log('settle - Setting status to Balance To Be Return, balanceNum:', balanceNum);
+        // Get user role from settlementData (passed from controller)
+        const userRole = settlementData.userRole;
+        console.log('settle - userRole:', userRole);
+        
+        // Check for Full Petty Cash Returned: no items settled and full amount is being returned
+        if (actualSpentNum === 0 && balanceNum === assignedAmountNum) {
+          newStatus = 'Full Petty Cash Returned';
+          console.log('settle - Setting status to Full Petty Cash Returned (no items paid, full cash returned)');
+        } else if (balanceNum > 0) {
+          // For Managers, set final status immediately (no approval workflow)
+          if (userRole === 'Manager') {
+            newStatus = 'Settled / Balance Returned';
+            console.log('settle - Manager settlement: Setting status to Settled / Balance Returned (final status)');
+          } else {
+            newStatus = 'Balance To Be Return';
+            console.log('settle - Waff Clerk settlement: Setting status to Balance To Be Return (pending approval)');
+          }
         } else if (overNum > 0) {
-          newStatus = 'Over Due';
-          console.log('settle - Setting status to Over Due, overNum:', overNum);
+          // For Managers, set final status immediately (no approval workflow)
+          if (userRole === 'Manager') {
+            newStatus = 'Settled / Over Due Collected';
+            console.log('settle - Manager settlement: Setting status to Settled / Over Due Collected (final status)');
+          } else {
+            newStatus = 'Over Due';
+            console.log('settle - Waff Clerk settlement: Setting status to Over Due (pending collection)');
+          }
+        } else {
+          // Exact match - status is 'Settled' for both roles
+          newStatus = 'Settled';
+          console.log('settle - Exact match: Setting status to Settled');
         }
         
-        console.log('settle - auto-determined status:', newStatus);
+        console.log('settle - final determined status:', newStatus);
         
         // Update assignment with calculated amounts and automatic status
         const updateResult = await transaction.request()
@@ -454,6 +593,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
                 'Pending Approval / Over Due', 
                 'Settled / Balance Returned', 
                 'Settled / Over Due Collected', 
+                'Full Petty Cash Returned',
                 'Closed',
                 'Settled/Approved', 
                 'Settled/Rejected', 
