@@ -14,16 +14,29 @@ class SettleGroupedAssignments {
       throw new Error('No assignments found for this group');
     }
 
-    // Settle all assignments in the group with the same items
+    // Settle all assignments in the group.
+    // Important: To avoid duplicating custom items in the combined view, 
+    // we should only attach custom items to ONE assignment in the group (the main one or the first one),
+    // while predefined items are synced across all.
     const results = [];
-    for (const assignment of groupAssignments) {
-      if (assignment.status === 'Assigned' || assignment.status === 'Pending') {
-        const result = await this.pettyCashAssignmentRepository.settle(
-          assignment.assignmentId,
-          settlementData
-        );
-        results.push(result);
-      }
+    const mainAssignmentId = groupAssignments[0].assignmentId;
+
+    for (let i = 0; i < groupAssignments.length; i++) {
+      const assignment = groupAssignments[i];
+      // Filter settlement data for this assignment
+      const assignmentSettlementData = {
+        ...settlementData,
+        // Only include custom items for the first assignment in the group to avoid duplication
+        items: settlementData.items.filter(item => 
+          !(item.isCustomItem || item.isCustom) || i === 0
+        )
+      };
+
+      const result = await this.pettyCashAssignmentRepository.settle(
+        assignment.assignmentId,
+        assignmentSettlementData
+      );
+      results.push(result);
     }
 
     return results;
