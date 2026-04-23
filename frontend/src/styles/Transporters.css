@@ -234,6 +234,163 @@
   overflow: hidden;
 }
 
+.transporters-page .assigned-jobs-section {
+  grid-column: 1 / -1;
+}
+
+.transporters-page .assigned-jobs-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.transporters-page .assigned-jobs-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.transporters-page .assigned-jobs-table th,
+.transporters-page .assigned-jobs-table td {
+  padding: 0.85rem 0.7rem;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  font-size: 0.78rem;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.transporters-page .assigned-jobs-table th {
+  background: #f8fafc;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.transporters-page .assigned-jobs-table tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+
+.transporters-page .assigned-jobs-table tbody tr:nth-child(even) td {
+  background: #f6f8fc;
+}
+
+.transporters-page .assigned-jobs-table tbody tr:hover td {
+  background: #eef2ff;
+}
+
+.transporters-page .assigned-jobs-table tbody tr {
+  height: 2.4rem;
+}
+
+.transporters-page .assigned-jobs-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.transporters-page .transporter-cost-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+  min-width: 120px;
+}
+
+.transporters-page .transporter-cost-amount {
+  font-weight: 700;
+  color: #111827;
+}
+
+.transporters-page .transporter-paid-badge,
+.transporters-page .transporter-unpaid-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.transporters-page .transporter-paid-badge {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.transporters-page .transporter-unpaid-badge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.transporters-page .btn-pay-amount {
+  padding: 0.45rem 0.7rem;
+  border-radius: 6px;
+  border: none;
+  background: #101036;
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.transporters-page .btn-pay-amount:hover {
+  background: #1b1b57;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(16, 16, 54, 0.15);
+}
+
+.transporters-page .transporter-no-cost {
+  color: #6b7280;
+}
+
+.transporters-page .assigned-jobs-table td:last-child,
+.transporters-page .assigned-jobs-table th:last-child {
+  text-align: center;
+}
+
+.transporters-page .payment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: capitalize;
+}
+
+.transporters-page .payment-paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.transporters-page .payment-unpaid,
+.transporters-page .payment-pending-payment {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.transporters-page .payment-partially-paid,
+.transporters-page .payment-overdue {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.transporters-page .payment-not-billed {
+  background: #e5e7eb;
+  color: #374151;
+}
+
 .transporters-page .detail-item,
 .transporters-page .detail-item-block {
   display: flex;
