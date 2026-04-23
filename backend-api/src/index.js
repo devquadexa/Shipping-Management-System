@@ -19,6 +19,7 @@ const locationRoutes = require('./presentation/routes/locations');
 const transporterRoutes = require('./presentation/routes/transporters');
 const cashBalanceSettlementRoutes = require('./presentation/routes/cashBalanceSettlements');
 const oldInvoiceRoutes = require('./presentation/routes/oldInvoices');
+const paymentRoutes = require('./presentation/routes/paymentRoutes');
 const { getConnection } = require('./config/database');
 const container = require('./infrastructure/di/container');
 const { startOverdueChecker } = require('./infrastructure/scheduler/overdueChecker');
@@ -57,6 +58,7 @@ app.use('/api/locations', locationRoutes);
 app.use('/api/transporters', transporterRoutes);
 app.use('/api/cash-balance-settlements', cashBalanceSettlementRoutes(container));
 app.use('/api/old-invoices', oldInvoiceRoutes(container));
+app.use('/api/payments', paymentRoutes);
 
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, '../../frontend/build')));

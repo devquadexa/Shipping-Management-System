@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
 import { transporterService } from '../api/services/transporterService';
+import Pagination from './Pagination';
 import '../styles/Transporters.css';
 
 const initialFormData = {
@@ -32,6 +33,8 @@ function Transporters() {
   const [formData, setFormData] = useState(initialFormData);
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
 
   const canViewTransporters = user && (
     user.role === 'Admin' ||
@@ -394,6 +397,28 @@ function Transporters() {
     return haystack.includes(searchTerm.toLowerCase());
   });
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredTransporters.length / recordsPerPage);
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = filteredTransporters.slice(indexOfFirstRecord, indexOfLastRecord);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    setExpandedRow(null);
+  };
+
+  const handleRecordsPerPageChange = (newRecordsPerPage) => {
+    setRecordsPerPage(newRecordsPerPage);
+    setCurrentPage(1);
+    setExpandedRow(null);
+  };
+
   if (!canViewTransporters) {
     return (
       <div className="container">
@@ -457,7 +482,7 @@ function Transporters() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTransporters.map((transporter) => (
+                {currentRecords.map((transporter) => (
                   <React.Fragment key={transporter.transporterId}>
                     <tr className={expandedRow === transporter.transporterId ? 'expanded' : ''}>
                       <td data-label="Transporter ID"><strong className="cell-value transporter-id">{transporter.transporterId}</strong></td>
@@ -602,6 +627,17 @@ function Transporters() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {filteredTransporters.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalRecords={filteredTransporters.length}
+            recordsPerPage={recordsPerPage}
+            onPageChange={handlePageChange}
+            onRecordsPerPageChange={handleRecordsPerPageChange}
+          />
         )}
       </div>
 

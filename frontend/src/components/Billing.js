@@ -5,6 +5,7 @@ import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
 import { transporterService } from '../api/services/transporterService';
 import API_BASE from '../api/config';
+import Pagination from './Pagination';
 import '../styles/Billing.css';
 
 function Billing() {
@@ -78,6 +79,8 @@ function Billing() {
   const [chequeDate, setChequeDate] = useState('');
   const [chequeAmount, setChequeAmount] = useState('');
   const [bankName, setBankName] = useState('Commercial Bank');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
 
   useEffect(() => {
     fetchBills();
@@ -1379,6 +1382,23 @@ function Billing() {
     );
   }
 
+  // Pagination logic
+  const totalPages = Math.ceil(bills.length / recordsPerPage);
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = bills.slice(indexOfFirstRecord, indexOfLastRecord);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    setExpandedBillId(null);
+  };
+
+  const handleRecordsPerPageChange = (newRecordsPerPage) => {
+    setRecordsPerPage(newRecordsPerPage);
+    setCurrentPage(1);
+    setExpandedBillId(null);
+  };
+
   return (
     <div className="billing-page">
       <div className="page-header">
@@ -1894,7 +1914,7 @@ function Billing() {
                 </tr>
               </thead>
               <tbody>
-                {bills.map(bill => (
+                {currentRecords.map(bill => (
                   <React.Fragment key={bill.billId}>
                     <tr className={bill.isOverdue ? 'overdue-row' : ''}>
                       <td data-label="Invoice No"><strong>{bill.invoiceNumber || bill.billId}</strong></td>
@@ -2057,6 +2077,17 @@ function Billing() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {bills.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalRecords={bills.length}
+            recordsPerPage={recordsPerPage}
+            onPageChange={handlePageChange}
+            onRecordsPerPageChange={handleRecordsPerPageChange}
+          />
         )}
       </div>
 

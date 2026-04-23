@@ -19,6 +19,7 @@ const MSSQLOfficePayItemRepository = require('../repositories/MSSQLOfficePayItem
 const MSSQLTransporterRepository = require('../repositories/MSSQLTransporterRepository');
 const MSSQLCashBalanceSettlementRepository = require('../repositories/MSSQLCashBalanceSettlementRepository');
 const MSSQLOldInvoiceRepository = require('../repositories/MSSQLOldInvoiceRepository');
+const MSSQLPaymentRepository = require('../repositories/MSSQLPaymentRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -135,6 +136,7 @@ class Container {
     this.dependencies.transporterRepository = new MSSQLTransporterRepository(getConnection, sql);
     this.dependencies.cashBalanceSettlementRepository = new MSSQLCashBalanceSettlementRepository(getConnection, sql);
     this.dependencies.oldInvoiceRepository = new MSSQLOldInvoiceRepository(getConnection, sql);
+    this.dependencies.paymentRepository = new MSSQLPaymentRepository(getConnection, sql);
   }
 
   setupUseCases() {
@@ -151,6 +153,7 @@ class Container {
       transporterRepository,
       cashBalanceSettlementRepository,
       oldInvoiceRepository,
+      paymentRepository,
     } = this.dependencies;
     
     // Customer use cases
@@ -181,7 +184,7 @@ class Container {
     this.dependencies.createBill = new CreateBill(billRepository, jobRepository, customerRepository, pettyCashAssignmentRepository);
     this.dependencies.getAllBills = new GetAllBills(billRepository);
     this.dependencies.getBillById = new GetBillById(billRepository);
-    this.dependencies.markBillAsPaid = new MarkBillAsPaid(billRepository);
+    this.dependencies.markBillAsPaid = new MarkBillAsPaid(billRepository, paymentRepository, jobRepository);
     this.dependencies.checkOverdueInvoices = new CheckOverdueInvoices(billRepository, jobRepository);
     
     // Petty Cash use cases

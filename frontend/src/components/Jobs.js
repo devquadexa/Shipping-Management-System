@@ -7,6 +7,7 @@ import { transporterService } from '../api/services/transporterService';
 import apiClient from '../api/client';
 import OfficePayItems from './OfficePayItems';
 import AdvancePayment from './AdvancePayment';
+import Pagination from './Pagination';
 import '../styles/Jobs.css';
 
 function Jobs() {
@@ -38,6 +39,8 @@ function Jobs() {
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
 
   useEffect(() => {
     fetchJobs();
@@ -420,6 +423,28 @@ function Jobs() {
     return statusMatch && searchMatch;
   });
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredJobs.length / recordsPerPage);
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = filteredJobs.slice(indexOfFirstRecord, indexOfLastRecord);
+
+  // Reset to page 1 when search term or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    setExpandedRow(null);
+  };
+
+  const handleRecordsPerPageChange = (newRecordsPerPage) => {
+    setRecordsPerPage(newRecordsPerPage);
+    setCurrentPage(1);
+    setExpandedRow(null);
+  };
+
   return (
     <div className="jobs-page">
       <div className="page-header">
@@ -501,7 +526,7 @@ function Jobs() {
               </tr>
             </thead>
             <tbody>
-              {filteredJobs.map(job => (
+              {currentRecords.map(job => (
                 <React.Fragment key={job.jobId}>
                   <tr className={expandedRow === job.jobId ? 'expanded' : ''}>
                     <td data-label="Job ID / CUSDEC Number" className="job-cusdec-cell">
@@ -687,6 +712,17 @@ function Jobs() {
             </tbody>
           </table>
           </div>
+        )}
+
+        {filteredJobs.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalRecords={filteredJobs.length}
+            recordsPerPage={recordsPerPage}
+            onPageChange={handlePageChange}
+            onRecordsPerPageChange={handleRecordsPerPageChange}
+          />
         )}
       </div>
 

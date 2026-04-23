@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { accountingService } from '../api/services/accountingService';
+import PaymentManagement from './PaymentManagement';
 import '../styles/Accounting.css';
 
 function Accounting() {
@@ -8,7 +9,7 @@ function Accounting() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [message, setMessage] = useState('');
-  const [activeTab, setActiveTab] = useState('summary'); // summary, jobs, customers
+  const [activeTab, setActiveTab] = useState('summary'); // summary, jobs, customers, payments
 
   useEffect(() => {
     fetchAccountingData();
@@ -104,6 +105,12 @@ function Accounting() {
             onClick={() => setActiveTab('customers')}
           >
             Customer Outstanding ({customerOutstanding.length})
+          </button>
+          <button 
+            className={`tab ${activeTab === 'payments' ? 'active' : ''}`}
+            onClick={() => setActiveTab('payments')}
+          >
+            Payment Management
           </button>
         </div>
       </div>
@@ -302,6 +309,10 @@ function Accounting() {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'payments' && (
+          <PaymentManagement />
         )}
       </div>
     </div>

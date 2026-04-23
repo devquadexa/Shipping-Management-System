@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { jobService } from '../api/services/jobService';
 import { authService } from '../api/services/authService';
 import { customerService } from '../api/services/customerService';
+import Pagination from './Pagination';
 import '../styles/PettyCash.css';
 import API_BASE from '../api/config';
 
@@ -21,6 +22,8 @@ function PettyCash() {
   // Search and Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
 
   // Collapsible section states
   const [assignmentsCollapsed, setAssignmentsCollapsed] = useState(false);
@@ -93,6 +96,11 @@ function PettyCash() {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [activeDropdown]);
+
+  // Reset to page 1 when search term or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const fetchAssignments = async () => {
     try {
@@ -1801,7 +1809,13 @@ function PettyCash() {
                     );
                   }
 
-                  return groups.map(([groupId, groupAssignments]) => {
+                  // Pagination logic for groups
+                  const totalPages = Math.ceil(groups.length / recordsPerPage);
+                  const indexOfLastRecord = currentPage * recordsPerPage;
+                  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+                  const currentGroups = groups.slice(indexOfFirstRecord, indexOfLastRecord);
+
+                  return currentGroups.map(([groupId, groupAssignments]) => {
                     const first = groupAssignments[0];
                     const job = jobs.find(j => j.jobId === first.jobId);
                     const isGroupExpanded = expandedRows.has(groupId);
@@ -2258,6 +2272,61 @@ function PettyCash() {
             </table>
           </div>
         ))}
+
+        {!assignmentsCollapsed && assignments.length > 0 && (() => {
+          // Calculate total groups for pagination
+          const filteredAssignments = assignments.filter(assignment => {
+            if (statusFilter !== 'all' && assignment.status !== statusFilter) {
+              return false;
+            }
+            if (searchTerm.trim()) {
+              const searchLower = searchTerm.toLowerCase();
+              const job = jobs.find(j => j.jobId === assignment.jobId);
+              const customerName = job ? getCustomerName(job.customerId).toLowerCase() : '';
+              const cusdecNumber = job?.cusdecNumber?.toLowerCase() || '';
+              const jobId = assignment.jobId.toLowerCase();
+              const assignedToName = (assignment.assignedToName || assignment.assignedTo || '').toLowerCase();
+              
+              const matchesSearch = 
+                jobId.includes(searchLower) ||
+                customerName.includes(searchLower) ||
+                cusdecNumber.includes(searchLower) ||
+                assignedToName.includes(searchLower);
+              
+              if (!matchesSearch) {
+                return false;
+              }
+            }
+            return true;
+          });
+          
+          const groupMap = new Map();
+          filteredAssignments.forEach(a => {
+            const gid = a.groupId || `${a.jobId}_${a.assignedTo}`;
+            if (!groupMap.has(gid)) groupMap.set(gid, []);
+            groupMap.get(gid).push(a);
+          });
+          const totalGroups = groupMap.size;
+          const totalPages = Math.ceil(totalGroups / recordsPerPage);
+
+          return totalGroups > 0 ? (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalRecords={totalGroups}
+              recordsPerPage={recordsPerPage}
+              onPageChange={(pageNumber) => {
+                setCurrentPage(pageNumber);
+                setExpandedRows(new Set());
+              }}
+              onRecordsPerPageChange={(newRecordsPerPage) => {
+                setRecordsPerPage(newRecordsPerPage);
+                setCurrentPage(1);
+                setExpandedRows(new Set());
+              }}
+            />
+          ) : null;
+        })()}
       </div>
       {/* Assign Petty Cash Modal */}
       {showAssignModal && (
