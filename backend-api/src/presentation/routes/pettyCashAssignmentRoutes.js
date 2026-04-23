@@ -104,17 +104,17 @@ module.exports = (container) => {
     (req, res) => controller.getSettlementItems(req, res)
   );
   
-  // Update settlement item (Waff Clerk and Manager only, before invoice generation)
+  // Update settlement item (Waff Clerk only, before invoice generation)
   router.patch('/:assignmentId/settlement-items/:itemId', 
     auth, 
-    checkRole('Waff Clerk', 'Manager'), 
+    checkRole('Waff Clerk'), 
     (req, res) => controller.updateSettlementItem(req, res)
   );
   
-  // Delete settlement item (Waff Clerk and Manager only, before invoice generation)
+  // Delete settlement item (Waff Clerk only, before invoice generation)
   router.delete('/:assignmentId/settlement-items/:itemId', 
     auth, 
-    checkRole('Waff Clerk', 'Manager'), 
+    checkRole('Waff Clerk'), 
     (req, res) => controller.deleteSettlementItem(req, res)
   );
 

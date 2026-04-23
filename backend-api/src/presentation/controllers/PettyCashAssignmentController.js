@@ -114,10 +114,9 @@ class PettyCashAssignmentController {
       
       const settlePettyCashAssignment = this.container.resolve('settlePettyCashAssignment');
       
-      // Add paidBy and userRole to settlement data
+      // Add paidBy to each item if not provided
       const settlementData = {
         ...req.body,
-        userRole: req.user.role, // Pass user role to determine status logic
         items: req.body.items.map(item => ({
           ...item,
           paidBy: item.paidBy || req.user.userId
