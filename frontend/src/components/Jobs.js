@@ -119,8 +119,8 @@ function Jobs() {
       console.log('Fetching users... Current user role:', user?.role);
       const data = await authService.getUsers();
       console.log('Fetched users data:', data);
-      const filteredUsers = data.filter(u => u.role === 'Waff Clerk');
-      console.log('Filtered users (role=Waff Clerk):', filteredUsers);
+      const filteredUsers = data.filter(u => u.role === 'Waff Clerk' || u.role === 'Manager');
+      console.log('Filtered users (role=Waff Clerk or Manager):', filteredUsers);
       setUsers(filteredUsers);
     } catch (error) {
       console.error('Error fetching users:', error);

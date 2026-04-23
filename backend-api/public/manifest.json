@@ -1,0 +1,17 @@
+{
+  "short_name": "Super Shine",
+  "name": "Super Shine Cargo Service",
+  "description": "Sri Lanka's Premier Cargo Solutions",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1e3c72",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary"
+}

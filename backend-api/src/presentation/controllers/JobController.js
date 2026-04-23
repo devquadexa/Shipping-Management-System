@@ -236,13 +236,19 @@ class JobController {
         const billingAmount = parseFloat(item.billingAmount || item.amount || item.actualCost || 0);
         
         return {
+          ...item,
           description: description,
           amount: amount,
           actualCost: amount,
           billingAmount: billingAmount,
           paidBy: item.paidBy || 'Office',
+          paidByName: item.paidByName || item.paidBy || 'Office',
           source: item.source || 'Custom',
-          addedDate: item.addedDate || new Date()
+          addedDate: item.addedDate || new Date(),
+          paymentStatus: item.paymentStatus || (item.isPaid ? 'Paid' : item.paymentStatus),
+          isPaid: item.isPaid === true,
+          paidAmount: item.paidAmount !== undefined ? parseFloat(item.paidAmount || 0) : undefined,
+          paidAt: item.paidAt || null
         };
       });
       

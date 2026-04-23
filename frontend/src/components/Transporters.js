@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
 import { transporterService } from '../api/services/transporterService';
+import { jobService } from '../api/services/jobService';
+import { billingService } from '../api/services/billingService';
 import '../styles/Transporters.css';
 
 const initialFormData = {
@@ -21,7 +23,16 @@ const initialFormData = {
 
 function Transporters() {
   const { user } = useAuth();
+  const formatAmount = (amount) => {
+    return parseFloat(amount || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   const [transporters, setTransporters] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [bills, setBills] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [cities, setCities] = useState([]);
   const [filteredCities, setFilteredCities] = useState([]);
@@ -44,10 +55,17 @@ function Transporters() {
     user.role === 'Super Admin' ||
     user.role === 'Manager'
   );
+  const canPayTransporterCosts = user && (
+    user.role === 'Admin' ||
+    user.role === 'Super Admin' ||
+    user.role === 'Manager'
+  );
 
   useEffect(() => {
     if (canViewTransporters) {
       fetchTransporters();
+      fetchJobs();
+      fetchBills();
       fetchDistricts();
       fetchAllCities();
     }
@@ -72,6 +90,26 @@ function Transporters() {
     } catch (error) {
       console.error('Error fetching transporters:', error);
       setMessage(error.response?.data?.message || 'Error loading transporters');
+    }
+  };
+
+  const fetchJobs = async () => {
+    try {
+      const data = await jobService.getAll();
+      setJobs(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      setJobs([]);
+    }
+  };
+
+  const fetchBills = async () => {
+    try {
+      const data = await billingService.getBills();
+      setBills(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching bills:', error);
+      setBills([]);
     }
   };
 
@@ -394,6 +432,140 @@ function Transporters() {
     return haystack.includes(searchTerm.toLowerCase());
   });
 
+  const getAssignedJobs = (transporter) => {
+    const transporterName = (transporter?.name || '').trim().toLowerCase();
+    const transporterId = (transporter?.transporterId || '').trim().toLowerCase();
+
+    return jobs.filter((job) => {
+      const jobTransporter = (job?.transporter || '').trim().toLowerCase();
+      const jobTransporterId = (job?.transporterId || '').trim().toLowerCase();
+
+      if (transporterId && jobTransporterId && jobTransporterId === transporterId) {
+        return true;
+      }
+
+      if (transporterName && jobTransporter && jobTransporter === transporterName) {
+        return true;
+      }
+
+      return false;
+    });
+  };
+
+  const getJobPaymentStatus = (jobId) => {
+    if (!jobId) return 'Not Billed';
+
+    const jobBills = bills.filter((bill) => bill.jobId === jobId);
+    if (jobBills.length === 0) {
+      return 'Not Billed';
+    }
+
+    const latestBill = [...jobBills].sort((a, b) => {
+      const aDate = new Date(a.billDate || a.createdDate || 0).getTime();
+      const bDate = new Date(b.billDate || b.createdDate || 0).getTime();
+      return bDate - aDate;
+    })[0];
+
+    return latestBill.paymentStatus || 'Not Billed';
+  };
+
+  const getPaymentStatusClassName = (status) => {
+    return String(status || 'Not Billed').toLowerCase().replace(/\s+/g, '-');
+  };
+
+  const getTransporterCostItems = (job) => {
+    const payItems = Array.isArray(job?.payItems) ? job.payItems : [];
+    return payItems.filter((item) => {
+      const label = (item?.description || item?.name || '').toLowerCase().trim();
+      return label === 'transporter cost';
+    });
+  };
+
+  const getTransporterCostAmount = (job) => {
+    const transporterCostItems = getTransporterCostItems(job);
+    if (!transporterCostItems.length) return 0;
+
+    return transporterCostItems.reduce((sum, item) => {
+      return sum + (parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0);
+    }, 0);
+  };
+
+  const isTransporterCostPaid = (job) => {
+    const transporterCostItems = getTransporterCostItems(job);
+    if (!transporterCostItems.length) return false;
+
+    return transporterCostItems.every((item) => (
+      item.paymentStatus === 'Paid' ||
+      item.isPaid === true ||
+      item.paidAt ||
+      item.paidAmount > 0
+    ));
+  };
+
+  const getPaidByLabel = (job) => {
+    const transporterCostItems = getTransporterCostItems(job);
+    if (!transporterCostItems.length) return '';
+
+    const paidByLabels = [...new Set(
+      transporterCostItems
+        .map((item) => item.paidByName || item.paidBy || '')
+        .filter(Boolean)
+    )];
+
+    return paidByLabels.join(', ');
+  };
+
+  const payTransporterCost = async (job) => {
+    const transporterCostItems = getTransporterCostItems(job);
+
+    if (!transporterCostItems.length) {
+      setMessage('Transporter cost not found for this job');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    const amount = getTransporterCostAmount(job);
+    if (amount <= 0) {
+      setMessage('Transporter cost amount is not set yet');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    try {
+      const updatedPayItems = (Array.isArray(job.payItems) ? job.payItems : []).map((item) => {
+        const label = (item?.description || item?.name || '').toLowerCase().trim();
+        if (label !== 'transporter cost') {
+          return item;
+        }
+
+        const itemAmount = parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0;
+
+        return {
+          ...item,
+          paymentStatus: 'Paid',
+          isPaid: true,
+          paidAmount: itemAmount,
+          paidAt: new Date().toISOString(),
+          paidBy: user?.userId || user?.username || user?.name || 'System',
+          paidByName: user?.name || user?.fullName || user?.username || user?.userId || 'System'
+        };
+      });
+
+      await jobService.replacePayItems(job.jobId, updatedPayItems);
+
+      setJobs((prevJobs) => prevJobs.map((currentJob) => (
+        currentJob.jobId === job.jobId ? { ...currentJob, payItems: updatedPayItems } : currentJob
+      )));
+
+      setMessage(`Transporter cost marked as paid for ${job.jobId}`);
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error paying transporter cost:', error);
+      setMessage(error.response?.data?.message || 'Error paying transporter cost');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
   if (!canViewTransporters) {
     return (
       <div className="container">
@@ -458,6 +630,9 @@ function Transporters() {
               </thead>
               <tbody>
                 {filteredTransporters.map((transporter) => (
+                  (() => {
+                    const assignedJobs = getAssignedJobs(transporter);
+                    return (
                   <React.Fragment key={transporter.transporterId}>
                     <tr className={expandedRow === transporter.transporterId ? 'expanded' : ''}>
                       <td data-label="Transporter ID"><strong className="cell-value transporter-id">{transporter.transporterId}</strong></td>
@@ -593,11 +768,91 @@ function Transporters() {
                                 </div>
                               </div>
                             )}
+
+                            <div className="detail-section assigned-jobs-section">
+                              <h4 className="section-title">Assigned Jobs ({assignedJobs.length})</h4>
+                              {assignedJobs.length === 0 ? (
+                                <div className="detail-value-block">No jobs assigned to this transporter</div>
+                              ) : (
+                                <div className="assigned-jobs-table-wrapper">
+                                  <table className="assigned-jobs-table">
+                                    <colgroup>
+                                      <col style={{ width: '20%' }} />
+                                      <col style={{ width: '22%' }} />
+                                      <col style={{ width: '20%' }} />
+                                      <col style={{ width: '18%' }} />
+                                      <col style={{ width: '20%' }} />
+                                    </colgroup>
+                                    <thead>
+                                      <tr>
+                                        <th>Job ID</th>
+                                        <th>Category</th>
+                                        <th>Transporter Cost</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {assignedJobs.map((job) => (
+                                        <tr key={job.jobId}>
+                                          <td>{job.jobId || '-'}</td>
+                                          <td>{job.shipmentCategory || '-'}</td>
+                                          <td>
+                                            {getTransporterCostAmount(job) > 0 ? (
+                                              <div className="transporter-cost-cell">
+                                                <span className="transporter-cost-amount">
+                                                  LKR {formatAmount(getTransporterCostAmount(job))}
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <span className="transporter-no-cost">-</span>
+                                            )}
+                                          </td>
+                                          <td>
+                                            {(() => {
+                                              const paymentStatus = getJobPaymentStatus(job.jobId);
+                                              return (
+                                                <span className={`payment-status-badge payment-${getPaymentStatusClassName(paymentStatus)}`}>
+                                                  {paymentStatus}
+                                                </span>
+                                              );
+                                            })()}
+                                          </td>
+                                          <td>
+                                            {getTransporterCostAmount(job) > 0 ? (
+                                              isTransporterCostPaid(job) ? (
+                                                <span className="transporter-paid-badge">
+                                                  Paid{getPaidByLabel(job) ? ` by ${getPaidByLabel(job)}` : ''}
+                                                </span>
+                                              ) : canPayTransporterCosts ? (
+                                                <button
+                                                  type="button"
+                                                  className="btn-action btn-pay-amount"
+                                                  onClick={() => payTransporterCost(job)}
+                                                >
+                                                  Pay the amount
+                                                </button>
+                                              ) : (
+                                                <span className="transporter-unpaid-badge">Unpaid</span>
+                                              )
+                                            ) : (
+                                              <span className="transporter-no-cost">-</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
                     )}
                   </React.Fragment>
+                    );
+                  })()
                 ))}
               </tbody>
             </table>

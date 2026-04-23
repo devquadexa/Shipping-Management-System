@@ -22,6 +22,92 @@ function Billing() {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
   };
 
+  const getTransporterCostItem = () => ({
+    name: 'transporter cost',
+    actualCost: '',
+    billingAmount: '',
+    sameAmount: false,
+    hasBill: false
+  });
+
+  const getBlankPayItem = () => ({
+    name: '',
+    actualCost: '',
+    billingAmount: '',
+    sameAmount: false,
+    hasBill: false
+  });
+
+  const hasTransporterCostItem = (items) => {
+    return Array.isArray(items) && items.some(item => {
+      const label = (item?.name || item?.description || '').toLowerCase().trim();
+      return label === 'transporter cost';
+    });
+  };
+
+  const isTransporterCostLabel = (value) => {
+    return String(value || '').toLowerCase().trim() === 'transporter cost';
+  };
+
+  const mergeTransporterCostItems = (items) => {
+    if (!Array.isArray(items) || items.length === 0) {
+      return [];
+    }
+
+    const merged = [];
+    let transporterAccumulator = null;
+
+    items.forEach((item) => {
+      const description = item.description || item.name || '';
+      if (!isTransporterCostLabel(description)) {
+        merged.push(item);
+        return;
+      }
+
+      if (!transporterAccumulator) {
+        transporterAccumulator = {
+          ...item,
+          description: 'transporter cost',
+          amount: parseFloat(item.amount || item.actualCost || 0) || 0,
+          actualCost: parseFloat(item.actualCost || item.amount || 0) || 0,
+          billingAmount: parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0
+        };
+        return;
+      }
+
+      transporterAccumulator.amount += parseFloat(item.amount || item.actualCost || 0) || 0;
+      transporterAccumulator.actualCost += parseFloat(item.actualCost || item.amount || 0) || 0;
+      transporterAccumulator.billingAmount += parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0;
+    });
+
+    if (transporterAccumulator) {
+      merged.push(transporterAccumulator);
+    }
+
+    return merged;
+  };
+
+  const ensureFclTransporterCost = (items, shipmentCategory) => {
+    const normalizedItems = Array.isArray(items) ? [...items] : [];
+    if (shipmentCategory !== 'FCL') return normalizedItems;
+
+    const fclItems = normalizedItems.filter(item => {
+      const label = (item?.name || item?.description || '').trim();
+      const hasAmount = item?.actualCost || item?.billingAmount || item?.amount;
+      return Boolean(label || hasAmount);
+    });
+
+    if (!hasTransporterCostItem(fclItems)) {
+      fclItems.push(getTransporterCostItem());
+    }
+
+    return fclItems;
+  };
+
+  const getDefaultPayItemsForCategory = (shipmentCategory) => {
+    return ensureFclTransporterCost([], shipmentCategory);
+  };
+
   const formatDateDDMMYYYY = (dateValue) => {
     if (!dateValue) return '';
 
@@ -59,7 +145,7 @@ function Billing() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [message, setMessage] = useState('');
   const [showPayItemsRow, setShowPayItemsRow] = useState(false);
-  const [payItems, setPayItems] = useState([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+  const [payItems, setPayItems] = useState([]);
   const [loadingSettlement, setLoadingSettlement] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
@@ -155,7 +241,7 @@ function Billing() {
   const handleJobSelect = async (jobId) => {
     if (!jobId) {
       setSelectedJob(null);
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false, paidBy: '', paidByName: '' }]);
+      setPayItems([]);
       setShowPayItemsRow(false);
       return;
     }
@@ -279,12 +365,14 @@ function Billing() {
             });
           }
         });
+        mergedPayItems = ensureFclTransporterCost(mergedPayItems, job.shipmentCategory);
         setSelectedJob({ ...job, payItems: mergedPayItems });
         setShowPayItemsRow(false);
         setMessage(`📋 Job has ${mergedPayItems.length} pay items. Use "+ Add More Items" to add additional items.`);
         setTimeout(() => setMessage(''), 5000);
       } else if (allPayItems.length > 0) {
-        setPayItems(allPayItems);
+        const payItemsWithFclItem = ensureFclTransporterCost(allPayItems, job.shipmentCategory);
+        setPayItems(payItemsWithFclItem);
         setShowPayItemsRow(true);
         
         const officeItemsCount = allPayItems.filter(item => item.isOfficePayItem).length;
@@ -305,8 +393,11 @@ function Billing() {
           setTimeout(() => setMessage(''), 3000);
         } else {
           loadPayItemTemplates(job);
+          return;
         }
-        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false, paidBy: '', paidByName: '' }]);
+        const defaultPayItems = getDefaultPayItemsForCategory(job?.shipmentCategory);
+        setPayItems(defaultPayItems);
+        setShowPayItemsRow(defaultPayItems.length > 0);
       }
     } catch (error) {
       console.error('Error fetching job:', error);
@@ -339,31 +430,58 @@ function Billing() {
               sameAmount: false,
               hasBill: false
             }));
+
+            const payItemsWithFclItem = ensureFclTransporterCost(loadedPayItems, job.shipmentCategory);
             
-            setPayItems(loadedPayItems);
+            setPayItems(payItemsWithFclItem);
             setShowPayItemsRow(true);
-            setMessage(`Loaded ${templates.length} default pay items for ${job.shipmentCategory}`);
+            setMessage(`Loaded ${payItemsWithFclItem.length} default pay items for ${job.shipmentCategory}`);
             setTimeout(() => setMessage(''), 3000);
           } else {
-            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+            const defaultPayItems = getDefaultPayItemsForCategory(job.shipmentCategory);
+            setPayItems(defaultPayItems);
+            setShowPayItemsRow(defaultPayItems.length > 0);
           }
+        } else {
+          const defaultPayItems = getDefaultPayItemsForCategory(job.shipmentCategory);
+          setPayItems(defaultPayItems);
+          setShowPayItemsRow(defaultPayItems.length > 0);
         }
       } catch (error) {
         console.error('Error loading pay item templates:', error);
-        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+        const defaultPayItems = getDefaultPayItemsForCategory(job.shipmentCategory);
+        setPayItems(defaultPayItems);
+        setShowPayItemsRow(defaultPayItems.length > 0);
       }
     } else {
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+      setPayItems(getDefaultPayItemsForCategory(job?.shipmentCategory));
     }
   };
 
   const addPayItemRow = () => {
-    setPayItems([...payItems, { name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+    setPayItems([...payItems, getBlankPayItem()]);
+  };
+
+  const openPayItemsEditor = () => {
+    setShowPayItemsRow(true);
+    if (!Array.isArray(payItems) || payItems.length === 0) {
+      setPayItems([getBlankPayItem()]);
+    }
+  };
+
+  const addTransporterCostRow = () => {
+    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
+    setShowPayItemsRow(true);
+  };
+
+  const addTransporterCostFromHeader = () => {
+    setShowPayItemsRow(true);
+    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
   };
 
   const removePayItemRow = (index) => {
     const newPayItems = payItems.filter((_, i) => i !== index);
-    setPayItems(newPayItems.length > 0 ? newPayItems : [{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+    setPayItems(newPayItems.length > 0 ? newPayItems : [getBlankPayItem()]);
   };
 
   const handlePayItemChange = (index, field, value) => {
@@ -463,17 +581,33 @@ function Billing() {
       
       // Combine existing and new pay items
       const allPayItemsData = [...existingPayItems, ...newPayItemsData];
+
+      const transporterCostCount = allPayItemsData.filter(item =>
+        isTransporterCostLabel(item.description || item.name)
+      ).length;
+
+      let finalPayItemsData = allPayItemsData;
+      if (transporterCostCount > 1) {
+        const shouldMergeTransporterCost = window.confirm(
+          'Transporter cost is already added.\n\nPress OK to merge with the existing transporter cost amount.\nPress Cancel to keep it as a separate line item.'
+        );
+
+        if (shouldMergeTransporterCost) {
+          finalPayItemsData = mergeTransporterCostItems(allPayItemsData);
+        }
+      }
       
       console.log('New pay items to add:', newPayItemsData);
       console.log('Combined pay items (existing + new):', allPayItemsData);
+      console.log('Final pay items to save:', finalPayItemsData);
       
       // Save combined pay items to the job
-      await jobService.replacePayItems(selectedJob.jobId, allPayItemsData);
+      await jobService.replacePayItems(selectedJob.jobId, finalPayItemsData);
       console.log('✓ All pay items saved successfully');
 
       const isAddingToExisting = existingPayItems.length > 0;
       const addedCount = newPayItemsData.length;
-      const totalCount = allPayItemsData.length;
+      const totalCount = finalPayItemsData.length;
       
       if (isAddingToExisting) {
         setMessage(`✓ Added ${addedCount} new pay item(s) successfully! Total: ${totalCount} items. Review below and generate invoice.`);
@@ -529,7 +663,7 @@ function Billing() {
       }
       
       // Reset the pay items form
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+      setPayItems([]);
       
       setTimeout(() => setMessage(''), 5000);
       console.log('=== SAVE PAY ITEMS END ===');
@@ -1047,6 +1181,43 @@ function Billing() {
       payItemsArray = [];
     }
 
+    const printablePayItems = payItemsArray.map((item, index) => {
+      const description = item.description || item.name || 'Service Charge';
+      const amount = parseFloat(item.billingAmount || item.amount || 0) || 0;
+      const payItemId = item.id || item.payItemId || item.officePayItemId || `PI${String(index + 1).padStart(3, '0')}`;
+
+      return {
+        description,
+        amount,
+        payItemId
+      };
+    });
+
+    const payItemsPerPage = 25;
+    const printablePayItemPages = [];
+    for (let index = 0; index < printablePayItems.length; index += payItemsPerPage) {
+      printablePayItemPages.push(printablePayItems.slice(index, index + payItemsPerPage));
+    }
+
+    if (printablePayItemPages.length === 0) {
+      printablePayItemPages.push([{ payItemId: 'PI001', description: 'Service Charges', amount: grossTotal }]);
+    }
+
+    // Add transporter cost for FCL shipments
+    if (job.shipmentCategory === 'FCL') {
+      const hasTransporterCost = payItemsArray.some(item => 
+        (item.name || item.description)?.toLowerCase() === 'transporter cost'
+      );
+      if (!hasTransporterCost) {
+        payItemsArray.push({
+          name: 'Transporter Cost',
+          description: 'Transporter Cost',
+          billingAmount: 0,
+          amount: 0
+        });
+      }
+    }
+
     const isCompactItemsLayout = payItemsArray.length >= 20;
     
     return `
@@ -1062,7 +1233,7 @@ function Billing() {
             --theme-soft: ${isColorMode ? '#e8f0ff' : '#ffffff'};
           }
           @page { 
-            margin: ${isCompactItemsLayout ? '10mm 14mm' : '15mm 20mm'}; 
+            margin: ${isCompactItemsLayout ? '32mm 14mm 32mm 14mm' : '35mm 20mm 35mm 20mm'}; 
             size: A4;
           }
           * {
@@ -1076,15 +1247,14 @@ function Billing() {
             color: #111;
           }
           .invoice-page {
-            min-height: ${isCompactItemsLayout ? '275mm' : '258mm'};
             font-size: 10pt;
             line-height: 1.3;
             color: #111;
-          }
-          .invoice-page {
-            min-height: 258mm;
+            padding: 0;
+            margin: 0;
             display: flex;
             flex-direction: column;
+            position: relative;
           }
           .page-header {
             position: relative;
@@ -1145,22 +1315,22 @@ function Billing() {
             font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
           }
           .recipient {
-            margin: ${isCompactItemsLayout ? '8px 0' : '15px 0'};
-            line-height: 1.5;
+            margin: ${isCompactItemsLayout ? '2px 0 4px 0' : '3px 0 6px 0'};
+            line-height: 1.4;
           }
           .recipient-line {
-            margin: ${isCompactItemsLayout ? '1px 0' : '2px 0'};
-            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
+            margin: ${isCompactItemsLayout ? '0px 0' : '1px 0'};
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
           }
           .details-section {
-            margin: 12px 0;
-            padding-bottom: 10px;
+            margin: ${isCompactItemsLayout ? '4px 0 4px 0' : '6px 0 5px 0'};
+            padding-bottom: 4px;
             border-bottom: 1px solid var(--theme-primary);
           }
           .detail-row {
             display: flex;
-            margin: ${isCompactItemsLayout ? '2px 0' : '3px 0'};
-            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
+            margin: ${isCompactItemsLayout ? '0.5px 0' : '1px 0'};
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
           }
           .detail-label {
             font-weight: bold;
@@ -1177,60 +1347,117 @@ function Billing() {
             overflow-wrap: anywhere;
           }
           .items-section {
-            margin: ${isCompactItemsLayout ? '8px 0' : '15px 0'};
+            margin: ${isCompactItemsLayout ? '2px 0 0 0' : '4px 0 0 0'};
+            flex: 1;
+            padding-bottom: ${isCompactItemsLayout ? '88mm' : '96mm'};
+          }
+          .pay-items-page {
+            width: 100%;
+          }
+          .pay-items-page:not(:last-child) {
+            page-break-after: always;
+            break-after: page;
+          }
+          .pay-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: ${isCompactItemsLayout ? '2px' : '4px'};
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
+            border: 1px solid var(--theme-primary);
+          }
+          .pay-items-table th,
+          .pay-items-table td {
+            border: 1px solid #cfd7ea;
+            padding: ${isCompactItemsLayout ? '3px 6px' : '4px 8px'};
+            vertical-align: top;
+          }
+          .pay-items-table tbody td {
+            line-height: 1.25;
+          }
+          .pay-items-table thead th {
+            background: #e9efff;
+            border-bottom: 2px solid var(--theme-primary);
+            color: var(--theme-primary);
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+          }
+          .pay-items-table .id-col {
+            width: 90px;
+            text-align: center;
+            white-space: nowrap;
+          }
+          .pay-items-table .description-col {
+            width: auto;
+          }
+          .pay-items-table .amount-col {
+            width: 120px;
+            text-align: right;
+            white-space: nowrap;
+          }
+          .pay-items-table .pay-item-description {
+            word-break: break-word;
+            overflow-wrap: anywhere;
+          }
+          .invoice-summary {
+            margin-top: ${isCompactItemsLayout ? '10px' : '14px'};
+          }
+          .totals-section {
+            position: fixed;
+            bottom: ${isCompactItemsLayout ? '14mm' : '18mm'};
+            left: 0;
+            right: 0;
+            margin: 0;
+            background: #ffffff;
+            padding-top: 4px;
+            z-index: 2;
           }
           .item-row {
             display: flex;
             justify-content: space-between;
-            margin: ${isCompactItemsLayout ? '1px 0' : '4px 0'};
-            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
-            padding: ${isCompactItemsLayout ? '1px 0' : '2px 0'};
+            margin: ${isCompactItemsLayout ? '0px 0' : '1px 0'};
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
+            padding: ${isCompactItemsLayout ? '0px 0' : '0.5px 0'};
             border-bottom: 1px solid #e0e0e0;
-          }
-          .item-description {
-            flex: 1;
-            padding-right: ${isCompactItemsLayout ? '12px' : '20px'};
-            white-space: ${isCompactItemsLayout ? 'nowrap' : 'normal'};
-            overflow: ${isCompactItemsLayout ? 'hidden' : 'visible'};
-            text-overflow: ${isCompactItemsLayout ? 'ellipsis' : 'clip'};
-          }
-          .item-amount {
-            text-align: right;
-            min-width: ${isCompactItemsLayout ? '92px' : '100px'};
-            padding-right: 5px;
-            font-weight: normal;
+            page-break-inside: avoid;
           }
           .item-row.subtotal {
             border-top: 1px solid var(--theme-primary);
             border-bottom: none;
-            margin-top: ${isCompactItemsLayout ? '6px' : '10px'};
-            padding-top: ${isCompactItemsLayout ? '6px' : '8px'};
+            margin-top: ${isCompactItemsLayout ? '1px' : '2px'};
+            padding-top: ${isCompactItemsLayout ? '1px' : '2px'};
             font-weight: normal;
           }
           .item-row.total {
             border-top: 2px solid var(--theme-primary);
             border-bottom: none;
-            margin-top: ${isCompactItemsLayout ? '5px' : '8px'};
-            padding-top: ${isCompactItemsLayout ? '6px' : '10px'};
-            padding-bottom: ${isCompactItemsLayout ? '3px' : '5px'};
+            margin-top: ${isCompactItemsLayout ? '1px' : '2px'};
+            padding-top: ${isCompactItemsLayout ? '2px' : '3px'};
+            padding-bottom: ${isCompactItemsLayout ? '1px' : '2px'};
             font-weight: bold;
-            font-size: 11pt;
+            font-size: 10pt;
             color: var(--theme-primary);
           }
           .signature-section {
-            margin-top: ${isCompactItemsLayout ? '24px' : '40px'};
+            position: fixed;
+            bottom: ${isCompactItemsLayout ? '0mm' : '2mm'};
+            left: 0;
+            margin-top: 0;
+            margin-left: 0;
             text-align: left;
+            background: #ffffff;
+            z-index: 3;
           }
           .signature-space {
             border-top: 1px solid var(--theme-primary);
-            width: 200px;
-            margin: ${isCompactItemsLayout ? '35px 0 5px 0' : '50px 0 5px 0'};
-            height: 2px;
+            width: 180px;
+            margin: ${isCompactItemsLayout ? '8px 0 2px 0' : '10px 0 2px 0'};
+            height: 1px;
           }
           .signature-label {
-            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
+            font-size: ${isCompactItemsLayout ? '8pt' : '8.5pt'};
             font-weight: bold;
-            margin-top: 5px;
+            margin-top: 2px;
             color: var(--theme-primary);
           }
           .footer {
@@ -1267,19 +1494,8 @@ function Billing() {
       </head>
       <body>
         <div class="invoice-page">
-        <div class="page-header">
-          <div class="logo">
-            <img src="${invoiceLogoUrl}" alt="SS Cargo Logo" />
-          </div>
-          <div class="company-header">
-            <div class="company-name">SUPER SHINE CARGO SERVICES</div>
-            <div class="company-tagline">Freight Forwarding / Clearing & Transporters</div>
-            <div class="company-tagline">Sea freight / Air Freight</div>
-          </div>
-          <div class="invoice-header-right">
-            ${billDate}<br>
-            <strong>INV No: ${invoiceNumber}</strong>
-          </div>
+        <div style="font-size: 10pt; font-weight: bold; margin-bottom: 6px; margin-top: 0;">
+          INV No: ${invoiceNumber}
         </div>
 
         <div class="recipient">
@@ -1320,23 +1536,31 @@ function Billing() {
         </div>
 
         <div class="items-section">
-          ${payItemsArray && Array.isArray(payItemsArray) && payItemsArray.length > 0 ? 
-            payItemsArray.map(item => {
-              const description = item.description || item.name || 'Service Charge';
-              const amount = item.billingAmount || item.amount || 0;
-              return `
-                <div class="item-row">
-                  <div class="item-description">${description}</div>
-                  <div class="item-amount">${formatAmount(amount)}</div>
-                </div>
-              `;
-            }).join('') : 
-            `<div class="item-row">
-              <div class="item-description">Service Charges</div>
-              <div class="item-amount">${formatAmount(grossTotal)}</div>
-            </div>`
-          }
-          
+          ${printablePayItemPages.map((pageItems, pageIndex) => `
+            <div class="pay-items-page">
+              <table class="pay-items-table">
+                <thead>
+                  <tr>
+                    <th class="id-col">ID</th>
+                    <th class="description-col">DESCRIPTION</th>
+                    <th class="amount-col">AMOUNT (LKR)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pageItems.map(item => `
+                    <tr>
+                      <td class="id-col">${item.payItemId}</td>
+                      <td class="description-col"><span class="pay-item-description">${item.description}</span></td>
+                      <td class="amount-col">${formatAmount(item.amount)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="totals-section invoice-summary">
           <div class="item-row subtotal">
             <div class="item-description">GROSS TOTAL</div>
             <div class="item-amount">${formatAmount(grossTotal)}</div>
@@ -1358,11 +1582,6 @@ function Billing() {
         <div class="signature-section">
           <div class="signature-space"></div>
           <div class="signature-label">SUPER SHINE CARGO SERVICES<br>MANAGER</div>
-        </div>
-
-        <div class="footer">
-          <div class="footer-line">No. 10/A, Ground Floor, Y.M.B.A Building Colombo 01, Sri Lanka. Office: 0112-433-581</div>
-          <div class="footer-line">WhatsApp: +94754-946-946, +1410-868-9329 Hotline: +94-777-898929 E-mail: Supershinecargo@gmail.com</div>
         </div>
         </div>
         </div>
@@ -1524,20 +1743,36 @@ function Billing() {
                 <div className="card-header-inline">
                   <h3>Pay Items</h3>
                   {!showPayItemsRow && selectedJob.payItems && selectedJob.payItems.length > 0 && (
-                    <button 
-                      onClick={() => setShowPayItemsRow(true)} 
-                      className="btn btn-primary btn-small"
-                    >
-                      + Add More Items
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={addTransporterCostFromHeader} 
+                        className="btn btn-secondary btn-small"
+                      >
+                        + Transporter Cost
+                      </button>
+                      <button 
+                        onClick={openPayItemsEditor} 
+                        className="btn btn-primary btn-small"
+                      >
+                        + Add More Items
+                      </button>
+                    </div>
                   )}
                   {!showPayItemsRow && (!selectedJob.payItems || selectedJob.payItems.length === 0) && (
-                    <button 
-                      onClick={() => setShowPayItemsRow(true)} 
-                      className="btn btn-primary btn-small"
-                    >
-                      + Add Items
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={addTransporterCostFromHeader} 
+                        className="btn btn-secondary btn-small"
+                      >
+                        + Transporter Cost
+                      </button>
+                      <button 
+                        onClick={openPayItemsEditor} 
+                        className="btn btn-primary btn-small"
+                      >
+                        + Add Items
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1670,9 +1905,16 @@ function Billing() {
                     </table>
                     
                     <div className="pay-items-actions">
-                      <button onClick={addPayItemRow} className="btn btn-secondary btn-small">
-                        + Add Another Item
-                      </button>
+                      {selectedJob?.shipmentCategory !== 'FCL' && !hasTransporterCostItem(payItems) && (
+                        <button onClick={addTransporterCostRow} className="btn btn-primary btn-small">
+                          + Add Transporter Cost
+                        </button>
+                      )}
+                      {!(payItems.length === 1 && isTransporterCostLabel(payItems[0]?.name || payItems[0]?.description)) && (
+                        <button onClick={addPayItemRow} className="btn btn-secondary btn-small">
+                          + Add Another Item
+                        </button>
+                      )}
                       <div className="action-buttons-right">
                         <button onClick={savePayItems} className="btn btn-success">
                           Save Pay Items
@@ -1680,7 +1922,7 @@ function Billing() {
                         <button 
                           onClick={() => {
                             setShowPayItemsRow(false);
-                            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+                            setPayItems([]);
                           }} 
                           className="btn btn-secondary"
                         >
