@@ -1866,7 +1866,7 @@ function Billing() {
                               />
                             </td>
                             <td>
-                              {payItems.length > 1 && !item.paidByName && (
+                              {payItems.length > 1 && !item.paidByName && !(selectedJob?.shipmentCategory === 'FCL' && isTransporterCostLabel(item.name)) && (
                                 <button
                                   type="button"
                                   onClick={() => removePayItemRow(index)}

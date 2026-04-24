@@ -43,6 +43,14 @@ function Transporters() {
   const [formData, setFormData] = useState(initialFormData);
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState('');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedJobForPayment, setSelectedJobForPayment] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeDate, setChequeDate] = useState('');
+  const [chequeAmount, setChequeAmount] = useState('');
+  const [bankName, setBankName] = useState('Commercial Bank');
+  const [expandedPaymentDetails, setExpandedPaymentDetails] = useState(null);
 
   const canViewTransporters = user && (
     user.role === 'Admin' ||
@@ -508,38 +516,116 @@ function Transporters() {
 
     const paidByLabels = [...new Set(
       transporterCostItems
-        .map((item) => item.paidByName || item.paidBy || '')
+        .map((item) => {
+          const name = item.paidByName || item.paidBy || '';
+          const method = item.paymentMethod || '';
+          if (name && method) return `${name} (${method})`;
+          return name;
+        })
         .filter(Boolean)
     )];
 
     return paidByLabels.join(', ');
   };
 
-  const payTransporterCost = async (job) => {
+  const getPaymentDetails = (job) => {
     const transporterCostItems = getTransporterCostItems(job);
+    if (!transporterCostItems.length) return null;
+    return transporterCostItems[0];
+  };
 
+  const calculateTransporterSummary = () => {
+    const summary = {
+      totalTransporters: transporters.filter(t => t.isActive).length,
+      transportersWithJobs: new Set(),
+      paidTransporters: new Set(),
+      unpaidTransporters: new Set(),
+      totalPaidAmount: 0,
+      totalUnpaidAmount: 0,
+    };
+
+    jobs.forEach((job) => {
+      const transporterName = (job?.transporter || '').trim().toLowerCase();
+      const transporterId = (job?.transporterId || '').trim().toLowerCase();
+
+      if (!transporterName && !transporterId) return;
+
+      const matchingTransporter = transporters.find((t) => {
+        const tName = (t?.name || '').trim().toLowerCase();
+        const tId = (t?.transporterId || '').trim().toLowerCase();
+        return (transporterId && tId === transporterId) || (transporterName && tName === transporterName);
+      });
+
+      if (!matchingTransporter) return;
+
+      summary.transportersWithJobs.add(matchingTransporter.transporterId);
+
+      const costAmount = getTransporterCostAmount(job);
+      if (costAmount > 0) {
+        if (isTransporterCostPaid(job)) {
+          summary.paidTransporters.add(matchingTransporter.transporterId);
+          summary.totalPaidAmount += costAmount;
+        } else {
+          summary.unpaidTransporters.add(matchingTransporter.transporterId);
+          summary.totalUnpaidAmount += costAmount;
+        }
+      }
+    });
+
+    return {
+      totalTransporters: summary.totalTransporters,
+      transportersWithJobs: summary.transportersWithJobs.size,
+      paidTransporters: summary.paidTransporters.size,
+      unpaidTransporters: summary.unpaidTransporters.size,
+      totalPaidAmount: summary.totalPaidAmount,
+      totalUnpaidAmount: summary.totalUnpaidAmount,
+    };
+  };
+
+  const openPaymentModal = (job) => {
+    const transporterCostItems = getTransporterCostItems(job);
     if (!transporterCostItems.length) {
       setMessage('Transporter cost not found for this job');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-
     const amount = getTransporterCostAmount(job);
     if (amount <= 0) {
       setMessage('Transporter cost amount is not set yet');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
+    setSelectedJobForPayment(job);
+    setPaymentMethod('Cash');
+    setChequeNumber('');
+    setChequeDate('');
+    setChequeAmount('');
+    setBankName('Commercial Bank');
+    setShowPaymentModal(true);
+  };
+
+  const submitTransporterPayment = async () => {
+    if (!selectedJobForPayment) return;
+
+    if (paymentMethod === 'Cheque') {
+      if (!chequeNumber || !chequeDate || !chequeAmount) {
+        setMessage('❌ Please fill in all cheque details (Number, Date, Amount)');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+      if (isNaN(parseFloat(chequeAmount)) || parseFloat(chequeAmount) <= 0) {
+        setMessage('❌ Please enter a valid cheque amount');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+    }
 
     try {
-      const updatedPayItems = (Array.isArray(job.payItems) ? job.payItems : []).map((item) => {
+      const updatedPayItems = (Array.isArray(selectedJobForPayment.payItems) ? selectedJobForPayment.payItems : []).map((item) => {
         const label = (item?.description || item?.name || '').toLowerCase().trim();
-        if (label !== 'transporter cost') {
-          return item;
-        }
+        if (label !== 'transporter cost') return item;
 
         const itemAmount = parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0;
-
         return {
           ...item,
           paymentStatus: 'Paid',
@@ -547,21 +633,26 @@ function Transporters() {
           paidAmount: itemAmount,
           paidAt: new Date().toISOString(),
           paidBy: user?.userId || user?.username || user?.name || 'System',
-          paidByName: user?.name || user?.fullName || user?.username || user?.userId || 'System'
+          paidByName: user?.name || user?.fullName || user?.username || user?.userId || 'System',
+          paymentMethod,
+          ...(paymentMethod === 'Cheque' && { chequeNumber, chequeDate, chequeAmount: parseFloat(chequeAmount) }),
+          ...(paymentMethod === 'Bank Transfer' && { bankName }),
         };
       });
 
-      await jobService.replacePayItems(job.jobId, updatedPayItems);
+      await jobService.replacePayItems(selectedJobForPayment.jobId, updatedPayItems);
 
       setJobs((prevJobs) => prevJobs.map((currentJob) => (
-        currentJob.jobId === job.jobId ? { ...currentJob, payItems: updatedPayItems } : currentJob
+        currentJob.jobId === selectedJobForPayment.jobId ? { ...currentJob, payItems: updatedPayItems } : currentJob
       )));
 
-      setMessage(`Transporter cost marked as paid for ${job.jobId}`);
-      setTimeout(() => setMessage(''), 3000);
+      setShowPaymentModal(false);
+      setSelectedJobForPayment(null);
+      setMessage(`✅ Transporter cost marked as paid for ${selectedJobForPayment.jobId} via ${paymentMethod}`);
+      setTimeout(() => setMessage(''), 4000);
     } catch (error) {
       console.error('Error paying transporter cost:', error);
-      setMessage(error.response?.data?.message || 'Error paying transporter cost');
+      setMessage(error.response?.data?.message || '❌ Error paying transporter cost');
       setTimeout(() => setMessage(''), 3000);
     }
   };
@@ -593,6 +684,44 @@ function Transporters() {
           {message}
         </div>
       )}
+
+      {(() => {
+        const summary = calculateTransporterSummary();
+        return (
+          <div className="summary-cards-container">
+            <div className="summary-card">
+              <div className="summary-card-icon">👥</div>
+              <div className="summary-card-content">
+                <div className="summary-card-label">Total Transporters</div>
+                <div className="summary-card-value">{summary.totalTransporters}</div>
+              </div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-card-icon">📋</div>
+              <div className="summary-card-content">
+                <div className="summary-card-label">With Jobs</div>
+                <div className="summary-card-value">{summary.transportersWithJobs}</div>
+              </div>
+            </div>
+            <div className="summary-card paid">
+              <div className="summary-card-icon">✅</div>
+              <div className="summary-card-content">
+                <div className="summary-card-label">Paid</div>
+                <div className="summary-card-value">{summary.paidTransporters}</div>
+                <div className="summary-card-amount">LKR {formatAmount(summary.totalPaidAmount)}</div>
+              </div>
+            </div>
+            <div className="summary-card unpaid">
+              <div className="summary-card-icon">⏳</div>
+              <div className="summary-card-content">
+                <div className="summary-card-label">Unpaid</div>
+                <div className="summary-card-value">{summary.unpaidTransporters}</div>
+                <div className="summary-card-amount">LKR {formatAmount(summary.totalUnpaidAmount)}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="card">
         <div className="card-header">
@@ -794,8 +923,13 @@ function Transporters() {
                                     </thead>
                                     <tbody>
                                       {assignedJobs.map((job) => (
-                                        <tr key={job.jobId}>
-                                          <td>{job.jobId || '-'}</td>
+                                        <React.Fragment key={job.jobId}>
+                                          <tr>
+                                          <td>
+                                            <span className="job-id-cell">
+                                              {job.jobId || '-'}{job.cusdecNumber && ` / ${job.cusdecNumber}`}
+                                            </span>
+                                          </td>
                                           <td>{job.shipmentCategory || '-'}</td>
                                           <td>
                                             {getTransporterCostAmount(job) > 0 ? (
@@ -819,27 +953,90 @@ function Transporters() {
                                             })()}
                                           </td>
                                           <td>
-                                            {getTransporterCostAmount(job) > 0 ? (
-                                              isTransporterCostPaid(job) ? (
-                                                <span className="transporter-paid-badge">
-                                                  Paid{getPaidByLabel(job) ? ` by ${getPaidByLabel(job)}` : ''}
-                                                </span>
-                                              ) : canPayTransporterCosts ? (
+                                            <div className="action-cell-wrapper">
+                                              <div className="action-buttons">
+                                                {getTransporterCostAmount(job) > 0 ? (
+                                                  isTransporterCostPaid(job) ? (
+                                                    <span className="transporter-paid-badge">
+                                                      Paid{getPaidByLabel(job) ? ` by ${getPaidByLabel(job)}` : ''}
+                                                    </span>
+                                                  ) : canPayTransporterCosts ? (
+                                                    <button
+                                                      type="button"
+                                                      className="btn-action btn-pay-amount"
+                                                      onClick={() => openPaymentModal(job)}
+                                                    >
+                                                      Pay the amount
+                                                    </button>
+                                                  ) : (
+                                                    <span className="transporter-unpaid-badge">Unpaid</span>
+                                                  )
+                                                ) : (
+                                                  <span className="transporter-no-cost">-</span>
+                                                )}
+                                              </div>
+                                              {getTransporterCostAmount(job) > 0 && (
                                                 <button
                                                   type="button"
-                                                  className="btn-action btn-pay-amount"
-                                                  onClick={() => payTransporterCost(job)}
+                                                  className="expand-btn-middle"
+                                                  onClick={() => setExpandedPaymentDetails(expandedPaymentDetails === job.jobId ? null : job.jobId)}
+                                                  title={expandedPaymentDetails === job.jobId ? "Hide details" : "View details"}
                                                 >
-                                                  Pay the amount
+                                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <polyline points={expandedPaymentDetails === job.jobId ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+                                                  </svg>
                                                 </button>
-                                              ) : (
-                                                <span className="transporter-unpaid-badge">Unpaid</span>
-                                              )
-                                            ) : (
-                                              <span className="transporter-no-cost">-</span>
-                                            )}
+                                              )}
+                                            </div>
                                           </td>
                                         </tr>
+                                        {expandedPaymentDetails === job.jobId && (
+                                          <tr className="payment-details-row">
+                                            <td colSpan="5">
+                                              <div className="payment-details-expanded">
+                                                <div className="detail-card">
+                                                  <div className="detail-card-label">AMOUNT</div>
+                                                  <div className="detail-card-value">LKR {formatAmount(getTransporterCostAmount(job))}</div>
+                                                </div>
+                                                {isTransporterCostPaid(job) && getPaymentDetails(job) && (
+                                                  <>
+                                                    <div className="detail-card">
+                                                      <div className="detail-card-label">PAID BY</div>
+                                                      <div className="detail-card-value">{getPaymentDetails(job).paidByName || '-'}</div>
+                                                    </div>
+                                                    <div className="detail-card">
+                                                      <div className="detail-card-label">PAYMENT METHOD</div>
+                                                      <div className="detail-card-value">{getPaymentDetails(job).paymentMethod || '-'}</div>
+                                                    </div>
+                                                    {getPaymentDetails(job).paymentMethod === 'Cheque' && (
+                                                      <>
+                                                        <div className="detail-card">
+                                                          <div className="detail-card-label">CHEQUE #</div>
+                                                          <div className="detail-card-value">{getPaymentDetails(job).chequeNumber || '-'}</div>
+                                                        </div>
+                                                        <div className="detail-card">
+                                                          <div className="detail-card-label">CHEQUE DATE</div>
+                                                          <div className="detail-card-value">{getPaymentDetails(job).chequeDate || '-'}</div>
+                                                        </div>
+                                                      </>
+                                                    )}
+                                                    {getPaymentDetails(job).paymentMethod === 'Bank Transfer' && (
+                                                      <div className="detail-card">
+                                                        <div className="detail-card-label">BANK</div>
+                                                        <div className="detail-card-value">{getPaymentDetails(job).bankName || '-'}</div>
+                                                      </div>
+                                                    )}
+                                                    <div className="detail-card">
+                                                      <div className="detail-card-label">PAID AT</div>
+                                                      <div className="detail-card-value">{getPaymentDetails(job).paidAt ? new Date(getPaymentDetails(job).paidAt).toLocaleDateString() : '-'}</div>
+                                                    </div>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        )}
+                                        </React.Fragment>
                                       ))}
                                     </tbody>
                                   </table>
@@ -1092,6 +1289,90 @@ function Transporters() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showPaymentModal && selectedJobForPayment && (
+        <div className="payment-modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="payment-modal-header">
+              <h3>💳 Payment Details</h3>
+              <button className="modal-close-btn" onClick={() => setShowPaymentModal(false)}>×</button>
+            </div>
+
+            <div className="payment-modal-body">
+              <div className="invoice-summary">
+                <div className="summary-row">
+                  <span className="summary-label">Job ID:</span>
+                  <span className="summary-value">{selectedJobForPayment.jobId}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Category:</span>
+                  <span className="summary-value">{selectedJobForPayment.shipmentCategory || '-'}</span>
+                </div>
+                <div className="summary-row total-row">
+                  <span className="summary-label">Amount to Pay:</span>
+                  <span className="summary-value amount-highlight">LKR {formatAmount(getTransporterCostAmount(selectedJobForPayment))}</span>
+                </div>
+              </div>
+
+              <div className="payment-form">
+                <div className="form-group">
+                  <label>Payment Method <span style={{color: '#dc2626'}}>*</span></label>
+                  <select
+                    className="form-control"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
+                </div>
+
+                {paymentMethod === 'Cheque' && (
+                  <div className="cheque-details">
+                    <div className="cheque-notice">
+                      <span className="notice-icon">📝</span>
+                      <span>Please provide cheque details</span>
+                    </div>
+                    <div className="form-group">
+                      <label>Cheque Number <span style={{color: '#dc2626'}}>*</span></label>
+                      <input type="text" className="form-control" value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} placeholder="Enter cheque number" />
+                    </div>
+                    <div className="form-group">
+                      <label>Cheque Date <span style={{color: '#dc2626'}}>*</span></label>
+                      <input type="date" className="form-control" value={chequeDate} onChange={(e) => setChequeDate(e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>Cheque Amount (LKR) <span style={{color: '#dc2626'}}>*</span></label>
+                      <input type="number" step="0.01" className="form-control" value={chequeAmount} onChange={(e) => setChequeAmount(e.target.value)} placeholder="0.00" />
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === 'Bank Transfer' && (
+                  <div className="bank-details">
+                    <div className="bank-notice">
+                      <span className="notice-icon">🏦</span>
+                      <span>Please select the bank</span>
+                    </div>
+                    <div className="form-group">
+                      <label>Bank Name <span style={{color: '#dc2626'}}>*</span></label>
+                      <select className="form-control" value={bankName} onChange={(e) => setBankName(e.target.value)}>
+                        <option value="Commercial Bank">Commercial Bank</option>
+                        <option value="Peoples Bank">Peoples Bank</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="payment-modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+              <button className="btn btn-success" onClick={submitTransporterPayment}>✓ Confirm Payment</button>
+            </div>
           </div>
         </div>
       )}
