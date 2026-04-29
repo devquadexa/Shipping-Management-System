@@ -799,7 +799,7 @@
 
 .balance-card-content h3 {
   margin: 0 0 0.5rem 0;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   opacity: 0.9;
   text-transform: uppercase;
@@ -808,14 +808,15 @@
 
 .balance-amount {
   margin: 0.5rem 0;
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.5px;
+  white-space: nowrap;
 }
 
 .balance-description {
   margin: 0.5rem 0 0 0;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   opacity: 0.8;
 }
 
@@ -841,6 +842,84 @@
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
   padding: 2rem;
+}
+
+/* ── Carousel wrapper ── */
+.ubc-wrapper {
+  padding: 16px 16px 8px;
+}
+
+.ubc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+/* Arrows row */
+.ubc-arrows {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-bottom: 8px;
+}
+
+.ubc-arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid #111827;
+  background: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s;
+}
+
+.ubc-arrow:hover:not(.disabled) {
+  background: #374151;
+  border-color: #374151;
+  transform: scale(1.1);
+}
+
+.ubc-arrow.disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.ubc-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ubc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: #d1d5db;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s;
+}
+
+.ubc-dot.active {
+  background: #101036;
+  width: 20px;
+  border-radius: 4px;
+}
+
+@media (max-width: 1200px) {
+  .ubc-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .ubc-grid { grid-template-columns: 1fr; }
 }
 
 .user-balance-card {

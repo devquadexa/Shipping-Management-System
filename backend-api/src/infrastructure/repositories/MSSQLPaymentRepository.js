@@ -28,6 +28,7 @@ class MSSQLPaymentRepository extends IPaymentRepository {
       .input('status', this.sql.VarChar, payment.status || 'Pending')
       .input('chequeNumber', this.sql.VarChar, payment.chequeNumber || null)
       .input('chequeDate', this.sql.Date, payment.chequeDate || null)
+      .input('chequeAmount', this.sql.Decimal(18, 2), payment.chequeAmount || null)
       .input('bankName', this.sql.NVarChar, payment.bankName || null)
       .input('referenceNumber', this.sql.VarChar, payment.referenceNumber || null)
       .input('notes', this.sql.NVarChar, payment.notes || null)
@@ -36,13 +37,13 @@ class MSSQLPaymentRepository extends IPaymentRepository {
         INSERT INTO Payments (
           PaymentId, JobId, CustomerId, CustomerName, InvoiceNumber, BillId,
           PaymentMethod, PaymentDate, Amount, Status,
-          ChequeNumber, ChequeDate, BankName, ReferenceNumber,
+          ChequeNumber, ChequeDate, ChequeAmount, BankName, ReferenceNumber,
           Notes, CreatedBy, CreatedDate
         )
         VALUES (
           @paymentId, @jobId, @customerId, @customerName, @invoiceNumber, @billId,
           @paymentMethod, @paymentDate, @amount, @status,
-          @chequeNumber, @chequeDate, @bankName, @referenceNumber,
+          @chequeNumber, @chequeDate, @chequeAmount, @bankName, @referenceNumber,
           @notes, @createdBy, GETDATE()
         )
       `);
@@ -61,30 +62,35 @@ class MSSQLPaymentRepository extends IPaymentRepository {
 
   async findAll(filters = {}) {
     const pool = await this.db();
-    let query = 'SELECT * FROM Payments WHERE 1=1';
+    let query = `
+      SELECT p.*, j.CUSDECNumber, j.CUSDECDate
+      FROM Payments p
+      LEFT JOIN Jobs j ON p.JobId = j.JobId
+      WHERE 1=1
+    `;
     const request = pool.request();
     
     if (filters.status) {
-      query += ' AND Status = @status';
+      query += ' AND p.Status = @status';
       request.input('status', this.sql.VarChar, filters.status);
     }
     
     if (filters.paymentMethod) {
-      query += ' AND PaymentMethod = @paymentMethod';
+      query += ' AND p.PaymentMethod = @paymentMethod';
       request.input('paymentMethod', this.sql.VarChar, filters.paymentMethod);
     }
     
     if (filters.customerId) {
-      query += ' AND CustomerId = @customerId';
+      query += ' AND p.CustomerId = @customerId';
       request.input('customerId', this.sql.VarChar(20), filters.customerId);
     }
     
     if (filters.jobId) {
-      query += ' AND JobId = @jobId';
+      query += ' AND p.JobId = @jobId';
       request.input('jobId', this.sql.VarChar, filters.jobId);
     }
     
-    query += ' ORDER BY PaymentDate DESC, CreatedDate DESC';
+    query += ' ORDER BY p.PaymentDate DESC, p.CreatedDate DESC';
     
     const result = await request.query(query);
     return result.recordset.map(row => this.mapToEntity(row));
@@ -105,6 +111,29 @@ class MSSQLPaymentRepository extends IPaymentRepository {
       .input('customerId', this.sql.VarChar(20), customerId)
       .query('SELECT * FROM Payments WHERE CustomerId = @customerId ORDER BY PaymentDate DESC');
     
+    return result.recordset.map(row => this.mapToEntity(row));
+  }
+
+  async findByBillId(billId) {
+    const pool = await this.db();
+    const result = await pool.request()
+      .input('billId', this.sql.VarChar, billId)
+      .query(`
+        SELECT p.*, j.CUSDECNumber, j.CUSDECDate
+        FROM Payments p
+        LEFT JOIN Jobs j ON p.JobId = j.JobId
+        WHERE p.BillId = @billId
+        ORDER BY p.PaymentDate ASC, p.CreatedDate ASC
+      `);
+    
+    return result.recordset.map(row => this.mapToEntity(row));
+  }
+
+  async findByChequeNumber(chequeNumber) {
+    const pool = await this.db();
+    const result = await pool.request()
+      .input('chequeNumber', this.sql.VarChar, chequeNumber)
+      .query('SELECT * FROM Payments WHERE ChequeNumber = @chequeNumber AND PaymentMethod = \'Cheque\' ORDER BY PaymentDate ASC');
     return result.recordset.map(row => this.mapToEntity(row));
   }
 
@@ -239,6 +268,7 @@ class MSSQLPaymentRepository extends IPaymentRepository {
       status: row.Status,
       chequeNumber: row.ChequeNumber,
       chequeDate: row.ChequeDate,
+      chequeAmount: row.ChequeAmount,
       bankName: row.BankName,
       referenceNumber: row.ReferenceNumber,
       clearedDate: row.ClearedDate,
@@ -246,7 +276,9 @@ class MSSQLPaymentRepository extends IPaymentRepository {
       notes: row.Notes,
       createdBy: row.CreatedBy,
       createdDate: row.CreatedDate,
-      updatedDate: row.UpdatedDate
+      updatedDate: row.UpdatedDate,
+      cusdecNumber: row.CUSDECNumber,
+      cusdecDate: row.CUSDECDate
     });
   }
 }

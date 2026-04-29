@@ -234,6 +234,17 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: #101036;
+}
+
+.job-cusdec-combined {
+  color: #101036;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
   white-space: nowrap;
 }
 

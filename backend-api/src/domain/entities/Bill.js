@@ -29,6 +29,8 @@ class Bill {
     chequeDate = null,
     chequeAmount = null,
     bankName = null, // Commercial Bank, Peoples Bank
+    paidAmount = 0,
+    remainingAmount = null,
     items = [],
     metadata = {}
   }) {
@@ -57,6 +59,8 @@ class Bill {
     this.chequeDate = chequeDate;
     this.chequeAmount = chequeAmount ? parseFloat(chequeAmount) : null;
     this.bankName = bankName;
+    this.paidAmount = parseFloat(paidAmount) || 0;
+    this.remainingAmount = remainingAmount !== null ? parseFloat(remainingAmount) : parseFloat(netTotal) || 0;
     this.items = items;
     this.metadata = metadata;
   }
@@ -125,24 +129,48 @@ class Bill {
       throw new Error('Bill is already paid');
     }
     this.paymentStatus = 'Paid';
-    this.paidDate = new Date();
-    
-    // Set payment details
-    if (paymentDetails.paymentMethod) {
-      this.paymentMethod = paymentDetails.paymentMethod;
+    this.paidDate = paymentDetails.paidDate ? new Date(paymentDetails.paidDate) : new Date();
+    this.paidAmount = parseFloat(this.netTotal) || parseFloat(this.total) || 0;
+    this.remainingAmount = 0;
+    if (paymentDetails.paymentMethod) this.paymentMethod = paymentDetails.paymentMethod;
+    if (paymentDetails.chequeNumber) this.chequeNumber = paymentDetails.chequeNumber;
+    if (paymentDetails.chequeDate) this.chequeDate = paymentDetails.chequeDate;
+    if (paymentDetails.chequeAmount) this.chequeAmount = parseFloat(paymentDetails.chequeAmount);
+    if (paymentDetails.bankName) this.bankName = paymentDetails.bankName;
+  }
+
+  markAsPartiallyPaid(paymentAmount, paymentDetails = {}) {
+    if (this.paymentStatus === 'Paid') {
+      throw new Error('Bill is already fully paid');
     }
-    if (paymentDetails.chequeNumber) {
-      this.chequeNumber = paymentDetails.chequeNumber;
+    const amount = parseFloat(paymentAmount);
+    if (!amount || amount <= 0) throw new Error('Payment amount must be greater than zero');
+
+    const currentPaid = parseFloat(this.paidAmount) || 0;
+    const invoiceTotal = parseFloat(this.netTotal) || parseFloat(this.total) || 0;
+    const newPaidAmount = currentPaid + amount;
+
+    if (newPaidAmount > invoiceTotal) {
+      throw new Error(`Payment amount (${newPaidAmount}) exceeds remaining balance (${invoiceTotal - currentPaid})`);
     }
-    if (paymentDetails.chequeDate) {
-      this.chequeDate = paymentDetails.chequeDate;
+
+    this.paidAmount = newPaidAmount;
+    this.remainingAmount = invoiceTotal - newPaidAmount;
+
+    if (this.remainingAmount <= 0) {
+      this.paymentStatus = 'Paid';
+      this.paidDate = paymentDetails.paidDate ? new Date(paymentDetails.paidDate) : new Date();
+      this.remainingAmount = 0;
+    } else {
+      this.paymentStatus = 'Partially Paid';
+      this.paidDate = paymentDetails.paidDate ? new Date(paymentDetails.paidDate) : new Date();
     }
-    if (paymentDetails.chequeAmount) {
-      this.chequeAmount = parseFloat(paymentDetails.chequeAmount);
-    }
-    if (paymentDetails.bankName) {
-      this.bankName = paymentDetails.bankName;
-    }
+
+    if (paymentDetails.paymentMethod) this.paymentMethod = paymentDetails.paymentMethod;
+    if (paymentDetails.chequeNumber) this.chequeNumber = paymentDetails.chequeNumber;
+    if (paymentDetails.chequeDate) this.chequeDate = paymentDetails.chequeDate;
+    if (paymentDetails.chequeAmount) this.chequeAmount = parseFloat(paymentDetails.chequeAmount);
+    if (paymentDetails.bankName) this.bankName = paymentDetails.bankName;
   }
 
   markAsUnpaid() {

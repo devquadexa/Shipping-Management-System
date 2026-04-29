@@ -2,10 +2,11 @@
  * Mark Bill As Paid Use Case
  */
 class MarkBillAsPaid {
-  constructor(billRepository, paymentRepository, jobRepository) {
+  constructor(billRepository, paymentRepository, jobRepository, customerRepository) {
     this.billRepository = billRepository;
     this.paymentRepository = paymentRepository;
     this.jobRepository = jobRepository;
+    this.customerRepository = customerRepository;
   }
 
   async execute(billId, paymentDetails = {}) {
@@ -34,11 +35,32 @@ class MarkBillAsPaid {
     // Persist bill update
     const updatedBill = await this.billRepository.markAsPaid(billId, paymentDetails);
     
-    // Create payment record if payment method is Cheque or Bank Transfer
-    if (paymentDetails.paymentMethod === 'Cheque' || paymentDetails.paymentMethod === 'Bank Transfer') {
+    // Update job status to "Payment Collected"
+    if (this.jobRepository) {
       try {
-        // Get job details for customer info
-        const job = await this.jobRepository.findById(bill.jobId);
+        await this.jobRepository.updateStatus(bill.jobId, 'Payment Collected');
+        console.log(`✓ Job ${bill.jobId} status updated to: Payment Collected`);
+      } catch (err) {
+        console.error('Error updating job status after full payment:', err);
+        // Non-fatal - payment is already recorded
+      }
+    }
+    
+    // Create payment record for Cheque, Bank Transfer, AND Cash
+    if (
+      paymentDetails.paymentMethod === 'Cheque' ||
+      paymentDetails.paymentMethod === 'Bank Transfer' ||
+      paymentDetails.paymentMethod === 'Cash'
+    ) {
+      try {
+        // Get customer name
+        let customerName = '';
+        try {
+          const customer = await this.customerRepository.findById(bill.customerId);
+          customerName = customer?.name || '';
+        } catch (error) {
+          console.warn('Could not fetch customer name:', error.message);
+        }
         
         // Generate payment ID
         const paymentId = await this.paymentRepository.generateNextId();
@@ -49,19 +71,18 @@ class MarkBillAsPaid {
           paymentId,
           jobId: bill.jobId,
           customerId: bill.customerId,
-          customerName: job?.customerName || '',
-          invoiceNumber: bill.invoiceNumber,
+          customerName: customerName,
+          invoiceNumber: bill.invoiceNumber || bill.billId,
           billId: bill.billId,
           paymentMethod: paymentDetails.paymentMethod,
-          paymentDate: new Date(),
-          amount: paymentDetails.paymentMethod === 'Cheque' 
-            ? paymentDetails.chequeAmount 
-            : (bill.netTotal || bill.total),
-          status: 'Pending', // Default to Pending, can be updated later
-          chequeNumber: paymentDetails.chequeNumber,
-          chequeDate: paymentDetails.chequeDate,
-          bankName: paymentDetails.bankName,
-          referenceNumber: paymentDetails.referenceNumber,
+          paymentDate: paymentDetails.paidDate ? new Date(paymentDetails.paidDate) : new Date(),
+          amount: bill.netTotal || bill.total || bill.billingAmount, // Invoice amount
+          status: paymentDetails.paymentMethod === 'Cash' ? 'Cleared' : 'Pending',
+          chequeNumber: paymentDetails.chequeNumber || null,
+          chequeDate: paymentDetails.chequeDate || null,
+          chequeAmount: paymentDetails.chequeAmount || null,
+          bankName: paymentDetails.bankName || null,
+          referenceNumber: paymentDetails.referenceNumber || null,
           notes: `Payment for invoice ${bill.invoiceNumber}`,
           createdBy: paymentDetails.createdBy
         });

@@ -290,6 +290,229 @@
   background: rgba(255,255,255,0.25);
 }
 
+/* ── Reports Dropdown (desktop) ─────────────────────────── */
+.nav-dropdown-item {
+  position: relative;
+  list-style: none;
+}
+
+.nav-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: white;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: inherit;
+  font-weight: 500;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.nav-dropdown-trigger:hover,
+.nav-dropdown-trigger.open {
+  background: rgba(255,255,255,0.15);
+}
+
+.nav-dropdown-trigger.active {
+  background: rgba(255,255,255,0.25);
+}
+
+.nav-dropdown-chevron {
+  transition: transform 0.2s ease;
+  opacity: 0.8;
+}
+
+.nav-dropdown-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 260px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid #e5e7eb;
+  z-index: 1000;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.18s ease;
+  padding: 6px 0;
+}
+
+.nav-dropdown-section-label {
+  padding: 8px 16px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #9ca3af;
+}
+
+.nav-dropdown-divider {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 6px 0;
+}
+
+.nav-dropdown-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  color: #374151;
+  text-decoration: none;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+
+.nav-dropdown-link:hover:not(.nav-dropdown-link-disabled) {
+  background: #f3f4f6;
+  color: #101036;
+}
+
+.nav-dropdown-link.active {
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.nav-dropdown-link-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.nav-dropdown-link-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #6b7280;
+}
+
+.nav-dropdown-link:hover:not(.nav-dropdown-link-disabled) .nav-dropdown-link-icon {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.nav-dropdown-link.active .nav-dropdown-link-icon {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.nav-dropdown-link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nav-dropdown-link-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-dropdown-link-desc {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.nav-dropdown-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: #e5e7eb;
+  color: #6b7280;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ── Mobile Reports submenu ─────────────────────────────── */
+.mobile-menu-group {
+  list-style: none;
+}
+
+.mobile-menu-group-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 20px;
+  background: none;
+  border: none;
+  color: #374151;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.mobile-menu-group-trigger:hover {
+  background: #f3f4f6;
+}
+
+.mobile-menu-group-trigger.open {
+  background: #f3f4f6;
+  color: #101036;
+  font-weight: 600;
+}
+
+.mobile-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+  color: #9ca3af;
+}
+
+.mobile-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+.mobile-submenu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.mobile-submenu li a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px 12px 36px;
+  color: #374151;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.mobile-submenu li a:hover {
+  background: #e5e7eb;
+}
+
+.mobile-submenu li a.active {
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
 /* Mobile Sidebar */
 .mobile-sidebar-overlay {
   display: none;

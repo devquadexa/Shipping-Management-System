@@ -16,6 +16,7 @@ class Payment {
     status = 'Pending',
     chequeNumber,
     chequeDate,
+    chequeAmount,
     bankName,
     referenceNumber,
     clearedDate,
@@ -23,7 +24,9 @@ class Payment {
     notes,
     createdBy,
     createdDate,
-    updatedDate
+    updatedDate,
+    cusdecNumber,
+    cusdecDate
   }) {
     this.paymentId = paymentId;
     this.jobId = jobId;
@@ -33,10 +36,11 @@ class Payment {
     this.billId = billId;
     this.paymentMethod = paymentMethod;
     this.paymentDate = paymentDate || new Date();
-    this.amount = amount;
+    this.amount = amount; // Invoice amount
     this.status = status;
     this.chequeNumber = chequeNumber;
     this.chequeDate = chequeDate;
+    this.chequeAmount = chequeAmount; // Total cheque amount
     this.bankName = bankName;
     this.referenceNumber = referenceNumber;
     this.clearedDate = clearedDate;
@@ -45,6 +49,8 @@ class Payment {
     this.createdBy = createdBy;
     this.createdDate = createdDate || new Date();
     this.updatedDate = updatedDate;
+    this.cusdecNumber = cusdecNumber;
+    this.cusdecDate = cusdecDate;
   }
 }
 

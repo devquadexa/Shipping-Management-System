@@ -17,6 +17,7 @@ function PettyCash() {
   const [message, setMessage] = useState('');
   const [overallBalance, setOverallBalance] = useState(0);
   const [userBalances, setUserBalances] = useState({});
+  const [userCarouselIndex, setUserCarouselIndex] = useState(0);
   const [jobAssignments, setJobAssignments] = useState({}); // Store job assignments
   
   // Search and Filter states
@@ -1159,6 +1160,14 @@ function PettyCash() {
     }
   };
 
+  const getStatusDisplay = (status) => {
+    switch (status) {
+      case 'Settled / Balance Returned': return 'Settled / BR';
+      case 'Settled / Over Due Collected': return 'Settled / OC';
+      default: return status;
+    }
+  };
+
   // Get filtered assignments count
   const getFilteredCount = () => {
     return assignments.filter(assignment => {
@@ -1546,80 +1555,91 @@ function PettyCash() {
         )}
       </div>
 
-      {/* Overall Balance Card for Admin/Super Admin */}
-      {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
-        <div className="balance-cards">
-          <div className="balance-card overall-balance">
-            <div className="balance-card-icon">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                <line x1="1" y1="10" x2="23" y2="10"></line>
-              </svg>
-            </div>
-            <div className="balance-card-content">
-              <h3>Overall Petty Cash Balance</h3>
-              <p className="balance-amount">LKR {formatAmount(overallBalance)}</p>
-              <p className="balance-description">Total available petty cash in system</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* User Balances Summary for Admin/Super Admin — carousel */}
+      {(user?.role === 'Admin' || user?.role === 'Super Admin') && Object.keys(userBalances).length > 0 && (() => {
+        const balanceList = Object.entries(userBalances);
+        const CARDS_PER_VIEW = 4;
+        const maxIndex = Math.max(0, balanceList.length - CARDS_PER_VIEW);
+        const canPrev = userCarouselIndex > 0;
+        const canNext = userCarouselIndex < maxIndex;
+        const visible = balanceList.slice(userCarouselIndex, userCarouselIndex + CARDS_PER_VIEW);
 
-      {/* User Balances Summary for Admin/Super Admin */}
-      {(user?.role === 'Admin' || user?.role === 'Super Admin') && Object.keys(userBalances).length > 0 && (
-        <div className="card">
-          <div className="card-header">
-            <h2>User Petty Cash Summary</h2>
-          </div>
-          <div className="user-balances-grid">
-            {Object.entries(userBalances).map(([userId, balance]) => {
-              return (
-                <div key={userId} className="user-balance-card">
-                  <div className="user-balance-header">
-                    <div className="user-avatar">
-                      {balance.userName.charAt(0).toUpperCase()}
+        return (
+          <div className="card">
+            <div className="card-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h2>User Petty Cash Summary</h2>
+              <span style={{fontSize:'13px', color:'#6b7280'}}>
+                Showing {userCarouselIndex + 1}–{Math.min(userCarouselIndex + CARDS_PER_VIEW, balanceList.length)} of {balanceList.length} users
+              </span>
+            </div>
+
+            <div className="ubc-wrapper">
+              <div className="ubc-grid">
+                {visible.map(([userId, balance]) => (
+                  <div key={userId} className="user-balance-card">
+                    <div className="user-balance-header">
+                      <div className="user-avatar">{balance.userName.charAt(0).toUpperCase()}</div>
+                      <div className="user-info">
+                        <h4>{balance.userName}</h4>
+                        <p className="user-id">{userId}</p>
+                      </div>
                     </div>
-                    <div className="user-info">
-                      <h4>{balance.userName}</h4>
-                      <p className="user-id">{userId}</p>
+                    <div className="user-balance-stats">
+                      <div className="stat-row">
+                        <span className="stat-label">Total Assigned:</span>
+                        <span className="stat-value">LKR {formatAmount(balance.totalAssigned)}</span>
+                      </div>
+                      <div className="stat-row">
+                        <span className="stat-label">Total Spent:</span>
+                        <span className="stat-value">LKR {formatAmount(balance.totalSpent)}</span>
+                      </div>
+                      <div className="stat-row stat-row-divider">
+                        <span className="stat-label">Active Assignments:</span>
+                        <span className="stat-value stat-badge">{balance.activeAssignments}</span>
+                      </div>
+                      <div className="stat-row">
+                        <span className="stat-label">Settled Assignments:</span>
+                        <span className="stat-value stat-badge">{balance.settledAssignments}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="user-balance-stats">
-                    <div className="stat-row">
-                      <span className="stat-label">Total Assigned:</span>
-                      <span className="stat-value">LKR {formatAmount(balance.totalAssigned)}</span>
-                    </div>
-                    <div className="stat-row">
-                      <span className="stat-label">Total Spent:</span>
-                      <span className="stat-value">LKR {formatAmount(balance.totalSpent)}</span>
-                    </div>
-                    {balance.totalBalance > 0 && (
-                      <div className="stat-row">
-                        <span className="stat-label">Balance to Return:</span>
-                        <span className="stat-value balance-positive">LKR {formatAmount(balance.totalBalance)}</span>
-                      </div>
-                    )}
-                    {balance.totalOver > 0 && (
-                      <div className="stat-row">
-                        <span className="stat-label">Over Amount:</span>
-                        <span className="stat-value balance-negative">LKR {formatAmount(balance.totalOver)}</span>
-                      </div>
-                    )}
-                    <div className="stat-row stat-row-divider">
-                      <span className="stat-label">Active Assignments:</span>
-                      <span className="stat-value stat-badge">{balance.activeAssignments}</span>
-                    </div>
-                    <div className="stat-row">
-                      <span className="stat-label">Settled Assignments:</span>
-                      <span className="stat-value stat-badge">{balance.settledAssignments}</span>
-                    </div>
-                  </div>
+                ))}
+              </div>
+
+              {/* Carousel arrows — always visible */}
+              <div className="ubc-arrows">
+                <button
+                  className={`ubc-arrow ${canPrev ? '' : 'disabled'}`}
+                  onClick={() => canPrev && setUserCarouselIndex(i => i - 1)}
+                  title="Previous"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="15 18 9 12 15 6"/>
+                  </svg>
+                </button>
+                <div className="ubc-dots">
+                  {Array.from({length: maxIndex + 1}).map((_, i) => (
+                    <button
+                      key={i}
+                      className={`ubc-dot ${i === userCarouselIndex ? 'active' : ''}`}
+                      onClick={() => setUserCarouselIndex(i)}
+                    />
+                  ))}
                 </div>
-              );
-            })}
+                <button
+                  className={`ubc-arrow ${canNext ? '' : 'disabled'}`}
+                  onClick={() => canNext && setUserCarouselIndex(i => i + 1)}
+                  title="Next"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* User's Own Balance Summary */}
       {message && (
@@ -1964,7 +1984,7 @@ function PettyCash() {
                           </td>
                           <td data-label="Status">
                             <span className={`status-badge ${getStatusBadgeClass(groupStatus)}`}>
-                              {groupStatus}
+                              {getStatusDisplay(groupStatus)}
                             </span>
                           </td>
                           <td data-label="Total Assigned"><strong>LKR {formatAmount(totalAssigned)}</strong></td>

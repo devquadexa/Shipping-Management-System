@@ -13,23 +13,27 @@ const billingController = new BillingController(
   container.get('createBill'),
   container.get('getAllBills'),
   container.get('getBillById'),
-  container.get('markBillAsPaid')
+  container.get('markBillAsPaid'),
+  container.get('applyPartialPayment')
 );
 
 // Routes
-router.post('/', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
+router.post('/', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) =>
   billingController.create(req, res)
 );
-
-router.get('/', auth, (req, res) => 
+router.get('/', auth, (req, res) =>
   billingController.getAll(req, res)
 );
-
-router.get('/:id', auth, (req, res) => 
+router.get('/:id', auth, (req, res) =>
   billingController.getById(req, res)
 );
-
-router.patch('/:id/pay', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
+router.patch('/:id/pay', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) =>
+  billingController.markAsPaid(req, res)
+);
+router.patch('/:id/partial-pay', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) =>
+  billingController.partialPayment(req, res)
+);
+router.put('/:id', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) =>
   billingController.markAsPaid(req, res)
 );
 

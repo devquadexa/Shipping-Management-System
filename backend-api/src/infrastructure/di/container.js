@@ -51,6 +51,7 @@ const GetAllBills = require('../../application/use-cases/billing/GetAllBills');
 const GetBillById = require('../../application/use-cases/billing/GetBillById');
 const MarkBillAsPaid = require('../../application/use-cases/billing/MarkBillAsPaid');
 const CheckOverdueInvoices = require('../../application/use-cases/billing/CheckOverdueInvoices');
+const ApplyPartialPayment = require('../../application/use-cases/billing/ApplyPartialPayment');
 
 // Accounting Use Cases
 const GetAccountingDashboard = require('../../application/use-cases/accounting/GetAccountingDashboard');
@@ -80,6 +81,9 @@ const SettleGroupedAssignments = require('../../application/use-cases/pettycasha
 const CreateSubAssignment = require('../../application/use-cases/pettycashassignment/CreateSubAssignment');
 const GetAssignmentsWithChildren = require('../../application/use-cases/pettycashassignment/GetAssignmentsWithChildren');
 const GetAggregatedAssignments = require('../../application/use-cases/pettycashassignment/GetAggregatedAssignments');
+const GetPettyCashReportByDate = require('../../application/use-cases/pettycashassignment/GetPettyCashReportByDate');
+const ExportPettyCashReportPDF = require('../../application/use-cases/pettycashassignment/ExportPettyCashReportPDF');
+const ExportPettyCashReportExcel = require('../../application/use-cases/pettycashassignment/ExportPettyCashReportExcel');
 
 // Office Pay Item Use Cases
 const CreateOfficePayItem = require('../../application/use-cases/officepayitem/CreateOfficePayItem');
@@ -184,8 +188,9 @@ class Container {
     this.dependencies.createBill = new CreateBill(billRepository, jobRepository, customerRepository, pettyCashAssignmentRepository);
     this.dependencies.getAllBills = new GetAllBills(billRepository);
     this.dependencies.getBillById = new GetBillById(billRepository);
-    this.dependencies.markBillAsPaid = new MarkBillAsPaid(billRepository, paymentRepository, jobRepository);
+    this.dependencies.markBillAsPaid = new MarkBillAsPaid(billRepository, paymentRepository, jobRepository, customerRepository);
     this.dependencies.checkOverdueInvoices = new CheckOverdueInvoices(billRepository, jobRepository);
+    this.dependencies.applyPartialPayment = new ApplyPartialPayment(billRepository, paymentRepository, customerRepository, jobRepository);
     
     // Petty Cash use cases
     this.dependencies.createPettyCashEntry = new CreatePettyCashEntry(pettyCashRepository);
@@ -212,6 +217,11 @@ class Container {
     this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository);
     this.dependencies.getAssignmentsWithChildren = new GetAssignmentsWithChildren(pettyCashAssignmentRepository);
     this.dependencies.getAggregatedAssignments = new GetAggregatedAssignments(pettyCashAssignmentRepository);
+    
+    // Petty Cash Report use cases
+    this.dependencies.getPettyCashReportByDate = new GetPettyCashReportByDate(pettyCashAssignmentRepository);
+    this.dependencies.exportPettyCashReportPDF = new ExportPettyCashReportPDF(pettyCashAssignmentRepository);
+    this.dependencies.exportPettyCashReportExcel = new ExportPettyCashReportExcel(pettyCashAssignmentRepository);
     
     // Office Pay Item use cases
     this.dependencies.createOfficePayItem = new CreateOfficePayItem(officePayItemRepository, jobRepository);

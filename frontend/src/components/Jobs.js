@@ -421,6 +421,18 @@ function Jobs() {
            openDate.includes(searchLower);
     
     return statusMatch && searchMatch;
+  }).sort((a, b) => {
+    // Extract numeric part from job ID (e.g., "JOB0001" -> 1)
+    const getJobNumber = (jobId) => {
+      const match = (jobId || '').match(/\d+/);
+      return match ? parseInt(match[0], 10) : 0;
+    };
+    
+    const numA = getJobNumber(a.jobId);
+    const numB = getJobNumber(b.jobId);
+    
+    // Sort in descending order (newest jobs first)
+    return numB - numA;
   });
 
   // Pagination logic
@@ -530,8 +542,8 @@ function Jobs() {
                 <React.Fragment key={job.jobId}>
                   <tr className={expandedRow === job.jobId ? 'expanded' : ''}>
                     <td data-label="Job ID / CUSDEC Number" className="job-cusdec-cell">
-                      {job.cusdecNumber ? (
-                        <span>{job.jobId || '-'} / {job.cusdecNumber}</span>
+                      {job.cusdecNumber && job.cusdecNumber.trim() ? (
+                        <span className="job-cusdec-combined">{job.jobId || '-'} / {formatCusdecNumberForDisplay(job.cusdecNumber)}</span>
                       ) : (
                         <span className="job-id">{job.jobId || '-'}</span>
                       )}
