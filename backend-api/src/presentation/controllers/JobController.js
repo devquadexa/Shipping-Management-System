@@ -34,6 +34,7 @@ class JobController {
         transporter: req.body.transporter || null,
         lcNumber: req.body.lcNumber || null,
         containerNumber: req.body.containerNumber || null,
+        transportDeliveryDate: req.body.transportDeliveryDate || null,
         assignedTo: req.body.assignedTo || null
       };
       
@@ -95,9 +96,14 @@ class JobController {
   async update(req, res) {
     try {
       const jobId = req.params.id;
+      console.log('JobController.update - START');
+      console.log('JobController.update - jobId:', jobId);
+      console.log('JobController.update - req.body:', JSON.stringify(req.body, null, 2));
+      
       const jobData = {
         blNumber: req.body.blNumber || null,
         cusdecNumber: req.body.cusdecNumber || null,
+        cusdecDate: req.body.cusdecDate || null,
         openDate: req.body.openDate || null,
         shipmentCategory: req.body.shipmentCategory,
         chassisNumber: req.body.chassisNumber || null,
@@ -105,11 +111,15 @@ class JobController {
         transporter: req.body.transporter || null,
         lcNumber: req.body.lcNumber || null,
         containerNumber: req.body.containerNumber || null,
-        status: req.body.status || 'Open',
+        transportDeliveryDate: req.body.transportDeliveryDate || null,
+        status: req.body.status,
         assignedTo: req.body.assignedTo || null
       };
       
+      console.log('JobController.update - jobData:', JSON.stringify(jobData, null, 2));
+      
       const job = await this.updateJob.execute(jobId, jobData);
+      console.log('JobController.update - job result:', JSON.stringify(job, null, 2));
       res.json(job);
     } catch (error) {
       console.error('Update job error:', error);
@@ -407,72 +417,6 @@ class JobController {
   // Legacy endpoint support: treat update as adding a new payment entry.
   async updateAdvancePayment(req, res) {
     return this.addAdvancePayment(req, res);
-  }
-
-  async update(req, res) {
-    try {
-      console.log('JobController.update - START');
-      console.log('JobController.update - params:', req.params);
-      console.log('JobController.update - body:', JSON.stringify(req.body, null, 2));
-      console.log('JobController.update - user:', req.user);
-      
-      // Validate job ID
-      if (!req.params.id) {
-        console.log('JobController.update - Missing job ID');
-        return res.status(400).json({ message: 'Job ID is required' });
-      }
-      
-      // Validate request body
-      if (!req.body || Object.keys(req.body).length === 0) {
-        console.log('JobController.update - Empty request body');
-        return res.status(400).json({ message: 'Update data is required' });
-      }
-      
-      const jobData = {
-        blNumber: req.body.blNumber,
-        cusdecNumber: req.body.cusdecNumber,
-        cusdecDate: req.body.cusdecDate,
-        openDate: req.body.openDate,
-        shipmentCategory: req.body.shipmentCategory,
-        chassisNumber: req.body.chassisNumber,
-        lcNumber: req.body.lcNumber,
-        containerNumber: req.body.containerNumber,
-        transporter: req.body.transporter,
-        exporter: req.body.exporter,
-        status: req.body.status
-      };
-      
-      console.log('JobController.update - processed jobData:', JSON.stringify(jobData, null, 2));
-      
-      const job = await this.updateJobUseCase.execute(req.params.id, jobData);
-      console.log('JobController.update - updated job:', JSON.stringify(job, null, 2));
-      console.log('JobController.update - END');
-      res.json(job);
-    } catch (error) {
-      console.error('JobController.update - ERROR:', error);
-      console.error('JobController.update - ERROR stack:', error.stack);
-      
-      // Provide specific error messages based on error type
-      let statusCode = 400;
-      let message = error.message;
-      
-      if (error.message.includes('not found')) {
-        statusCode = 404;
-      } else if (error.message.includes('Database')) {
-        statusCode = 500;
-        message = 'Database error occurred while updating job';
-      } else if (error.message.includes('Invalid date')) {
-        statusCode = 400;
-        message = 'Invalid date format provided';
-      } else if (error.message.includes('required')) {
-        statusCode = 400;
-      }
-      
-      res.status(statusCode).json({ 
-        message: message,
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-    }
   }
 }
 
