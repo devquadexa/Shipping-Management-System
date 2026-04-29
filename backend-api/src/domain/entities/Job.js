@@ -113,7 +113,7 @@ class Job {
   }
 
   updateStatus(newStatus) {
-    const validStatuses = ['Open', 'In Progress', 'Pending Payment', 'Payment Collected', 'Overdue', 'Completed', 'Canceled'];
+    const validStatuses = ['Open', 'In Progress', 'Pending Payment', 'Partially Paid', 'Payment Collected', 'Overdue', 'Completed', 'Canceled'];
     if (!validStatuses.includes(newStatus)) {
       throw new Error(`Invalid status: ${newStatus}`);
     }

@@ -154,13 +154,20 @@ class MSSQLBillRepository extends IBillRepository {
 
   async markAsPaid(billId, paymentDetails = {}) {
     const pool = await this.db();
-    
+
+    // Get current bill to calculate paidAmount
+    const bill = await this.findById(billId);
+    const invoiceTotal = parseFloat(bill?.netTotal || bill?.total || 0);
+
     const request = pool.request()
       .input('billId', this.sql.VarChar, billId)
-      .input('paidDate', this.sql.DateTime, new Date());
-    
-    const updates = ["PaymentStatus = 'Paid'", "paidDate = @paidDate"];
-    
+      .input('paidDate', this.sql.DateTime, paymentDetails.paidDate ? new Date(paymentDetails.paidDate) : new Date())
+      .input('paidAmount', this.sql.Decimal(18, 2), invoiceTotal)
+      .input('remainingAmount', this.sql.Decimal(18, 2), 0);
+
+    const updates = ["PaymentStatus = 'Paid'", "paidDate = @paidDate",
+                     "paidAmount = @paidAmount", "remainingAmount = @remainingAmount"];
+
     if (paymentDetails.paymentMethod) {
       request.input('paymentMethod', this.sql.VarChar, paymentDetails.paymentMethod);
       updates.push('paymentMethod = @paymentMethod');
@@ -181,9 +188,46 @@ class MSSQLBillRepository extends IBillRepository {
       request.input('bankName', this.sql.VarChar, paymentDetails.bankName);
       updates.push('bankName = @bankName');
     }
-    
+
     await request.query(`UPDATE Bills SET ${updates.join(', ')} WHERE BillId = @billId`);
-    
+    return await this.findById(billId);
+  }
+
+  async applyPartialPayment(billId, paymentAmount, paymentDetails = {}) {
+    const pool = await this.db();
+
+    // Get current bill
+    const bill = await this.findById(billId);
+    if (!bill) throw new Error('Bill not found');
+
+    const invoiceTotal = parseFloat(bill.netTotal || bill.total || 0);
+    const currentPaid = parseFloat(bill.paidAmount) || 0;
+    const newPaidAmount = currentPaid + parseFloat(paymentAmount);
+    const newRemaining = Math.max(0, invoiceTotal - newPaidAmount);
+    const newStatus = newRemaining <= 0 ? 'Paid' : 'Partially Paid';
+
+    const request = pool.request()
+      .input('billId', this.sql.VarChar, billId)
+      .input('paidAmount', this.sql.Decimal(18, 2), newPaidAmount)
+      .input('remainingAmount', this.sql.Decimal(18, 2), newRemaining)
+      .input('paymentStatus', this.sql.VarChar, newStatus);
+
+    // Only update the running totals and status on the Bills row.
+    // Payment method details (paymentMethod, chequeNumber, bankName, etc.) are
+    // stored per-payment in the Payments table — do NOT overwrite them here so
+    // that a second payment never erases the first payment's details on the bill.
+    const updates = [
+      'paidAmount = @paidAmount',
+      'remainingAmount = @remainingAmount',
+      'PaymentStatus = @paymentStatus'
+    ];
+
+    if (newStatus === 'Paid' || newStatus === 'Partially Paid') {
+      request.input('paidDate', this.sql.DateTime, paymentDetails.paidDate ? new Date(paymentDetails.paidDate) : new Date());
+      updates.push('paidDate = @paidDate');
+    }
+
+    await request.query(`UPDATE Bills SET ${updates.join(', ')} WHERE BillId = @billId`);
     return await this.findById(billId);
   }
 
@@ -230,7 +274,9 @@ class MSSQLBillRepository extends IBillRepository {
       chequeNumber: row.chequeNumber,
       chequeDate: row.chequeDate,
       chequeAmount: row.chequeAmount,
-      bankName: row.bankName
+      bankName: row.bankName,
+      paidAmount: row.paidAmount || 0,
+      remainingAmount: row.remainingAmount !== undefined ? row.remainingAmount : (row.netTotal || row.total || 0)
     });
   }
 }

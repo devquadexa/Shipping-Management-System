@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { customerService } from '../api/services/customerService';
+import Pagination from './Pagination';
 import '../styles/Customers.css';
 import API_BASE from '../api/config';
 
@@ -44,6 +45,8 @@ function Customers() {
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
 
   // Check if user is Admin, Super Admin, Manager, or Office Executive
   const isAdminOrSuperAdmin = () => {
@@ -572,6 +575,27 @@ function Customers() {
     (customer.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCustomers.length / recordsPerPage);
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleRecordsPerPageChange = (newRecordsPerPage) => {
+    setRecordsPerPage(newRecordsPerPage);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="container customers-page">
       <div className="page-header">
@@ -630,7 +654,7 @@ function Customers() {
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map(customer => (
+                {paginatedCustomers.map(customer => (
                   <React.Fragment key={customer.customerId}>
                     <tr className={expandedRow === customer.customerId ? 'expanded' : ''}>
                       <td data-label="Customer ID"><strong className="customer-id">{customer.customerId}</strong></td>
@@ -783,6 +807,17 @@ function Customers() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {filteredCustomers.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalRecords={filteredCustomers.length}
+            recordsPerPage={recordsPerPage}
+            onPageChange={handlePageChange}
+            onRecordsPerPageChange={handleRecordsPerPageChange}
+          />
         )}
       </div>
 

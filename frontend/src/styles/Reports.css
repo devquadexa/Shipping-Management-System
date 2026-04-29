@@ -1,0 +1,321 @@
+/* ═══════════════════════════════════════════════════════════
+   Reports Hub — Professional UI
+   Super Shine Cargo Service
+═══════════════════════════════════════════════════════════ */
+
+.rpt-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem;
+}
+
+/* ── Page Header ────────────────────────────────────────── */
+.rpt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  gap: 1rem;
+}
+
+.rpt-title {
+  margin: 0 0 0.4rem 0;
+  color: #101036;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.rpt-subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.rpt-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.rpt-available-count {
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+}
+
+.rpt-total-count {
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+}
+
+/* ── Section ────────────────────────────────────────────── */
+.rpt-section {
+  margin-bottom: 3rem;
+}
+
+.rpt-section-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.rpt-section-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.rpt-section-line {
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+/* ── Grid ───────────────────────────────────────────────── */
+.rpt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+/* ── Card ───────────────────────────────────────────────── */
+.rpt-card {
+  position: relative;
+  background: white;
+  border-radius: 14px;
+  padding: 1.75rem;
+  border: 2px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.rpt-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 14px 14px 0 0;
+}
+
+/* Color accent lines */
+.rpt-card-blue::before   { background: #3b82f6; }
+.rpt-card-green::before  { background: #10b981; }
+.rpt-card-amber::before  { background: #f59e0b; }
+.rpt-card-purple::before { background: #8b5cf6; }
+.rpt-card-teal::before   { background: #0d9488; }
+.rpt-card-red::before    { background: #ef4444; }
+
+.rpt-card-available {
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.rpt-card-available:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  transform: translateY(-3px);
+}
+
+.rpt-card-available:hover .rpt-card-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.rpt-card-soon {
+  opacity: 0.6;
+  cursor: default;
+  background: #fafafa;
+}
+
+/* ── Badge ──────────────────────────────────────────────── */
+.rpt-badge {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+}
+
+.rpt-badge-available {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.rpt-badge-soon {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+/* ── Icon ───────────────────────────────────────────────── */
+.rpt-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rpt-icon-blue   { background: #dbeafe; color: #3b82f6; }
+.rpt-icon-green  { background: #d1fae5; color: #10b981; }
+.rpt-icon-amber  { background: #fef3c7; color: #d97706; }
+.rpt-icon-purple { background: #ede9fe; color: #8b5cf6; }
+.rpt-icon-teal   { background: #ccfbf1; color: #0d9488; }
+.rpt-icon-red    { background: #fee2e2; color: #ef4444; }
+
+/* ── Card body ──────────────────────────────────────────── */
+.rpt-card-body {
+  flex: 1;
+}
+
+.rpt-card-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.rpt-card-desc {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+/* ── Tags ───────────────────────────────────────────────── */
+.rpt-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.rpt-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+/* ── Arrow ──────────────────────────────────────────────── */
+.rpt-card-arrow {
+  display: flex;
+  justify-content: flex-end;
+  color: #9ca3af;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: all 0.2s ease;
+}
+
+/* ── Access denied ──────────────────────────────────────── */
+.rpt-access-denied {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 2rem;
+}
+
+.rpt-access-box {
+  text-align: center;
+  background: white;
+  padding: 3rem;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  max-width: 400px;
+}
+
+.rpt-access-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.rpt-access-box h2 {
+  margin: 0 0 0.5rem 0;
+  color: #101036;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.rpt-access-box p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .rpt-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .rpt-container {
+    padding: 1.5rem 1rem;
+  }
+
+  .rpt-title {
+    font-size: 1.5rem;
+  }
+
+  .rpt-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .rpt-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .rpt-card {
+    padding: 1.25rem;
+  }
+
+  .rpt-card-icon {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  .rpt-container {
+    padding: 1rem 0.75rem;
+  }
+
+  .rpt-title {
+    font-size: 1.25rem;
+  }
+}

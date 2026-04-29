@@ -47,4 +47,12 @@ export const billingService = {
     const response = await apiClient.patch(`/billing/${billId}/pay`, paymentDetails);
     return response.data;
   },
+
+  applyPartialPayment: async (billId, paymentAmount, paymentDetails) => {
+    const response = await apiClient.patch(`/billing/${billId}/partial-pay`, {
+      paymentAmount,
+      ...paymentDetails
+    });
+    return response.data;
+  },
 };
