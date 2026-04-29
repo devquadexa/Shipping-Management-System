@@ -51,6 +51,10 @@ function Transporters() {
   const [chequeAmount, setChequeAmount] = useState('');
   const [bankName, setBankName] = useState('Commercial Bank');
   const [expandedPaymentDetails, setExpandedPaymentDetails] = useState(null);
+  const [dateRangeFilter, setDateRangeFilter] = useState({
+    startDate: '',
+    endDate: ''
+  });
 
   const canViewTransporters = user && (
     user.role === 'Admin' ||
@@ -477,6 +481,27 @@ function Transporters() {
     return latestBill.paymentStatus || 'Not Billed';
   };
 
+  const getBillingAmount = (jobId) => {
+    if (!jobId) return 0;
+
+    // Find the job with this ID
+    const job = jobs.find(j => j.jobId === jobId);
+    if (!job || !job.payItems) return 0;
+
+    // Get only transporter cost billing amount from job's pay items
+    const payItems = Array.isArray(job.payItems) ? job.payItems : [];
+    const transporterCostItems = payItems.filter((item) => {
+      const label = (item?.description || item?.name || '').toLowerCase().trim();
+      return label === 'transporter cost';
+    });
+
+    if (!transporterCostItems.length) return 0;
+
+    return transporterCostItems.reduce((sum, item) => {
+      return sum + (parseFloat(item.billingAmount || item.amount || 0) || 0);
+    }, 0);
+  };
+
   const getPaymentStatusClassName = (status) => {
     return String(status || 'Not Billed').toLowerCase().replace(/\s+/g, '-');
   };
@@ -494,7 +519,7 @@ function Transporters() {
     if (!transporterCostItems.length) return 0;
 
     return transporterCostItems.reduce((sum, item) => {
-      return sum + (parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0);
+      return sum + (parseFloat(item.actualCost || item.amount || 0) || 0);
     }, 0);
   };
 
@@ -899,50 +924,114 @@ function Transporters() {
                             )}
 
                             <div className="detail-section assigned-jobs-section">
-                              <h4 className="section-title">Assigned Jobs ({assignedJobs.length})</h4>
+                              <div className="settlement-items-header">
+                                <span className="settlement-items-title">Assigned Jobs</span>
+                                <span className="settlement-items-count">{assignedJobs.length} job{assignedJobs.length !== 1 ? 's' : ''}</span>
+                              </div>
                               {assignedJobs.length === 0 ? (
-                                <div className="detail-value-block">No jobs assigned to this transporter</div>
+                                <div className="no-settlement-items">
+                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                  </svg>
+                                  <p>No jobs assigned to this transporter</p>
+                                </div>
                               ) : (
-                                <div className="assigned-jobs-table-wrapper">
-                                  <table className="assigned-jobs-table">
-                                    <colgroup>
-                                      <col style={{ width: '20%' }} />
-                                      <col style={{ width: '22%' }} />
-                                      <col style={{ width: '20%' }} />
-                                      <col style={{ width: '18%' }} />
-                                      <col style={{ width: '20%' }} />
-                                    </colgroup>
-                                    <thead>
-                                      <tr>
-                                        <th>Job ID</th>
-                                        <th>Category</th>
-                                        <th>Transporter Cost</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {assignedJobs.map((job) => (
-                                        <React.Fragment key={job.jobId}>
-                                          <tr>
-                                          <td>
+                                <>
+                                  <div className="date-range-filter">
+                                    <div className="filter-group">
+                                      <label>From Date:</label>
+                                      <input
+                                        type="date"
+                                        value={dateRangeFilter.startDate}
+                                        onChange={(e) => setDateRangeFilter({...dateRangeFilter, startDate: e.target.value})}
+                                        className="filter-input"
+                                      />
+                                    </div>
+                                    <div className="filter-group">
+                                      <label>To Date:</label>
+                                      <input
+                                        type="date"
+                                        value={dateRangeFilter.endDate}
+                                        onChange={(e) => setDateRangeFilter({...dateRangeFilter, endDate: e.target.value})}
+                                        className="filter-input"
+                                      />
+                                    </div>
+                                    {(dateRangeFilter.startDate || dateRangeFilter.endDate) && (
+                                      <button
+                                        onClick={() => setDateRangeFilter({startDate: '', endDate: ''})}
+                                        className="btn-clear-filter"
+                                      >
+                                        Clear Filter
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="settlement-review-table">
+                                  <div className="settlement-table-header">
+                                    <div className="settlement-header-cell settlement-num-col">#</div>
+                                    <div className="settlement-header-cell settlement-name-col">Job ID</div>
+                                    <div className="settlement-header-cell settlement-type-col">Category</div>
+                                    <div className="settlement-header-cell settlement-type-col">Delivery Date</div>
+                                    <div className="settlement-header-cell settlement-bill-col">Cost</div>
+                                    <div className="settlement-header-cell settlement-bill-col">Billing Amount</div>
+                                    <div className="settlement-header-cell settlement-amount-col">Status</div>
+                                    <div className="settlement-header-cell settlement-actions-col">Action</div>
+                                  </div>
+                                  <div className="settlement-table-body">
+                                    {assignedJobs.filter((job) => {
+                                      if (!dateRangeFilter.startDate && !dateRangeFilter.endDate) {
+                                        return true;
+                                      }
+                                      
+                                      const jobDate = job.transportDeliveryDate ? new Date(job.transportDeliveryDate) : null;
+                                      if (!jobDate) return false;
+                                      
+                                      if (dateRangeFilter.startDate) {
+                                        const startDate = new Date(dateRangeFilter.startDate);
+                                        if (jobDate < startDate) return false;
+                                      }
+                                      
+                                      if (dateRangeFilter.endDate) {
+                                        const endDate = new Date(dateRangeFilter.endDate);
+                                        endDate.setHours(23, 59, 59, 999);
+                                        if (jobDate > endDate) return false;
+                                      }
+                                      
+                                      return true;
+                                    }).map((job, idx) => (
+                                      <React.Fragment key={job.jobId}>
+                                        <div className="settlement-table-row">
+                                          <div className="settlement-table-cell settlement-num-col settlement-num">{idx + 1}</div>
+                                          <div className="settlement-table-cell settlement-name-col">
                                             <span className="job-id-cell">
                                               {job.jobId || '-'}{job.cusdecNumber && ` / ${job.cusdecNumber}`}
                                             </span>
-                                          </td>
-                                          <td>{job.shipmentCategory || '-'}</td>
-                                          <td>
+                                          </div>
+                                          <div className="settlement-table-cell settlement-type-col">
+                                            {job.shipmentCategory || '-'}
+                                          </div>
+                                          <div className="settlement-table-cell settlement-type-col">
+                                            {job.transportDeliveryDate ? new Date(job.transportDeliveryDate).toLocaleDateString() : '-'}
+                                          </div>
+                                          <div className="settlement-table-cell settlement-bill-col">
                                             {getTransporterCostAmount(job) > 0 ? (
-                                              <div className="transporter-cost-cell">
-                                                <span className="transporter-cost-amount">
-                                                  LKR {formatAmount(getTransporterCostAmount(job))}
-                                                </span>
-                                              </div>
+                                              <span className="transporter-cost-amount">
+                                                LKR {formatAmount(getTransporterCostAmount(job))}
+                                              </span>
                                             ) : (
                                               <span className="transporter-no-cost">-</span>
                                             )}
-                                          </td>
-                                          <td>
+                                          </div>
+                                          <div className="settlement-table-cell settlement-bill-col">
+                                            {getBillingAmount(job.jobId) > 0 ? (
+                                              <span className="billing-amount">
+                                                LKR {formatAmount(getBillingAmount(job.jobId))}
+                                              </span>
+                                            ) : (
+                                              <span className="transporter-no-cost">-</span>
+                                            )}
+                                          </div>
+                                          <div className="settlement-table-cell settlement-amount-col">
                                             {(() => {
                                               const paymentStatus = getJobPaymentStatus(job.jobId);
                                               return (
@@ -951,48 +1040,45 @@ function Transporters() {
                                                 </span>
                                               );
                                             })()}
-                                          </td>
-                                          <td>
-                                            <div className="action-cell-wrapper">
-                                              <div className="action-buttons">
-                                                {getTransporterCostAmount(job) > 0 ? (
-                                                  isTransporterCostPaid(job) ? (
-                                                    <span className="transporter-paid-badge">
-                                                      Paid{getPaidByLabel(job) ? ` by ${getPaidByLabel(job)}` : ''}
-                                                    </span>
-                                                  ) : canPayTransporterCosts ? (
-                                                    <button
-                                                      type="button"
-                                                      className="btn-action btn-pay-amount"
-                                                      onClick={() => openPaymentModal(job)}
-                                                    >
-                                                      Pay the amount
-                                                    </button>
-                                                  ) : (
-                                                    <span className="transporter-unpaid-badge">Unpaid</span>
-                                                  )
+                                          </div>
+                                          <div className="settlement-table-cell settlement-actions-col">
+                                            <div className="inline-action-btns">
+                                              {getTransporterCostAmount(job) > 0 ? (
+                                                isTransporterCostPaid(job) ? (
+                                                  <span className="transporter-paid-badge">Paid</span>
+                                                ) : canPayTransporterCosts ? (
+                                                  <button
+                                                    type="button"
+                                                    className="inline-btn-edit"
+                                                    onClick={() => openPaymentModal(job)}
+                                                    title="Pay the amount"
+                                                  >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                  </button>
                                                 ) : (
-                                                  <span className="transporter-no-cost">-</span>
-                                                )}
-                                              </div>
+                                                  <span className="transporter-unpaid-badge">Unpaid</span>
+                                                )
+                                              ) : (
+                                                <span className="transporter-no-cost">-</span>
+                                              )}
                                               {getTransporterCostAmount(job) > 0 && (
                                                 <button
                                                   type="button"
-                                                  className="expand-btn-middle"
+                                                  className="inline-btn-delete"
                                                   onClick={() => setExpandedPaymentDetails(expandedPaymentDetails === job.jobId ? null : job.jobId)}
                                                   title={expandedPaymentDetails === job.jobId ? "Hide details" : "View details"}
                                                 >
-                                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                     <polyline points={expandedPaymentDetails === job.jobId ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
                                                   </svg>
                                                 </button>
                                               )}
                                             </div>
-                                          </td>
-                                        </tr>
+                                          </div>
+                                        </div>
                                         {expandedPaymentDetails === job.jobId && (
-                                          <tr className="payment-details-row">
-                                            <td colSpan="5">
+                                          <div className="settlement-table-row payment-details-expanded-row">
+                                            <div className="settlement-table-cell" style={{gridColumn: '1 / -1'}}>
                                               <div className="payment-details-expanded">
                                                 <div className="detail-card">
                                                   <div className="detail-card-label">AMOUNT</div>
@@ -1033,14 +1119,27 @@ function Transporters() {
                                                   </>
                                                 )}
                                               </div>
-                                            </td>
-                                          </tr>
+                                            </div>
+                                          </div>
                                         )}
-                                        </React.Fragment>
-                                      ))}
-                                    </tbody>
-                                  </table>
+                                      </React.Fragment>
+                                    ))}
+                                    <div className="settlement-table-row settlement-total-row">
+                                      <div className="settlement-table-cell settlement-num-col"></div>
+                                      <div className="settlement-table-cell settlement-name-col"><strong>Total</strong></div>
+                                      <div className="settlement-table-cell settlement-type-col"></div>
+                                      <div className="settlement-table-cell settlement-bill-col settlement-amount-value">
+                                        <strong>LKR {formatAmount(assignedJobs.reduce((sum, job) => sum + getTransporterCostAmount(job), 0))}</strong>
+                                      </div>
+                                      <div className="settlement-table-cell settlement-bill-col settlement-amount-value">
+                                        <strong>LKR {formatAmount(assignedJobs.reduce((sum, job) => sum + getBillingAmount(job.jobId), 0))}</strong>
+                                      </div>
+                                      <div className="settlement-table-cell settlement-amount-col"></div>
+                                      <div className="settlement-table-cell settlement-actions-col"></div>
+                                    </div>
+                                  </div>
                                 </div>
+                                </>
                               )}
                             </div>
                           </div>

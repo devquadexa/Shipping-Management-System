@@ -82,6 +82,9 @@ class MSSQLJobRepository extends IJobRepository {
       
       IF COL_LENGTH('Jobs', 'metadata') IS NULL
         ALTER TABLE Jobs ADD metadata NVARCHAR(MAX) NULL;
+      
+      IF COL_LENGTH('Jobs', 'transportDeliveryDate') IS NULL
+        ALTER TABLE Jobs ADD transportDeliveryDate DATETIME NULL;
 
       IF OBJECT_ID('JobAdvancePayments', 'U') IS NULL
       BEGIN
@@ -121,12 +124,13 @@ class MSSQLJobRepository extends IJobRepository {
       .input('transporter', this.sql.VarChar, job.transporter)
       .input('lcNumber', this.sql.VarChar, job.lcNumber)
       .input('containerNumber', this.sql.VarChar, job.containerNumber)
+      .input('transportDeliveryDate', this.sql.Date, job.transportDeliveryDate)
       .input('status', this.sql.VarChar, job.status)
       .input('assignedTo', this.sql.VarChar, job.assignedTo)
       .input('createdDate', this.sql.DateTime, job.createdDate)
       .query(`
-        INSERT INTO Jobs (JobId, CustomerId, BLNumber, CUSDECNumber, CUSDECDate, OpenDate, ShipmentCategory, chassisNumber, Exporter, Transporter, LCNumber, ContainerNumber, Status, AssignedTo, CreatedDate)
-        VALUES (@jobId, @customerId, @blNumber, @cusdecNumber, @cusdecDate, @openDate, @shipmentCategory, @chassisNumber, @exporter, @transporter, @lcNumber, @containerNumber, @status, @assignedTo, @createdDate)
+        INSERT INTO Jobs (JobId, CustomerId, BLNumber, CUSDECNumber, CUSDECDate, OpenDate, ShipmentCategory, chassisNumber, Exporter, Transporter, LCNumber, ContainerNumber, transportDeliveryDate, Status, AssignedTo, CreatedDate)
+        VALUES (@jobId, @customerId, @blNumber, @cusdecNumber, @cusdecDate, @openDate, @shipmentCategory, @chassisNumber, @exporter, @transporter, @lcNumber, @containerNumber, @transportDeliveryDate, @status, @assignedTo, @createdDate)
       `);
     
     console.log('MSSQLJobRepository.create - job created successfully');
@@ -229,13 +233,14 @@ class MSSQLJobRepository extends IJobRepository {
       .input('transporter', this.sql.VarChar, job.transporter)
       .input('lcNumber', this.sql.VarChar, job.lcNumber)
       .input('containerNumber', this.sql.VarChar, job.containerNumber)
+      .input('transportDeliveryDate', this.sql.Date, job.transportDeliveryDate)
       .input('status', this.sql.VarChar, job.status)
       .input('assignedTo', this.sql.VarChar, job.assignedTo)
       .query(`
         UPDATE Jobs 
         SET BLNumber = @blNumber, CUSDECNumber = @cusdecNumber, CUSDECDate = @cusdecDate, OpenDate = @openDate,
           ShipmentCategory = @shipmentCategory, chassisNumber = @chassisNumber, Exporter = @exporter, Transporter = @transporter,
-            LCNumber = @lcNumber, ContainerNumber = @containerNumber, Status = @status, AssignedTo = @assignedTo
+            LCNumber = @lcNumber, ContainerNumber = @containerNumber, transportDeliveryDate = @transportDeliveryDate, Status = @status, AssignedTo = @assignedTo
         WHERE JobId = @jobId
       `);
     
@@ -943,6 +948,7 @@ class MSSQLJobRepository extends IJobRepository {
       transporter: row.Transporter,
       lcNumber: row.LCNumber,
       containerNumber: row.ContainerNumber,
+      transportDeliveryDate: row.transportDeliveryDate || row.TransportDeliveryDate,
       status: row.Status || 'Open',
       assignedTo: row.AssignedTo, // Legacy field
       assignedUsers: assignedUsers, // New field with user details
