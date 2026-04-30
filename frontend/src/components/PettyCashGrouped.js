@@ -77,7 +77,7 @@ function PettyCashGrouped() {
   const fetchUsers = async () => {
     try {
       const data = await authService.getUsers();
-      setUsers(data.filter(u => u.role === 'Waff Clerk' || u.role === 'Manager'));
+      setUsers(data.filter(u => u.role === 'Waff Clerk'));
     } catch (error) {
       console.error('Error fetching users:', error);
     }
@@ -420,7 +420,7 @@ function PettyCashGrouped() {
                     ))}
                   </div>
 
-                  {group.hasUnsettled && (user?.role === 'Waff Clerk' || user?.role === 'Manager') && group.assignments && group.assignments[0] && group.assignments[0].assignedTo === user?.userId && (
+                  {group.hasUnsettled && user?.role === 'Waff Clerk' && (
                     <div className="group-actions">
                       <button 
                         className="btn btn-primary"

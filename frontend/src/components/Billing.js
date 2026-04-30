@@ -5,6 +5,8 @@ import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
 import { transporterService } from '../api/services/transporterService';
 import API_BASE from '../api/config';
+import apiClient from '../api/client';
+import Pagination from './Pagination';
 import '../styles/Billing.css';
 
 function Billing() {
@@ -20,6 +22,92 @@ function Billing() {
 
   const isVehicleShipmentCategory = (category) => {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
+  };
+
+  const getTransporterCostItem = () => ({
+    name: 'transporter cost',
+    actualCost: '',
+    billingAmount: '',
+    sameAmount: false,
+    hasBill: false
+  });
+
+  const getBlankPayItem = () => ({
+    name: '',
+    actualCost: '',
+    billingAmount: '',
+    sameAmount: false,
+    hasBill: false
+  });
+
+  const hasTransporterCostItem = (items) => {
+    return Array.isArray(items) && items.some(item => {
+      const label = (item?.name || item?.description || '').toLowerCase().trim();
+      return label === 'transporter cost';
+    });
+  };
+
+  const isTransporterCostLabel = (value) => {
+    return String(value || '').toLowerCase().trim() === 'transporter cost';
+  };
+
+  const mergeTransporterCostItems = (items) => {
+    if (!Array.isArray(items) || items.length === 0) {
+      return [];
+    }
+
+    const merged = [];
+    let transporterAccumulator = null;
+
+    items.forEach((item) => {
+      const description = item.description || item.name || '';
+      if (!isTransporterCostLabel(description)) {
+        merged.push(item);
+        return;
+      }
+
+      if (!transporterAccumulator) {
+        transporterAccumulator = {
+          ...item,
+          description: 'transporter cost',
+          amount: parseFloat(item.amount || item.actualCost || 0) || 0,
+          actualCost: parseFloat(item.actualCost || item.amount || 0) || 0,
+          billingAmount: parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0
+        };
+        return;
+      }
+
+      transporterAccumulator.amount += parseFloat(item.amount || item.actualCost || 0) || 0;
+      transporterAccumulator.actualCost += parseFloat(item.actualCost || item.amount || 0) || 0;
+      transporterAccumulator.billingAmount += parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0;
+    });
+
+    if (transporterAccumulator) {
+      merged.push(transporterAccumulator);
+    }
+
+    return merged;
+  };
+
+  const ensureFclTransporterCost = (items, shipmentCategory) => {
+    const normalizedItems = Array.isArray(items) ? [...items] : [];
+    if (shipmentCategory !== 'FCL') return normalizedItems;
+
+    const fclItems = normalizedItems.filter(item => {
+      const label = (item?.name || item?.description || '').trim();
+      const hasAmount = item?.actualCost || item?.billingAmount || item?.amount;
+      return Boolean(label || hasAmount);
+    });
+
+    if (!hasTransporterCostItem(fclItems)) {
+      fclItems.push(getTransporterCostItem());
+    }
+
+    return fclItems;
+  };
+
+  const getDefaultPayItemsForCategory = (shipmentCategory) => {
+    return ensureFclTransporterCost([], shipmentCategory);
   };
 
   const formatDateDDMMYYYY = (dateValue) => {
@@ -59,7 +147,7 @@ function Billing() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [message, setMessage] = useState('');
   const [showPayItemsRow, setShowPayItemsRow] = useState(false);
-  const [payItems, setPayItems] = useState([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+  const [payItems, setPayItems] = useState([]);
   const [loadingSettlement, setLoadingSettlement] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
@@ -78,6 +166,15 @@ function Billing() {
   const [chequeDate, setChequeDate] = useState('');
   const [chequeAmount, setChequeAmount] = useState('');
   const [bankName, setBankName] = useState('Commercial Bank');
+  const [chequeAutoFilled, setChequeAutoFilled] = useState(false);
+  const [chequeAutoFillData, setChequeAutoFillData] = useState(null);
+  const [chequeType, setChequeType] = useState('new'); // 'new' | 'existing'
+  const [existingCheques, setExistingCheques] = useState([]);
+  const [loadingExistingCheques, setLoadingExistingCheques] = useState(false);
+  const [paymentMode, setPaymentMode] = useState('full'); // 'full' | 'partial'
+  const [partialPaymentAmount, setPartialPaymentAmount] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
 
   useEffect(() => {
     fetchBills();
@@ -89,7 +186,30 @@ function Billing() {
   const fetchBills = async () => {
     try {
       const data = await billingService.getBills();
-      setBills(data);
+      
+      // Fetch payment records for each bill
+      const billsWithPayments = await Promise.all(
+        data.map(async (bill) => {
+          try {
+            const paymentRecords = await apiClient.get(`/payments/bill/${bill.billId}`);
+            // Ensure paymentRecords is always an array
+            const records = Array.isArray(paymentRecords.data) ? paymentRecords.data : [];
+            return {
+              ...bill,
+              paymentRecords: records
+            };
+          } catch (error) {
+            console.warn(`Could not fetch payment records for bill ${bill.billId}:`, error);
+            // Always return an empty array, never undefined or null
+            return {
+              ...bill,
+              paymentRecords: []
+            };
+          }
+        })
+      );
+      
+      setBills(billsWithPayments);
     } catch (error) {
       console.error('Error fetching bills:', error);
     }
@@ -155,7 +275,7 @@ function Billing() {
   const handleJobSelect = async (jobId) => {
     if (!jobId) {
       setSelectedJob(null);
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false, paidBy: '', paidByName: '' }]);
+      setPayItems([]);
       setShowPayItemsRow(false);
       return;
     }
@@ -279,12 +399,14 @@ function Billing() {
             });
           }
         });
+        mergedPayItems = ensureFclTransporterCost(mergedPayItems, job.shipmentCategory);
         setSelectedJob({ ...job, payItems: mergedPayItems });
         setShowPayItemsRow(false);
         setMessage(`📋 Job has ${mergedPayItems.length} pay items. Use "+ Add More Items" to add additional items.`);
         setTimeout(() => setMessage(''), 5000);
       } else if (allPayItems.length > 0) {
-        setPayItems(allPayItems);
+        const payItemsWithFclItem = ensureFclTransporterCost(allPayItems, job.shipmentCategory);
+        setPayItems(payItemsWithFclItem);
         setShowPayItemsRow(true);
         
         const officeItemsCount = allPayItems.filter(item => item.isOfficePayItem).length;
@@ -305,8 +427,11 @@ function Billing() {
           setTimeout(() => setMessage(''), 3000);
         } else {
           loadPayItemTemplates(job);
+          return;
         }
-        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false, paidBy: '', paidByName: '' }]);
+        const defaultPayItems = getDefaultPayItemsForCategory(job?.shipmentCategory);
+        setPayItems(defaultPayItems);
+        setShowPayItemsRow(defaultPayItems.length > 0);
       }
     } catch (error) {
       console.error('Error fetching job:', error);
@@ -339,31 +464,58 @@ function Billing() {
               sameAmount: false,
               hasBill: false
             }));
+
+            const payItemsWithFclItem = ensureFclTransporterCost(loadedPayItems, job.shipmentCategory);
             
-            setPayItems(loadedPayItems);
+            setPayItems(payItemsWithFclItem);
             setShowPayItemsRow(true);
-            setMessage(`Loaded ${templates.length} default pay items for ${job.shipmentCategory}`);
+            setMessage(`Loaded ${payItemsWithFclItem.length} default pay items for ${job.shipmentCategory}`);
             setTimeout(() => setMessage(''), 3000);
           } else {
-            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+            const defaultPayItems = getDefaultPayItemsForCategory(job.shipmentCategory);
+            setPayItems(defaultPayItems);
+            setShowPayItemsRow(defaultPayItems.length > 0);
           }
+        } else {
+          const defaultPayItems = getDefaultPayItemsForCategory(job.shipmentCategory);
+          setPayItems(defaultPayItems);
+          setShowPayItemsRow(defaultPayItems.length > 0);
         }
       } catch (error) {
         console.error('Error loading pay item templates:', error);
-        setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+        const defaultPayItems = getDefaultPayItemsForCategory(job.shipmentCategory);
+        setPayItems(defaultPayItems);
+        setShowPayItemsRow(defaultPayItems.length > 0);
       }
     } else {
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+      setPayItems(getDefaultPayItemsForCategory(job?.shipmentCategory));
     }
   };
 
   const addPayItemRow = () => {
-    setPayItems([...payItems, { name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+    setPayItems([...payItems, getBlankPayItem()]);
+  };
+
+  const openPayItemsEditor = () => {
+    setShowPayItemsRow(true);
+    if (!Array.isArray(payItems) || payItems.length === 0) {
+      setPayItems([getBlankPayItem()]);
+    }
+  };
+
+  const addTransporterCostRow = () => {
+    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
+    setShowPayItemsRow(true);
+  };
+
+  const addTransporterCostFromHeader = () => {
+    setShowPayItemsRow(true);
+    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
   };
 
   const removePayItemRow = (index) => {
     const newPayItems = payItems.filter((_, i) => i !== index);
-    setPayItems(newPayItems.length > 0 ? newPayItems : [{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+    setPayItems(newPayItems.length > 0 ? newPayItems : [getBlankPayItem()]);
   };
 
   const handlePayItemChange = (index, field, value) => {
@@ -463,17 +615,33 @@ function Billing() {
       
       // Combine existing and new pay items
       const allPayItemsData = [...existingPayItems, ...newPayItemsData];
+
+      const transporterCostCount = allPayItemsData.filter(item =>
+        isTransporterCostLabel(item.description || item.name)
+      ).length;
+
+      let finalPayItemsData = allPayItemsData;
+      if (transporterCostCount > 1) {
+        const shouldMergeTransporterCost = window.confirm(
+          'Transporter cost is already added.\n\nPress OK to merge with the existing transporter cost amount.\nPress Cancel to keep it as a separate line item.'
+        );
+
+        if (shouldMergeTransporterCost) {
+          finalPayItemsData = mergeTransporterCostItems(allPayItemsData);
+        }
+      }
       
       console.log('New pay items to add:', newPayItemsData);
       console.log('Combined pay items (existing + new):', allPayItemsData);
+      console.log('Final pay items to save:', finalPayItemsData);
       
       // Save combined pay items to the job
-      await jobService.replacePayItems(selectedJob.jobId, allPayItemsData);
+      await jobService.replacePayItems(selectedJob.jobId, finalPayItemsData);
       console.log('✓ All pay items saved successfully');
 
       const isAddingToExisting = existingPayItems.length > 0;
       const addedCount = newPayItemsData.length;
-      const totalCount = allPayItemsData.length;
+      const totalCount = finalPayItemsData.length;
       
       if (isAddingToExisting) {
         setMessage(`✓ Added ${addedCount} new pay item(s) successfully! Total: ${totalCount} items. Review below and generate invoice.`);
@@ -529,7 +697,7 @@ function Billing() {
       }
       
       // Reset the pay items form
-      setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+      setPayItems([]);
       
       setTimeout(() => setMessage(''), 5000);
       console.log('=== SAVE PAY ITEMS END ===');
@@ -753,6 +921,9 @@ function Billing() {
     ) {
       missingFields.push('Chassis Number');
     }
+    if (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) {
+      missingFields.push('Transport Delivery Date');
+    }
     console.log('generateBill - missingFields:', missingFields);
     
     if (missingFields.length > 0) {
@@ -848,21 +1019,122 @@ function Billing() {
   };
 
   const markAsPaid = async (billId) => {
-    // Open payment modal instead of directly marking as paid
     const bill = bills.find(b => b.billId === billId);
     setSelectedBillForPayment(bill);
     setShowPaymentModal(true);
-    
-    // Reset payment form
     setPaymentMethod('Cash');
     setChequeNumber('');
     setChequeDate('');
     setChequeAmount('');
     setBankName('Commercial Bank');
+    setChequeAutoFilled(false);
+    setChequeAutoFillData(null);
+    setChequeType('new');
+    setExistingCheques([]);
+    setPaymentMode('full');
+    setPartialPaymentAmount('');
+  };
+
+  // Load existing cheques with balance for this customer
+  const loadExistingCheques = async (customerId) => {
+    if (!customerId) return;
+    try {
+      setLoadingExistingCheques(true);
+      const res = await apiClient.get(`/payments/customer/${customerId}/cheques`);
+      const data = res.data;
+      // Guard: ensure it's always an array regardless of what backend returns
+      setExistingCheques(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('Could not load existing cheques:', err?.response?.status);
+      setExistingCheques([]);
+    } finally {
+      setLoadingExistingCheques(false);
+    }
+  };
+
+  // When user switches to "Existing" radio, load cheques for this customer
+  const handleChequeTypeChange = (type) => {
+    setChequeType(type);
+    setChequeNumber('');
+    setChequeDate('');
+    setChequeAmount('');
+    setChequeAutoFilled(false);
+    setChequeAutoFillData(null);
+    if (type === 'existing' && selectedBillForPayment) {
+      loadExistingCheques(selectedBillForPayment.customerId);
+    }
+  };
+
+  // When user picks an existing cheque from dropdown
+  const handleExistingChequeSelect = (chequeNum) => {
+    if (!chequeNum) {
+      setChequeNumber('');
+      setChequeDate('');
+      setChequeAmount('');
+      setChequeAutoFilled(false);
+      return;
+    }
+    const found = existingCheques.find(c => c.chequeNumber === chequeNum);
+    if (found) {
+      setChequeNumber(found.chequeNumber);
+      setChequeDate(found.chequeDate ? found.chequeDate.split('T')[0] : '');
+      setChequeAmount(String(found.chequeAmount));
+      setChequeAutoFilled(true);
+    }
+  };
+
+  // Auto-fill cheque details when user finishes typing a cheque number
+  const handleChequeNumberBlur = async (num) => {
+    const trimmed = (num || '').trim();
+    // Need at least 4 characters to be a valid cheque number
+    if (!trimmed || trimmed.length < 4) {
+      setChequeAutoFilled(false);
+      setChequeAutoFillData(null);
+      return;
+    }
+    try {
+      const res = await apiClient.get(`/payments/cheque/${encodeURIComponent(trimmed)}`);
+      const data = res.data;
+      // Only auto-fill if the cheque has a valid amount (properly recorded cheque)
+      if (data && data.chequeAmount > 0) {
+        setChequeDate(data.chequeDate ? data.chequeDate.split('T')[0] : '');
+        setChequeAmount(String(data.chequeAmount));
+        setChequeAutoFilled(true);
+        setChequeAutoFillData(data);
+      } else {
+        setChequeAutoFilled(false);
+        setChequeAutoFillData(null);
+      }
+    } catch {
+      // 404 = new cheque, user fills manually — this is normal
+      setChequeAutoFilled(false);
+      setChequeAutoFillData(null);
+    }
   };
   
   const submitPayment = async () => {
     if (!selectedBillForPayment) return;
+    
+    // Validate partial payment amount
+    if (paymentMode === 'partial') {
+      const amount = parseFloat(partialPaymentAmount);
+      const remaining = parseFloat(selectedBillForPayment.remainingAmount) || 
+                       parseFloat(selectedBillForPayment.netTotal) || 
+                       parseFloat(selectedBillForPayment.total) || 
+                       0;
+      
+      if (!amount || amount <= 0) {
+        setMessage('❌ Please enter a valid payment amount');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+      
+      if (amount > remaining + 0.01) { // 0.01 tolerance for floating point
+        setMessage(`❌ Payment amount (LKR ${formatAmount(amount)}) exceeds remaining balance (LKR ${formatAmount(remaining)})`);
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+    }
     
     // Validate based on payment method
     if (paymentMethod === 'Cheque') {
@@ -891,6 +1163,7 @@ function Billing() {
     try {
       const paymentDetails = {
         paymentMethod,
+        paidDate: new Date().toISOString(),
         ...(paymentMethod === 'Cheque' && {
           chequeNumber,
           chequeDate,
@@ -901,13 +1174,26 @@ function Billing() {
         })
       };
       
-      await billingService.markAsPaid(selectedBillForPayment.billId, paymentDetails);
+      if (paymentMode === 'partial') {
+        // Call partial payment endpoint
+        await apiClient.patch(`/billing/${selectedBillForPayment.billId}/partial-pay`, {
+          paymentAmount: parseFloat(partialPaymentAmount),
+          ...paymentDetails
+        });
+        
+        const newRemaining = (parseFloat(selectedBillForPayment.remainingAmount || selectedBillForPayment.netTotal) - parseFloat(partialPaymentAmount));
+        const newStatus = newRemaining <= 0.01 ? 'Paid' : 'Partially Paid';
+        
+        setMessage(`✅ Partial payment of LKR ${formatAmount(partialPaymentAmount)} recorded successfully. Invoice status: ${newStatus}`);
+      } else {
+        // Call full payment endpoint
+        await billingService.markAsPaid(selectedBillForPayment.billId, paymentDetails);
+        setMessage(`✅ Invoice ${selectedBillForPayment.invoiceNumber || selectedBillForPayment.billId} marked as paid via ${paymentMethod}`);
+      }
       
       setShowPaymentModal(false);
       setSelectedBillForPayment(null);
       fetchBills();
-      
-      setMessage(`✅ Invoice ${selectedBillForPayment.invoiceNumber} marked as paid via ${paymentMethod}`);
       setTimeout(() => setMessage(''), 5000);
     } catch (error) {
       console.error('Error marking bill as paid:', error);
@@ -1047,6 +1333,67 @@ function Billing() {
       payItemsArray = [];
     }
 
+    const printablePayItems = payItemsArray.map((item, index) => {
+      const description = item.description || item.name || 'Service Charge';
+      const amount = parseFloat(item.billingAmount || item.amount || 0) || 0;
+      const payItemId = item.id || item.payItemId || item.officePayItemId || `PI${String(index + 1).padStart(3, '0')}`;
+
+      return {
+        description,
+        amount,
+        payItemId
+      };
+    });
+
+    const payItemsPerPage = 25;
+    const printablePayItemPages = [];
+    
+    // Create pages with exactly 25 rows each
+    for (let index = 0; index < printablePayItems.length; index += payItemsPerPage) {
+      const pageItems = printablePayItems.slice(index, index + payItemsPerPage);
+      
+      // Fill remaining rows with empty items to make exactly 25 rows
+      while (pageItems.length < payItemsPerPage) {
+        pageItems.push({
+          payItemId: '',
+          description: '',
+          amount: null
+        });
+      }
+      
+      printablePayItemPages.push(pageItems);
+    }
+
+    if (printablePayItemPages.length === 0) {
+      const defaultPage = [{ payItemId: 'PI001', description: 'Service Charges', amount: grossTotal }];
+      // Fill remaining rows with empty items
+      while (defaultPage.length < payItemsPerPage) {
+        defaultPage.push({
+          payItemId: '',
+          description: '',
+          amount: null
+        });
+      }
+      printablePayItemPages.push(defaultPage);
+    }
+
+    const hasMultiplePages = printablePayItemPages.length > 1;
+
+    // Add transporter cost for FCL shipments
+    if (job.shipmentCategory === 'FCL') {
+      const hasTransporterCost = payItemsArray.some(item => 
+        (item.name || item.description)?.toLowerCase() === 'transporter cost'
+      );
+      if (!hasTransporterCost) {
+        payItemsArray.push({
+          name: 'Transporter Cost',
+          description: 'Transporter Cost',
+          billingAmount: 0,
+          amount: 0
+        });
+      }
+    }
+
     const isCompactItemsLayout = payItemsArray.length >= 20;
     
     return `
@@ -1062,7 +1409,7 @@ function Billing() {
             --theme-soft: ${isColorMode ? '#e8f0ff' : '#ffffff'};
           }
           @page { 
-            margin: ${isCompactItemsLayout ? '10mm 14mm' : '15mm 20mm'}; 
+            margin: ${isCompactItemsLayout ? '32mm 14mm 32mm 14mm' : '35mm 20mm 35mm 20mm'}; 
             size: A4;
           }
           * {
@@ -1076,15 +1423,14 @@ function Billing() {
             color: #111;
           }
           .invoice-page {
-            min-height: ${isCompactItemsLayout ? '275mm' : '258mm'};
             font-size: 10pt;
             line-height: 1.3;
             color: #111;
-          }
-          .invoice-page {
-            min-height: 258mm;
+            padding: 0;
+            margin: 0;
             display: flex;
             flex-direction: column;
+            position: relative;
           }
           .page-header {
             position: relative;
@@ -1145,22 +1491,22 @@ function Billing() {
             font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
           }
           .recipient {
-            margin: ${isCompactItemsLayout ? '8px 0' : '15px 0'};
-            line-height: 1.5;
+            margin: ${isCompactItemsLayout ? '2px 0 4px 0' : '3px 0 6px 0'};
+            line-height: 1.4;
           }
           .recipient-line {
-            margin: ${isCompactItemsLayout ? '1px 0' : '2px 0'};
-            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
+            margin: ${isCompactItemsLayout ? '0px 0' : '1px 0'};
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
           }
           .details-section {
-            margin: 12px 0;
-            padding-bottom: 10px;
+            margin: ${isCompactItemsLayout ? '4px 0 4px 0' : '6px 0 5px 0'};
+            padding-bottom: 4px;
             border-bottom: 1px solid var(--theme-primary);
           }
           .detail-row {
             display: flex;
-            margin: ${isCompactItemsLayout ? '2px 0' : '3px 0'};
-            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
+            margin: ${isCompactItemsLayout ? '0.5px 0' : '1px 0'};
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
           }
           .detail-label {
             font-weight: bold;
@@ -1177,60 +1523,141 @@ function Billing() {
             overflow-wrap: anywhere;
           }
           .items-section {
-            margin: ${isCompactItemsLayout ? '8px 0' : '15px 0'};
+            margin: ${isCompactItemsLayout ? '2px 0 0 0' : '4px 0 0 0'};
+            flex: 1;
+          }
+          .pay-items-page {
+            width: 100%;
+          }
+          .pay-items-page:not(:last-child) {
+            page-break-after: always;
+            break-after: page;
+          }
+          .pay-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: ${isCompactItemsLayout ? '2px' : '4px'};
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
+            border: 1px solid var(--theme-primary);
+          }
+          .pay-items-table th,
+          .pay-items-table td {
+            border: 1px solid #cfd7ea;
+            padding: ${isCompactItemsLayout ? '3px 6px' : '4px 8px'};
+            vertical-align: top;
+          }
+          .pay-items-table tbody td {
+            line-height: 1.25;
+            min-height: ${isCompactItemsLayout ? '18px' : '20px'};
+          }
+          .pay-items-table tbody tr {
+            height: ${isCompactItemsLayout ? '18px' : '20px'};
+          }
+          .pay-items-table thead th {
+            background: #e9efff;
+            border-bottom: 2px solid var(--theme-primary);
+            color: var(--theme-primary);
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+          }
+          .pay-items-table .id-col {
+            width: 90px;
+            text-align: center;
+            white-space: nowrap;
+          }
+          .pay-items-table .description-col {
+            width: auto;
+          }
+          .pay-items-table .amount-col {
+            width: 120px;
+            text-align: right;
+            white-space: nowrap;
+          }
+          .pay-items-table .pay-item-description {
+            word-break: break-word;
+            overflow-wrap: anywhere;
+          }
+          .invoice-summary {
+            margin-top: ${isCompactItemsLayout ? '10px' : '14px'};
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 2rem;
+          }
+          .totals-box {
+            flex-shrink: 0;
+            border: 2px solid var(--theme-primary);
+            padding: ${isCompactItemsLayout ? '6px 12px' : '8px 16px'};
+            background: ${isColorMode ? 'linear-gradient(135deg, var(--theme-soft) 0%, #ffffff 100%)' : '#ffffff'};
+            border-radius: 4px;
+            min-width: 280px;
+          }
+          .totals-box .item-row {
+            margin: ${isCompactItemsLayout ? '2px 0' : '3px 0'};
+            padding: ${isCompactItemsLayout ? '1px 0' : '2px 0'};
+          }
+          .totals-box .item-row.subtotal {
+            margin-top: ${isCompactItemsLayout ? '2px' : '3px'};
+            padding-top: ${isCompactItemsLayout ? '2px' : '3px'};
+          }
+          .totals-box .item-row.total {
+            margin-top: ${isCompactItemsLayout ? '3px' : '4px'};
+            padding-top: ${isCompactItemsLayout ? '3px' : '4px'};
+            padding-bottom: ${isCompactItemsLayout ? '2px' : '3px'};
+          }
+          .totals-section {
+            position: relative;
+            margin-top: ${isCompactItemsLayout ? '10px' : '14px'};
+            background: #ffffff;
+            padding-top: 4px;
+            z-index: 2;
           }
           .item-row {
             display: flex;
             justify-content: space-between;
-            margin: ${isCompactItemsLayout ? '1px 0' : '4px 0'};
-            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
-            padding: ${isCompactItemsLayout ? '1px 0' : '2px 0'};
+            margin: ${isCompactItemsLayout ? '0px 0' : '1px 0'};
+            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
+            padding: ${isCompactItemsLayout ? '0px 0' : '0.5px 0'};
             border-bottom: 1px solid #e0e0e0;
-          }
-          .item-description {
-            flex: 1;
-            padding-right: ${isCompactItemsLayout ? '12px' : '20px'};
-            white-space: ${isCompactItemsLayout ? 'nowrap' : 'normal'};
-            overflow: ${isCompactItemsLayout ? 'hidden' : 'visible'};
-            text-overflow: ${isCompactItemsLayout ? 'ellipsis' : 'clip'};
-          }
-          .item-amount {
-            text-align: right;
-            min-width: ${isCompactItemsLayout ? '92px' : '100px'};
-            padding-right: 5px;
-            font-weight: normal;
+            page-break-inside: avoid;
           }
           .item-row.subtotal {
             border-top: 1px solid var(--theme-primary);
             border-bottom: none;
-            margin-top: ${isCompactItemsLayout ? '6px' : '10px'};
-            padding-top: ${isCompactItemsLayout ? '6px' : '8px'};
+            margin-top: ${isCompactItemsLayout ? '1px' : '2px'};
+            padding-top: ${isCompactItemsLayout ? '1px' : '2px'};
             font-weight: normal;
           }
           .item-row.total {
             border-top: 2px solid var(--theme-primary);
             border-bottom: none;
-            margin-top: ${isCompactItemsLayout ? '5px' : '8px'};
-            padding-top: ${isCompactItemsLayout ? '6px' : '10px'};
-            padding-bottom: ${isCompactItemsLayout ? '3px' : '5px'};
+            margin-top: ${isCompactItemsLayout ? '1px' : '2px'};
+            padding-top: ${isCompactItemsLayout ? '2px' : '3px'};
+            padding-bottom: ${isCompactItemsLayout ? '1px' : '2px'};
             font-weight: bold;
-            font-size: 11pt;
+            font-size: 10pt;
             color: var(--theme-primary);
           }
           .signature-section {
-            margin-top: ${isCompactItemsLayout ? '24px' : '40px'};
+            position: relative;
+            margin-top: 0;
+            margin-left: 0;
             text-align: left;
+            background: #ffffff;
+            z-index: 3;
+            flex-shrink: 0;
           }
           .signature-space {
-            border-top: 1px solid var(--theme-primary);
-            width: 200px;
-            margin: ${isCompactItemsLayout ? '35px 0 5px 0' : '50px 0 5px 0'};
-            height: 2px;
+            border-bottom: 1px solid var(--theme-primary);
+            width: 280px;
+            margin: ${isCompactItemsLayout ? '0 0 2px 0' : '0 0 2px 0'};
+            height: 40px;
           }
           .signature-label {
-            font-size: ${isCompactItemsLayout ? '9pt' : '10pt'};
+            font-size: ${isCompactItemsLayout ? '8pt' : '8.5pt'};
             font-weight: bold;
-            margin-top: 5px;
+            margin-top: 2px;
             color: var(--theme-primary);
           }
           .footer {
@@ -1267,19 +1694,8 @@ function Billing() {
       </head>
       <body>
         <div class="invoice-page">
-        <div class="page-header">
-          <div class="logo">
-            <img src="${invoiceLogoUrl}" alt="SS Cargo Logo" />
-          </div>
-          <div class="company-header">
-            <div class="company-name">SUPER SHINE CARGO SERVICES</div>
-            <div class="company-tagline">Freight Forwarding / Clearing & Transporters</div>
-            <div class="company-tagline">Sea freight / Air Freight</div>
-          </div>
-          <div class="invoice-header-right">
-            ${billDate}<br>
-            <strong>INV No: ${invoiceNumber}</strong>
-          </div>
+        <div style="font-size: 10pt; font-weight: bold; margin-bottom: 6px; margin-top: 0;">
+          INV No: ${invoiceNumber}
         </div>
 
         <div class="recipient">
@@ -1320,49 +1736,54 @@ function Billing() {
         </div>
 
         <div class="items-section">
-          ${payItemsArray && Array.isArray(payItemsArray) && payItemsArray.length > 0 ? 
-            payItemsArray.map(item => {
-              const description = item.description || item.name || 'Service Charge';
-              const amount = item.billingAmount || item.amount || 0;
-              return `
-                <div class="item-row">
-                  <div class="item-description">${description}</div>
-                  <div class="item-amount">${formatAmount(amount)}</div>
-                </div>
-              `;
-            }).join('') : 
-            `<div class="item-row">
-              <div class="item-description">Service Charges</div>
-              <div class="item-amount">${formatAmount(grossTotal)}</div>
-            </div>`
-          }
-          
-          <div class="item-row subtotal">
-            <div class="item-description">GROSS TOTAL</div>
-            <div class="item-amount">${formatAmount(grossTotal)}</div>
-          </div>
-          
-          ${advancePayment > 0 ? `
-            <div class="item-row subtotal">
-              <div class="item-description">${advancePaymentLabel}</div>
-              <div class="item-amount">${formatAmount(advancePayment)}</div>
+          ${printablePayItemPages.map((pageItems, pageIndex) => `
+            <div class="pay-items-page">
+              <table class="pay-items-table">
+                <thead>
+                  <tr>
+                    <th class="id-col">ID</th>
+                    <th class="description-col">DESCRIPTION</th>
+                    <th class="amount-col">AMOUNT (LKR)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pageItems.map(item => `
+                    <tr>
+                      <td class="id-col">${item.payItemId || ''}</td>
+                      <td class="description-col"><span class="pay-item-description">${item.description || ''}</span></td>
+                      <td class="amount-col">${item.amount !== null && item.amount !== undefined ? formatAmount(item.amount) : ''}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
             </div>
-          ` : ''}
-          
-          <div class="item-row total">
-            <div class="item-description">Total Due Amount</div>
-            <div class="item-amount">${formatAmount(advancePayment > 0 ? netTotal : grossTotal)}</div>
+          `).join('')}
+        </div>
+
+        <div class="invoice-summary">
+          <div class="signature-section">
+            <div class="signature-space"></div>
+            <div class="signature-label">SUPER SHINE CARGO SERVICES<br>MANAGER</div>
           </div>
-        </div>
 
-        <div class="signature-section">
-          <div class="signature-space"></div>
-          <div class="signature-label">SUPER SHINE CARGO SERVICES<br>MANAGER</div>
-        </div>
-
-        <div class="footer">
-          <div class="footer-line">No. 10/A, Ground Floor, Y.M.B.A Building Colombo 01, Sri Lanka. Office: 0112-433-581</div>
-          <div class="footer-line">WhatsApp: +94754-946-946, +1410-868-9329 Hotline: +94-777-898929 E-mail: Supershinecargo@gmail.com</div>
+          <div class="totals-box">
+            <div class="item-row subtotal">
+              <div class="item-description">GROSS TOTAL</div>
+              <div class="item-amount">${formatAmount(grossTotal)}</div>
+            </div>
+            
+            ${advancePayment > 0 ? `
+              <div class="item-row subtotal">
+                <div class="item-description">${advancePaymentLabel}</div>
+                <div class="item-amount">${formatAmount(advancePayment)}</div>
+              </div>
+            ` : ''}
+            
+            <div class="item-row total">
+              <div class="item-description">Total Due Amount</div>
+              <div class="item-amount">${formatAmount(advancePayment > 0 ? netTotal : grossTotal)}</div>
+            </div>
+          </div>
         </div>
         </div>
         </div>
@@ -1378,6 +1799,23 @@ function Billing() {
       </div>
     );
   }
+
+  // Pagination logic
+  const totalPages = Math.ceil(bills.length / recordsPerPage);
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = bills.slice(indexOfFirstRecord, indexOfLastRecord);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    setExpandedBillId(null);
+  };
+
+  const handleRecordsPerPageChange = (newRecordsPerPage) => {
+    setRecordsPerPage(newRecordsPerPage);
+    setCurrentPage(1);
+    setExpandedBillId(null);
+  };
 
   return (
     <div className="billing-page">
@@ -1499,6 +1937,12 @@ function Billing() {
                     </div>
                   )}
                   <div className="info-row">
+                    <span className="info-label">Transport Delivery Date: {(!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) && <span className="required-indicator">*Required</span>}</span>
+                    <span className={`info-value ${(!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) ? 'missing-value' : ''}`}>
+                      {selectedJob.transportDeliveryDate ? new Date(selectedJob.transportDeliveryDate).toLocaleDateString() : '-'}
+                    </span>
+                  </div>
+                  <div className="info-row">
                     <span className="info-label">Status:</span>
                     <span className="info-value">
                       <span className={`status-badge status-${(selectedJob.status || 'Open').toLowerCase()}`}>
@@ -1524,20 +1968,36 @@ function Billing() {
                 <div className="card-header-inline">
                   <h3>Pay Items</h3>
                   {!showPayItemsRow && selectedJob.payItems && selectedJob.payItems.length > 0 && (
-                    <button 
-                      onClick={() => setShowPayItemsRow(true)} 
-                      className="btn btn-primary btn-small"
-                    >
-                      + Add More Items
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={addTransporterCostFromHeader} 
+                        className="btn btn-secondary btn-small"
+                      >
+                        + Transporter Cost
+                      </button>
+                      <button 
+                        onClick={openPayItemsEditor} 
+                        className="btn btn-primary btn-small"
+                      >
+                        + Add More Items
+                      </button>
+                    </div>
                   )}
                   {!showPayItemsRow && (!selectedJob.payItems || selectedJob.payItems.length === 0) && (
-                    <button 
-                      onClick={() => setShowPayItemsRow(true)} 
-                      className="btn btn-primary btn-small"
-                    >
-                      + Add Items
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={addTransporterCostFromHeader} 
+                        className="btn btn-secondary btn-small"
+                      >
+                        + Transporter Cost
+                      </button>
+                      <button 
+                        onClick={openPayItemsEditor} 
+                        className="btn btn-primary btn-small"
+                      >
+                        + Add Items
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1631,7 +2091,7 @@ function Billing() {
                               />
                             </td>
                             <td>
-                              {payItems.length > 1 && !item.paidByName && (
+                              {payItems.length > 1 && !item.paidByName && !(selectedJob?.shipmentCategory === 'FCL' && isTransporterCostLabel(item.name)) && (
                                 <button
                                   type="button"
                                   onClick={() => removePayItemRow(index)}
@@ -1670,9 +2130,18 @@ function Billing() {
                     </table>
                     
                     <div className="pay-items-actions">
-                      <button onClick={addPayItemRow} className="btn btn-secondary btn-small">
-                        + Add Another Item
-                      </button>
+                      <div className="add-items-buttons">
+                        {selectedJob?.shipmentCategory !== 'FCL' && !hasTransporterCostItem(payItems) && (
+                          <button onClick={addTransporterCostRow} className="btn btn-primary btn-small">
+                            + Add Transporter Cost
+                          </button>
+                        )}
+                        {!(payItems.length === 1 && isTransporterCostLabel(payItems[0]?.name || payItems[0]?.description)) && (
+                          <button onClick={addPayItemRow} className="btn btn-secondary btn-small">
+                            + Add Another Item
+                          </button>
+                        )}
+                      </div>
                       <div className="action-buttons-right">
                         <button onClick={savePayItems} className="btn btn-success">
                           Save Pay Items
@@ -1680,7 +2149,7 @@ function Billing() {
                         <button 
                           onClick={() => {
                             setShowPayItemsRow(false);
-                            setPayItems([{ name: '', actualCost: '', billingAmount: '', sameAmount: false, hasBill: false }]);
+                            setPayItems([]);
                           }} 
                           className="btn btn-secondary"
                         >
@@ -1894,7 +2363,7 @@ function Billing() {
                 </tr>
               </thead>
               <tbody>
-                {bills.map(bill => (
+                {currentRecords.map(bill => (
                   <React.Fragment key={bill.billId}>
                     <tr className={bill.isOverdue ? 'overdue-row' : ''}>
                       <td data-label="Invoice No"><strong>{bill.invoiceNumber || bill.billId}</strong></td>
@@ -1912,9 +2381,11 @@ function Billing() {
                         ) : '-'}
                       </td>
                       <td data-label="Status">
-                        <span className={`status-badge status-${bill.paymentStatus.toLowerCase()}`}>
-                          {bill.paymentStatus}
-                        </span>
+                        <div className="status-cell">
+                          <span className={`status-badge status-${(bill.paymentStatus || 'unpaid').toLowerCase().replace(' ', '-')}`}>
+                            {bill.paymentStatus || 'Unpaid'}
+                          </span>
+                        </div>
                       </td>
                       <td className="expand-column">
                         <button
@@ -1936,13 +2407,23 @@ function Billing() {
                           >
                             Print
                           </button>
-                          {bill.paymentStatus === 'Unpaid' && (
-                            <button 
-                              onClick={() => markAsPaid(bill.billId)} 
-                              className="btn btn-success btn-small"
-                            >
-                              Mark Paid
-                            </button>
+                          {(bill.paymentStatus === 'Unpaid' || bill.paymentStatus === 'Partially Paid') && (
+                            <>
+                              <button 
+                                onClick={() => markAsPaid(bill.billId)} 
+                                className={`btn ${bill.paymentStatus === 'Partially Paid' ? 'btn-primary' : 'btn-success'} btn-small`}
+                              >
+                                {bill.paymentStatus === 'Partially Paid' ? 'Pay Remaining' : 'Pay Invoice'}
+                              </button>
+                            </>
+                          )}
+                          {bill.paymentStatus === 'Paid' && (
+                            <span className="paid-indicator">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                              </svg>
+                              Paid
+                            </span>
                           )}
                         </div>
                       </td>
@@ -1962,17 +2443,167 @@ function Billing() {
                               </div>
                               <div className="detail-card">
                                 <div className="detail-label">Profit</div>
-                                <div className={`detail-value ${bill.profit >= 0 ? 'profit-positive' : 'profit-negative'}`}>
+                                <div className="detail-value">
                                   LKR {formatAmount(bill.profit)}
                                 </div>
                               </div>
-                              <div className="detail-card">
-                                <div className="detail-label">Total Due</div>
-                                <div className="detail-value total-due"><strong>LKR {formatAmount(bill.total)}</strong></div>
-                              </div>
+                              {/* Show Paid Amount + Total Due cards for Partially Paid only */}
+                              {bill.paymentStatus === 'Partially Paid' && (
+                                <>
+                                  <div className="detail-card detail-card--paid">
+                                    <div className="detail-label">Amount Paid</div>
+                                    <div className="detail-value detail-value--paid">
+                                      LKR {formatAmount(bill.paidAmount || 0)}
+                                    </div>
+                                    <div className="detail-card-sub">
+                                      {Math.round((parseFloat(bill.paidAmount || 0) / parseFloat(bill.netTotal || bill.total || 1)) * 100)}% of invoice settled
+                                    </div>
+                                  </div>
+                                  <div className="detail-card detail-card--remaining">
+                                    <div className="detail-label">Total Due</div>
+                                    <div className="detail-value detail-value--remaining">
+                                      LKR {formatAmount(bill.remainingAmount || 0)}
+                                    </div>
+                                    <div className="detail-card-sub">
+                                      {Math.round((parseFloat(bill.remainingAmount || 0) / parseFloat(bill.netTotal || bill.total || 1)) * 100)}% outstanding
+                                    </div>
+                                  </div>
+                                </>
+                              )}
                             </div>
-                            
-                            {/* Payment Details Section - Only show if paid */}
+
+                            {/* Payment Tracking Table — shown for Partially Paid and Paid invoices */}
+                            {(bill.paymentStatus === 'Partially Paid' || bill.paymentStatus === 'Paid') && (
+                              <div className="payment-tracking-section">
+                                <div className="payment-tracking-header">
+                                  <span className="payment-tracking-title">Payment Tracking</span>
+                                  <span className="payment-tracking-count">
+                                    {Array.isArray(bill.paymentRecords) && bill.paymentRecords.length > 0 
+                                      ? `${bill.paymentRecords.length} payment record${bill.paymentRecords.length !== 1 ? 's' : ''}`
+                                      : '1 payment record'
+                                    }
+                                  </span>
+                                </div>
+                                
+                                <div className="payment-tracking-table">
+                                  <div className="payment-table-header">
+                                    <div className="payment-header-cell payment-date-col">#</div>
+                                    <div className="payment-header-cell payment-date-col">Payment Date</div>
+                                    <div className="payment-header-cell payment-method-col">Method</div>
+                                    <div className="payment-header-cell payment-reference-col">Reference</div>
+                                    <div className="payment-header-cell payment-amount-col">Amount Paid</div>
+                                    <div className="payment-header-cell payment-balance-col">Remaining Balance</div>
+                                  </div>
+                                  
+                                  <div className="payment-table-body">
+                                    {bill.paymentRecords && Array.isArray(bill.paymentRecords) && bill.paymentRecords.length > 0 ? (
+                                      bill.paymentRecords.map((payment, idx) => {
+                                        // Calculate running balance
+                                        const paidUpToThisPoint = bill.paymentRecords
+                                          .slice(0, idx + 1)
+                                          .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+                                        const remainingAtThisPoint = (parseFloat(bill.netTotal || bill.total || 0)) - paidUpToThisPoint;
+                                        
+                                        return (
+                                          <div key={idx} className="payment-table-row">
+                                            <div className="payment-table-cell payment-date-col">
+                                              <span className="payment-num">{idx + 1}</span>
+                                            </div>
+                                            <div className="payment-table-cell payment-date-col">
+                                              {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('en-US', {
+                                                year: 'numeric',
+                                                month: 'short',
+                                                day: 'numeric'
+                                              }) : '-'}
+                                            </div>
+                                            <div className="payment-table-cell payment-method-col">
+                                              <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
+                                                {payment.paymentMethod === 'Cash' && '💵'}
+                                                {payment.paymentMethod === 'Cheque' && '📝'}
+                                                {payment.paymentMethod === 'Bank Transfer' && '🏦'}
+                                                {' '}{payment.paymentMethod || '-'}
+                                              </span>
+                                            </div>
+                                            <div className="payment-table-cell payment-reference-col">
+                                              {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? (
+                                                <span className="reference-text">CHQ: {payment.chequeNumber}</span>
+                                              ) : payment.paymentMethod === 'Bank Transfer' && payment.bankName ? (
+                                                <span className="reference-text">{payment.bankName}</span>
+                                              ) : payment.paymentMethod === 'Cash' ? (
+                                                <span className="reference-text">Cash</span>
+                                              ) : (
+                                                <span className="reference-empty">-</span>
+                                              )}
+                                            </div>
+                                            <div className="payment-table-cell payment-amount-col">
+                                              <span className="payment-amount-value">LKR {formatAmount(payment.amount || 0)}</span>
+                                            </div>
+                                            <div className="payment-table-cell payment-balance-col">
+                                              <span className="payment-balance-value">LKR {formatAmount(Math.max(0, remainingAtThisPoint))}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <div className="payment-table-row">
+                                        <div className="payment-table-cell payment-date-col">
+                                          <span className="payment-num">1</span>
+                                        </div>
+                                        <div className="payment-table-cell payment-date-col">
+                                          {bill.paidDate ? new Date(bill.paidDate).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric'
+                                          }) : '-'}
+                                        </div>
+                                        <div className="payment-table-cell payment-method-col">
+                                          <span className={`payment-method-badge payment-method-${bill.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
+                                            {bill.paymentMethod === 'Cash' && '💵'}
+                                            {bill.paymentMethod === 'Cheque' && '📝'}
+                                            {bill.paymentMethod === 'Bank Transfer' && '🏦'}
+                                            {' '}{bill.paymentMethod || '-'}
+                                          </span>
+                                        </div>
+                                        <div className="payment-table-cell payment-reference-col">
+                                          {bill.paymentMethod === 'Cheque' && bill.chequeNumber ? (
+                                            <span className="reference-text">CHQ: {bill.chequeNumber}</span>
+                                          ) : bill.paymentMethod === 'Bank Transfer' && bill.bankName ? (
+                                            <span className="reference-text">{bill.bankName}</span>
+                                          ) : bill.paymentMethod === 'Cash' ? (
+                                            <span className="reference-text">Cash</span>
+                                          ) : (
+                                            <span className="reference-empty">-</span>
+                                          )}
+                                        </div>
+                                        <div className="payment-table-cell payment-amount-col">
+                                          <span className="payment-amount-value">LKR {formatAmount(bill.paidAmount || 0)}</span>
+                                        </div>
+                                        <div className="payment-table-cell payment-balance-col">
+                                          <span className="payment-balance-value">LKR {formatAmount(bill.remainingAmount || 0)}</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="payment-total-row">
+                                    <div className="payment-table-cell payment-date-col"></div>
+                                    <div className="payment-table-cell payment-date-col"></div>
+                                    <div className="payment-table-cell payment-method-col"></div>
+                                    <div className="payment-table-cell payment-reference-col">
+                                      <strong>Total</strong>
+                                    </div>
+                                    <div className="payment-table-cell payment-amount-col">
+                                      <strong>LKR {formatAmount(bill.paidAmount || 0)}</strong>
+                                    </div>
+                                    <div className="payment-table-cell payment-balance-col">
+                                      <strong>LKR {formatAmount(bill.remainingAmount || 0)}</strong>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Payment Information — shown for Fully Paid invoices */}
                             {bill.paymentStatus === 'Paid' && bill.paymentMethod && (
                               <div className="payment-details-section">
                                 <h4 className="payment-details-title">💳 Payment Information</h4>
@@ -1988,20 +2619,20 @@ function Billing() {
                                       </span>
                                     </div>
                                   </div>
-                                  
+
                                   {bill.paidDate && (
                                     <div className="payment-detail-card">
                                       <div className="payment-detail-label">Payment Date</div>
                                       <div className="payment-detail-value">
-                                        {new Date(bill.paidDate).toLocaleDateString('en-US', { 
-                                          year: 'numeric', 
-                                          month: 'long', 
-                                          day: 'numeric' 
+                                        {new Date(bill.paidDate).toLocaleDateString('en-US', {
+                                          year: 'numeric',
+                                          month: 'long',
+                                          day: 'numeric'
                                         })}
                                       </div>
                                     </div>
                                   )}
-                                  
+
                                   {bill.paymentMethod === 'Cheque' && (
                                     <>
                                       {bill.chequeNumber && (
@@ -2012,20 +2643,18 @@ function Billing() {
                                           </div>
                                         </div>
                                       )}
-                                      
                                       {bill.chequeDate && (
                                         <div className="payment-detail-card">
                                           <div className="payment-detail-label">Cheque Date</div>
                                           <div className="payment-detail-value">
-                                            {new Date(bill.chequeDate).toLocaleDateString('en-US', { 
-                                              year: 'numeric', 
-                                              month: 'long', 
-                                              day: 'numeric' 
+                                            {new Date(bill.chequeDate).toLocaleDateString('en-US', {
+                                              year: 'numeric',
+                                              month: 'long',
+                                              day: 'numeric'
                                             })}
                                           </div>
                                         </div>
                                       )}
-                                      
                                       {bill.chequeAmount && (
                                         <div className="payment-detail-card">
                                           <div className="payment-detail-label">Cheque Amount</div>
@@ -2036,7 +2665,7 @@ function Billing() {
                                       )}
                                     </>
                                   )}
-                                  
+
                                   {bill.paymentMethod === 'Bank Transfer' && bill.bankName && (
                                     <div className="payment-detail-card">
                                       <div className="payment-detail-label">Bank Name</div>
@@ -2058,136 +2687,360 @@ function Billing() {
             </table>
           </div>
         )}
+
+        {bills.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalRecords={bills.length}
+            recordsPerPage={recordsPerPage}
+            onPageChange={handlePageChange}
+            onRecordsPerPageChange={handleRecordsPerPageChange}
+          />
+        )}
       </div>
 
-      {/* Payment Details Modal */}
+      {/* ═══════════════════════════════════════════════════════
+           RECORD PAYMENT MODAL  —  3-Row Professional Layout
+           Row 1: Invoice details strip
+           Row 2: Payment type (Full / Partial) + amount
+           Row 3: Payment method + cheque / bank fields
+      ═══════════════════════════════════════════════════════ */}
       {showPaymentModal && selectedBillForPayment && (
-        <div className="payment-modal-overlay" onClick={() => setShowPaymentModal(false)}>
-          <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="payment-modal-header">
-              <h3>💳 Payment Details</h3>
-              <button 
-                className="modal-close-btn" 
-                onClick={() => setShowPaymentModal(false)}
-                title="Close"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="payment-modal-body">
-              <div className="invoice-summary">
-                <div className="summary-row">
-                  <span className="summary-label">Invoice Number:</span>
-                  <span className="summary-value">{selectedBillForPayment.invoiceNumber}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Customer:</span>
-                  <span className="summary-value">{getCustomerName(selectedBillForPayment.customerId)}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Job ID:</span>
-                  <span className="summary-value">{selectedBillForPayment.jobId}</span>
-                </div>
-                <div className="summary-row total-row">
-                  <span className="summary-label">Amount to Pay:</span>
-                  <span className="summary-value amount-highlight">LKR {formatAmount(selectedBillForPayment.netTotal || selectedBillForPayment.total)}</span>
+        <div className="pm-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="pm-modal" onClick={e => e.stopPropagation()}>
+
+            {/* ── Title bar ── */}
+            <div className="pm-titlebar">
+              <div className="pm-titlebar-left">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{flexShrink:0}}>
+                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+                <div>
+                  <span className="pm-title">Record Payment</span>
+                  <span className="pm-subtitle">Invoice&nbsp;#{selectedBillForPayment.invoiceNumber || selectedBillForPayment.billId}</span>
                 </div>
               </div>
+              <button className="pm-close" onClick={() => setShowPaymentModal(false)} aria-label="Close">×</button>
+            </div>
 
-              <div className="payment-form">
-                <div className="form-group">
-                  <label>Payment Method <span style={{color: '#dc2626'}}>*</span></label>
-                  <select 
-                    className="form-control"
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
+            {/* ══════════════════════════════════════════
+                ROW 1 — Invoice details (horizontal strip)
+            ══════════════════════════════════════════ */}
+            <div className="pm-body">
+            <div className="pm-row pm-row-details">
+              <div className="pm-detail-cell">
+                <span className="pm-detail-label">Customer</span>
+                <span className="pm-detail-value">{getCustomerName(selectedBillForPayment.customerId)}</span>
+              </div>
+              <div className="pm-detail-cell">
+                <span className="pm-detail-label">Job ID</span>
+                <span className="pm-detail-value"><code className="pm-code">{selectedBillForPayment.jobId}</code></span>
+              </div>
+              <div className="pm-detail-cell">
+                <span className="pm-detail-label">Invoice Total</span>
+                <span className="pm-detail-value pm-amount-total">LKR {formatAmount(selectedBillForPayment.netTotal || selectedBillForPayment.total)}</span>
+              </div>
+              {parseFloat(selectedBillForPayment.paidAmount) > 0 && (
+                <div className="pm-detail-cell">
+                  <span className="pm-detail-label">Already Paid</span>
+                  <span className="pm-detail-value pm-amount-paid">LKR {formatAmount(selectedBillForPayment.paidAmount)}</span>
+                </div>
+              )}
+              <div className={parseFloat(selectedBillForPayment.paidAmount) > 0 ? 'pm-detail-cell pm-detail-cell--due' : 'pm-detail-cell pm-detail-cell--due pm-detail-cell--due-only'}>
+                <span className="pm-detail-label">Amount Due</span>
+                <span className="pm-detail-value pm-amount-due">
+                  LKR {formatAmount(
+                    parseFloat(selectedBillForPayment.remainingAmount) > 0
+                      ? selectedBillForPayment.remainingAmount
+                      : (parseFloat(selectedBillForPayment.netTotal || selectedBillForPayment.total) - parseFloat(selectedBillForPayment.paidAmount || 0))
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* ══════════════════════════════════════════
+                ROW 2 — Payment type + amount
+            ══════════════════════════════════════════ */}
+            <div className="pm-row pm-row-type">
+
+              {/* Left: radio buttons */}
+              <div className="pm-type-panel">
+                <p className="pm-panel-label">Payment Type</p>
+                <div className="pm-radio-group">
+                  <label
+                    className={`pm-radio-card ${paymentMode === 'full' ? 'pm-radio-card--active' : ''}`}
+                    onClick={() => { setPaymentMode('full'); setPartialPaymentAmount(''); }}
                   >
-                    <option value="Cash">Cash</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                  </select>
+                    <input
+                      type="radio" name="pmMode" value="full"
+                      checked={paymentMode === 'full'}
+                      onChange={() => { setPaymentMode('full'); setPartialPaymentAmount(''); }}
+                    />
+                    <span className="pm-radio-dot"></span>
+                    <span className="pm-radio-text">
+                      <strong>Full Payment</strong>
+                      <small>Settle entire balance</small>
+                    </span>
+                  </label>
+                  <label
+                    className={`pm-radio-card ${paymentMode === 'partial' ? 'pm-radio-card--active' : ''}`}
+                    onClick={() => setPaymentMode('partial')}
+                  >
+                    <input
+                      type="radio" name="pmMode" value="partial"
+                      checked={paymentMode === 'partial'}
+                      onChange={() => setPaymentMode('partial')}
+                    />
+                    <span className="pm-radio-dot"></span>
+                    <span className="pm-radio-text">
+                      <strong>Partial Payment</strong>
+                      <small>Pay a portion now</small>
+                    </span>
+                  </label>
                 </div>
+              </div>
 
-                {paymentMethod === 'Cheque' && (
-                  <div className="cheque-details">
-                    <div className="cheque-notice">
-                      <span className="notice-icon">📝</span>
-                      <span>Please provide cheque details</span>
-                    </div>
-                    
-                    <div className="form-group">
-                      <label>Cheque Number <span style={{color: '#dc2626'}}>*</span></label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={chequeNumber}
-                        onChange={(e) => setChequeNumber(e.target.value)}
-                        placeholder="Enter cheque number"
-                      />
-                    </div>
+              {/* Divider */}
+              <div className="pm-col-divider" />
 
-                    <div className="form-group">
-                      <label>Cheque Date <span style={{color: '#dc2626'}}>*</span></label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={chequeDate}
-                        onChange={(e) => setChequeDate(e.target.value)}
-                      />
+              {/* Right: amount area */}
+              <div className="pm-amount-panel">
+                {paymentMode === 'full' ? (
+                  <div className="pm-full-amount-display">
+                    <p className="pm-panel-label">Amount to Collect</p>
+                    <div className="pm-full-amount">
+                      LKR {formatAmount(
+                        parseFloat(selectedBillForPayment.remainingAmount) > 0
+                          ? selectedBillForPayment.remainingAmount
+                          : (parseFloat(selectedBillForPayment.netTotal || selectedBillForPayment.total) - parseFloat(selectedBillForPayment.paidAmount || 0))
+                      )}
                     </div>
-
-                    <div className="form-group">
-                      <label>Cheque Amount (LKR) <span style={{color: '#dc2626'}}>*</span></label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="form-control"
-                        value={chequeAmount}
-                        onChange={(e) => setChequeAmount(e.target.value)}
-                        placeholder="0.00"
-                      />
-                    </div>
+                    <span className="pm-full-badge">Full balance</span>
                   </div>
-                )}
-
-                {paymentMethod === 'Bank Transfer' && (
-                  <div className="bank-details">
-                    <div className="bank-notice">
-                      <span className="notice-icon">🏦</span>
-                      <span>Please select the bank</span>
+                ) : (
+                  <div className="pm-partial-area">
+                    <div className="pm-field">
+                      <label className="pm-field-label">Enter Amount (LKR) <span className="pm-req">*</span></label>
+                      <input
+                        type="number" step="0.01"
+                        className="pm-input pm-input--amount"
+                        value={partialPaymentAmount}
+                        onChange={e => setPartialPaymentAmount(e.target.value)}
+                        placeholder="0.00"
+                        autoFocus
+                      />
                     </div>
-                    
-                    <div className="form-group">
-                      <label>Bank Name <span style={{color: '#dc2626'}}>*</span></label>
-                      <select 
-                        className="form-control"
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                      >
-                        <option value="Commercial Bank">Commercial Bank</option>
-                        <option value="Peoples Bank">Peoples Bank</option>
-                      </select>
+                    {/* Mini breakdown */}
+                    <div className="pm-breakdown">
+                      <div className="pm-bk-row">
+                        <span>Invoice Total</span>
+                        <span>LKR {formatAmount(parseFloat(selectedBillForPayment.netTotal || selectedBillForPayment.total) || 0)}</span>
+                      </div>
+                      {parseFloat(selectedBillForPayment.paidAmount) > 0 && (
+                        <div className="pm-bk-row">
+                          <span>Already Paid</span>
+                          <span className="pm-bk-paid">LKR {formatAmount(parseFloat(selectedBillForPayment.paidAmount))}</span>
+                        </div>
+                      )}
+                      <div className="pm-bk-row">
+                        <span>This Payment</span>
+                        <span className="pm-bk-current">LKR {formatAmount(parseFloat(partialPaymentAmount) || 0)}</span>
+                      </div>
+                      <div className="pm-bk-row pm-bk-row--total">
+                        <span>Remaining After</span>
+                        <span>LKR {formatAmount(Math.max(0,
+                          (parseFloat(selectedBillForPayment.remainingAmount) ||
+                           parseFloat(selectedBillForPayment.netTotal || selectedBillForPayment.total) -
+                           parseFloat(selectedBillForPayment.paidAmount || 0))
+                          - (parseFloat(partialPaymentAmount) || 0)
+                        ))}</span>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
+
+            </div>{/* end ROW 2 */}
+
+            {/* ══════════════════════════════════════════
+                ROW 3 — Payment method + details
+            ══════════════════════════════════════════ */}
+            <div className="pm-row pm-row-method">
+
+              {/* Left: method selector */}
+              <div className="pm-method-panel">
+                <p className="pm-panel-label">Payment Method</p>
+                <div className="pm-method-tabs">
+                  {['Cash','Cheque','Bank Transfer'].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      className={`pm-method-tab ${paymentMethod === m ? 'pm-method-tab--active' : ''}`}
+                      onClick={() => {
+                        setPaymentMethod(m);
+                        setChequeAutoFilled(false);
+                        setChequeAutoFillData(null);
+                        setChequeType('new');
+                        setExistingCheques([]);
+                      }}
+                    >
+                      {m === 'Cash' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>}
+                      {m === 'Cheque' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>}
+                      {m === 'Bank Transfer' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
+                      {m}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Cash — no extra fields */}
+                {paymentMethod === 'Cash' && (
+                  <div className="pm-cash-note">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Cash payment — no additional details required.
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="pm-col-divider" />
+
+              {/* Right: cheque / bank fields */}
+              <div className="pm-details-panel">
+
+                {/* ── Cheque ── */}
+                {paymentMethod === 'Cheque' && (
+                  <>
+                    <p className="pm-panel-label">Cheque Details</p>
+
+                    {/* Cheque type toggle */}
+                    <div className="pm-cheque-type-row">
+                      <label className="pm-radio-inline">
+                        <input type="radio" name="chequeType" value="new" checked={chequeType === 'new'} onChange={() => handleChequeTypeChange('new')} />
+                        New Cheque
+                      </label>
+                      <label className="pm-radio-inline">
+                        <input type="radio" name="chequeType" value="existing" checked={chequeType === 'existing'} onChange={() => handleChequeTypeChange('existing')} />
+                        Existing Cheque
+                      </label>
+                    </div>
+
+                    {/* Existing cheque picker */}
+                    {chequeType === 'existing' && (
+                      <div className="pm-field pm-field--full">
+                        <label className="pm-field-label">Select Cheque <span className="pm-req">*</span></label>
+                        {loadingExistingCheques ? (
+                          <span className="pm-loading">Loading cheques…</span>
+                        ) : !Array.isArray(existingCheques) || existingCheques.length === 0 ? (
+                          <div className="pm-info-box">No cheques with remaining balance found for this customer.</div>
+                        ) : (
+                          <select className="pm-input" value={chequeNumber} onChange={e => handleExistingChequeSelect(e.target.value)}>
+                            <option value="">— Select a cheque —</option>
+                            {existingCheques.map(c => (
+                              <option key={c.chequeNumber} value={c.chequeNumber}>
+                                Cheque #{c.chequeNumber} — Balance: LKR {parseFloat(c.remainingBalance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Cheque fields grid */}
+                    {(chequeType === 'new' || (chequeType === 'existing' && chequeNumber)) && (
+                      <div className="pm-fields-grid">
+                        <div className="pm-field">
+                          <label className="pm-field-label">Cheque Number <span className="pm-req">*</span></label>
+                          <input type="text" className="pm-input"
+                            value={chequeNumber}
+                            onChange={e => { setChequeNumber(e.target.value); setChequeAutoFilled(false); }}
+                            onBlur={e => chequeType === 'new' && handleChequeNumberBlur(e.target.value)}
+                            placeholder="e.g. 001234"
+                            readOnly={chequeType === 'existing'}
+                          />
+                        </div>
+                        <div className="pm-field">
+                          <label className="pm-field-label">Cheque Date <span className="pm-req">*</span></label>
+                          <input type="date" className="pm-input"
+                            value={chequeDate}
+                            onChange={e => setChequeDate(e.target.value)}
+                            readOnly={chequeType === 'existing'}
+                          />
+                          {chequeAutoFilled && <small className="pm-autofill">✓ Auto-filled</small>}
+                        </div>
+                        <div className="pm-field">
+                          <label className="pm-field-label">Cheque Amount (LKR) <span className="pm-req">*</span></label>
+                          <input type="number" step="0.01" className="pm-input"
+                            value={chequeAmount}
+                            onChange={e => setChequeAmount(e.target.value)}
+                            placeholder="0.00"
+                            readOnly={chequeType === 'existing'}
+                          />
+                          {chequeAutoFilled && <small className="pm-autofill">✓ Auto-filled</small>}
+                          <small className="pm-hint">Total value written on cheque</small>
+                        </div>
+                        <div className="pm-field">
+                          <label className="pm-field-label">Bank Name</label>
+                          <select className="pm-input" value={bankName} onChange={e => setBankName(e.target.value)} disabled={chequeType === 'existing'}>
+                            <option>Commercial Bank</option>
+                            <option>Peoples Bank</option>
+                            <option>Bank of Ceylon</option>
+                            <option>Hatton National Bank</option>
+                            <option>Sampath Bank</option>
+                            <option>Nations Trust Bank</option>
+                            <option>DFCC Bank</option>
+                            <option>Other</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ── Bank Transfer ── */}
+                {paymentMethod === 'Bank Transfer' && (
+                  <>
+                    <p className="pm-panel-label">Transfer Details</p>
+                    <div className="pm-fields-grid">
+                      <div className="pm-field pm-field--full">
+                        <label className="pm-field-label">Bank Name <span className="pm-req">*</span></label>
+                        <select className="pm-input" value={bankName} onChange={e => setBankName(e.target.value)}>
+                          <option>Commercial Bank</option>
+                          <option>Peoples Bank</option>
+                          <option>Bank of Ceylon</option>
+                          <option>Hatton National Bank</option>
+                          <option>Sampath Bank</option>
+                          <option>Nations Trust Bank</option>
+                          <option>DFCC Bank</option>
+                          <option>Other</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Cash placeholder ── */}
+                {paymentMethod === 'Cash' && (
+                  <div className="pm-empty-panel">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+                    <p>No additional details needed for cash.</p>
+                  </div>
+                )}
+
+              </div>{/* end pm-details-panel */}
+
+            </div>{/* end ROW 3 */}
+            </div>{/* end pm-body */}
+
+            {/* ── Footer ── */}
+            <div className="pm-footer">
+              <button className="pm-btn pm-btn--cancel" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+              <button className="pm-btn pm-btn--confirm" onClick={submitPayment}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Confirm Payment
+              </button>
             </div>
 
-            <div className="payment-modal-footer">
-              <button 
-                className="btn btn-secondary"
-                onClick={() => setShowPaymentModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn btn-success"
-                onClick={submitPayment}
-              >
-                ✓ Confirm Payment
-              </button>
-            </div>
           </div>
         </div>
       )}

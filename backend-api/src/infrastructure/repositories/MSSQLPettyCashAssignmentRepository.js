@@ -525,39 +525,19 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
         const actualSpentNum = Number(actualSpent);
         const assignedAmountNum = Number(assignedAmount);
         
-        // Get user role from settlementData (passed from controller)
-        const userRole = settlementData.userRole;
-        console.log('settle - userRole:', userRole);
-        
         // Check for Full Petty Cash Returned: no items settled and full amount is being returned
         if (actualSpentNum === 0 && balanceNum === assignedAmountNum) {
           newStatus = 'Full Petty Cash Returned';
           console.log('settle - Setting status to Full Petty Cash Returned (no items paid, full cash returned)');
         } else if (balanceNum > 0) {
-          // For Managers, set final status immediately (no approval workflow)
-          if (userRole === 'Manager') {
-            newStatus = 'Settled / Balance Returned';
-            console.log('settle - Manager settlement: Setting status to Settled / Balance Returned (final status)');
-          } else {
-            newStatus = 'Balance To Be Return';
-            console.log('settle - Waff Clerk settlement: Setting status to Balance To Be Return (pending approval)');
-          }
+          newStatus = 'Balance To Be Return';
+          console.log('settle - Setting status to Balance To Be Return, balanceNum:', balanceNum);
         } else if (overNum > 0) {
-          // For Managers, set final status immediately (no approval workflow)
-          if (userRole === 'Manager') {
-            newStatus = 'Settled / Over Due Collected';
-            console.log('settle - Manager settlement: Setting status to Settled / Over Due Collected (final status)');
-          } else {
-            newStatus = 'Over Due';
-            console.log('settle - Waff Clerk settlement: Setting status to Over Due (pending collection)');
-          }
-        } else {
-          // Exact match - status is 'Settled' for both roles
-          newStatus = 'Settled';
-          console.log('settle - Exact match: Setting status to Settled');
+          newStatus = 'Over Due';
+          console.log('settle - Setting status to Over Due, overNum:', overNum);
         }
         
-        console.log('settle - final determined status:', newStatus);
+        console.log('settle - auto-determined status:', newStatus);
         
         // Update assignment with calculated amounts and automatic status
         const updateResult = await transaction.request()
@@ -1233,6 +1213,102 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
       console.error('Error in updateStatusAndClearAmount:', error);
       throw error;
     }
+  }
+
+  // Find assignments by date range (for reporting)
+  async findByDateRange(fromDate, toDate) {
+    try {
+      const pool = await this.getConnection();
+
+      // Convert Date objects to YYYY-MM-DD strings for proper comparison
+      const fromDateStr = fromDate instanceof Date 
+        ? fromDate.toISOString().split('T')[0] 
+        : fromDate;
+      const toDateStr = toDate instanceof Date 
+        ? toDate.toISOString().split('T')[0] 
+        : toDate;
+
+      const result = await pool.request()
+        .input('fromDate', this.sql.VarChar, fromDateStr)
+        .input('toDate',   this.sql.VarChar, toDateStr)
+        .query(`
+          WITH SettlementTotals AS (
+            SELECT 
+              assignmentId,
+              SUM(actualCost) as totalSettled
+            FROM PettyCashSettlementItems
+            GROUP BY assignmentId
+          ),
+          GroupedAssignments AS (
+            SELECT 
+              MIN(pca.assignmentId) as assignmentId,
+              pca.jobId,
+              pca.assignedTo,
+              MIN(pca.assignedBy) as assignedBy,
+              SUM(pca.assignedAmount) as assignedAmount,
+              MIN(pca.assignedDate) as assignedDate,
+              CASE 
+                WHEN COUNT(DISTINCT pca.status) = 1 THEN MIN(pca.status)
+                WHEN SUM(CASE WHEN pca.status LIKE 'Settled%' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Settled'
+                ELSE 'Mixed'
+              END as status,
+              MAX(pca.settlementDate) as settlementDate,
+              SUM(ISNULL(pca.actualSpent, 0)) as actualSpent,
+              STRING_AGG(ISNULL(pca.notes, ''), '; ') as notes,
+              MIN(ISNULL(pca.groupId, pca.jobId + '_' + pca.assignedTo)) as groupId,
+              MIN(j.shipmentCategory) as shipmentCategory,
+              MIN(j.customerId) as customerId,
+              MIN(c.Name) as customerName,
+              MIN(assignedToUser.fullName) as assignedToName,
+              MIN(assignedByUser.fullName) as assignedByName,
+              SUM(ISNULL(st.totalSettled, 0)) as settledAmount,
+              SUM(ISNULL(pca.balanceAmount, 0)) as totalBalanceAmount,
+              SUM(ISNULL(pca.overAmount, 0)) as totalOverAmount
+            FROM PettyCashAssignments pca
+            LEFT JOIN Jobs j ON pca.jobId = j.jobId
+            LEFT JOIN Customers c ON j.customerId = c.customerId
+            LEFT JOIN Users assignedToUser ON pca.assignedTo = assignedToUser.userId
+            LEFT JOIN Users assignedByUser ON pca.assignedBy = assignedByUser.userId
+            LEFT JOIN SettlementTotals st ON pca.assignmentId = st.assignmentId
+            WHERE CONVERT(DATE, pca.assignedDate) BETWEEN CONVERT(DATE, @fromDate) AND CONVERT(DATE, @toDate)
+            GROUP BY 
+              pca.jobId,
+              pca.assignedTo
+          )
+          SELECT 
+            assignmentId,
+            jobId,
+            assignedTo,
+            assignedBy,
+            assignedAmount,
+            assignedDate,
+            status,
+            settlementDate,
+            actualSpent,
+            notes,
+            groupId,
+            shipmentCategory,
+            customerId,
+            customerName,
+            assignedToName,
+            assignedByName,
+            settledAmount,
+            totalBalanceAmount as balanceAmount,
+            totalOverAmount as overAmount
+          FROM GroupedAssignments
+          ORDER BY jobId ASC, assignedTo ASC
+        `);
+
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching assignments by date range:', error);
+      throw error;
+    }
+  }
+
+  // Keep single-date method as a convenience wrapper
+  async findByDate(date) {
+    return this.findByDateRange(date, date);
   }
 }
 

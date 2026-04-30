@@ -7,6 +7,7 @@ import { transporterService } from '../api/services/transporterService';
 import apiClient from '../api/client';
 import OfficePayItems from './OfficePayItems';
 import AdvancePayment from './AdvancePayment';
+import Pagination from './Pagination';
 import '../styles/Jobs.css';
 
 function Jobs() {
@@ -31,6 +32,7 @@ function Jobs() {
     lcNumber: '',
     containerNumber: '',
     transporter: '',
+    transportDeliveryDate: '',
     assignedTo: ''
   });
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -38,6 +40,8 @@ function Jobs() {
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
 
   useEffect(() => {
     fetchJobs();
@@ -183,6 +187,7 @@ function Jobs() {
         lcNumber: '',
         containerNumber: '',
         transporter: '',
+        transportDeliveryDate: '',
         assignedTo: '' 
       });
       setSelectedUsers([]);
@@ -335,6 +340,7 @@ function Jobs() {
       lcNumber: job.lcNumber || '',
       containerNumber: job.containerNumber || '',
       transporter: job.transporter || '',
+      transportDeliveryDate: job.transportDeliveryDate ? job.transportDeliveryDate.split('T')[0] : '',
       assignedTo: job.assignedTo || ''
     });
     // For editing, load existing assignments
@@ -380,6 +386,7 @@ function Jobs() {
         lcNumber: '',
         containerNumber: '',
         transporter: '',
+        transportDeliveryDate: '',
         assignedTo: ''
       });
       setSelectedUsers([]);
@@ -418,7 +425,41 @@ function Jobs() {
            openDate.includes(searchLower);
     
     return statusMatch && searchMatch;
+  }).sort((a, b) => {
+    // Extract numeric part from job ID (e.g., "JOB0001" -> 1)
+    const getJobNumber = (jobId) => {
+      const match = (jobId || '').match(/\d+/);
+      return match ? parseInt(match[0], 10) : 0;
+    };
+    
+    const numA = getJobNumber(a.jobId);
+    const numB = getJobNumber(b.jobId);
+    
+    // Sort in descending order (newest jobs first)
+    return numB - numA;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredJobs.length / recordsPerPage);
+  const indexOfLastRecord = currentPage * recordsPerPage;
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
+  const currentRecords = filteredJobs.slice(indexOfFirstRecord, indexOfLastRecord);
+
+  // Reset to page 1 when search term or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    setExpandedRow(null);
+  };
+
+  const handleRecordsPerPageChange = (newRecordsPerPage) => {
+    setRecordsPerPage(newRecordsPerPage);
+    setCurrentPage(1);
+    setExpandedRow(null);
+  };
 
   return (
     <div className="jobs-page">
@@ -501,12 +542,12 @@ function Jobs() {
               </tr>
             </thead>
             <tbody>
-              {filteredJobs.map(job => (
+              {currentRecords.map(job => (
                 <React.Fragment key={job.jobId}>
                   <tr className={expandedRow === job.jobId ? 'expanded' : ''}>
                     <td data-label="Job ID / CUSDEC Number" className="job-cusdec-cell">
-                      {job.cusdecNumber ? (
-                        <span>{job.jobId || '-'} / {job.cusdecNumber}</span>
+                      {job.cusdecNumber && job.cusdecNumber.trim() ? (
+                        <span className="job-cusdec-combined">{job.jobId || '-'} / {formatCusdecNumberForDisplay(job.cusdecNumber)}</span>
                       ) : (
                         <span className="job-id">{job.jobId || '-'}</span>
                       )}
@@ -648,6 +689,10 @@ function Jobs() {
                               <span className="detail-value">{job.transporter || '-'}</span>
                             </div>
                             <div className="detail-item">
+                              <span className="detail-label">Transport Delivery Date:</span>
+                              <span className="detail-value">{job.transportDeliveryDate ? new Date(job.transportDeliveryDate).toLocaleDateString() : '-'}</span>
+                            </div>
+                            <div className="detail-item">
                               <span className="detail-label">Assigned To:</span>
                               <span className="detail-value">
                                 {job.assignments && job.assignments.length > 0 ? (
@@ -687,6 +732,17 @@ function Jobs() {
             </tbody>
           </table>
           </div>
+        )}
+
+        {filteredJobs.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalRecords={filteredJobs.length}
+            recordsPerPage={recordsPerPage}
+            onPageChange={handlePageChange}
+            onRecordsPerPageChange={handleRecordsPerPageChange}
+          />
         )}
       </div>
 
@@ -851,6 +907,11 @@ function Jobs() {
                         <option value={formData.transporter}>{formData.transporter}</option>
                       )}
                     </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Transport Delivery Date</label>
+                    <input type="date" name="transportDeliveryDate" value={formData.transportDeliveryDate} onChange={handleChange} />
                   </div>
                 </div>
               </div>

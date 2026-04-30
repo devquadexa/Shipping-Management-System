@@ -3,11 +3,12 @@
  * Handles HTTP requests for billing operations
  */
 class BillingController {
-  constructor(createBill, getAllBills, getBillById, markBillAsPaid) {
+  constructor(createBill, getAllBills, getBillById, markBillAsPaid, applyPartialPayment) {
     this.createBill = createBill;
     this.getAllBills = getAllBills;
     this.getBillById = getBillById;
     this.markBillAsPaid = markBillAsPaid;
+    this.applyPartialPayment = applyPartialPayment;
   }
 
   async create(req, res) {
@@ -62,16 +63,40 @@ class BillingController {
     try {
       const paymentDetails = {
         paymentMethod: req.body.paymentMethod,
+        paidDate: req.body.paidDate,
         chequeNumber: req.body.chequeNumber,
         chequeDate: req.body.chequeDate,
         chequeAmount: req.body.chequeAmount,
-        bankName: req.body.bankName
+        bankName: req.body.bankName,
+        createdBy: req.user?.userId
       };
-      
       const bill = await this.markBillAsPaid.execute(req.params.id, paymentDetails);
       res.json(bill);
     } catch (error) {
       console.error('Mark bill paid error:', error);
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  async partialPayment(req, res) {
+    try {
+      const { paymentAmount } = req.body;
+      if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+        return res.status(400).json({ message: 'Payment amount must be greater than zero' });
+      }
+      const paymentDetails = {
+        paymentMethod: req.body.paymentMethod,
+        paidDate: req.body.paidDate,
+        chequeNumber: req.body.chequeNumber,
+        chequeDate: req.body.chequeDate,
+        chequeAmount: req.body.chequeAmount,
+        bankName: req.body.bankName,
+        createdBy: req.user?.userId
+      };
+      const bill = await this.applyPartialPayment.execute(req.params.id, paymentAmount, paymentDetails);
+      res.json(bill);
+    } catch (error) {
+      console.error('Partial payment error:', error);
       res.status(400).json({ message: error.message });
     }
   }

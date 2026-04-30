@@ -234,6 +234,163 @@
   overflow: hidden;
 }
 
+.transporters-page .assigned-jobs-section {
+  grid-column: 1 / -1;
+}
+
+.transporters-page .assigned-jobs-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.transporters-page .assigned-jobs-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.transporters-page .assigned-jobs-table th,
+.transporters-page .assigned-jobs-table td {
+  padding: 0.85rem 0.7rem;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  font-size: 0.78rem;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.transporters-page .assigned-jobs-table th {
+  background: #f8fafc;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.transporters-page .assigned-jobs-table tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+
+.transporters-page .assigned-jobs-table tbody tr:nth-child(even) td {
+  background: #f6f8fc;
+}
+
+.transporters-page .assigned-jobs-table tbody tr:hover td {
+  background: #eef2ff;
+}
+
+.transporters-page .assigned-jobs-table tbody tr {
+  height: 2.4rem;
+}
+
+.transporters-page .assigned-jobs-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.transporters-page .transporter-cost-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+  min-width: 120px;
+}
+
+.transporters-page .transporter-cost-amount {
+  font-weight: 700;
+  color: #111827;
+}
+
+.transporters-page .transporter-paid-badge,
+.transporters-page .transporter-unpaid-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.transporters-page .transporter-paid-badge {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.transporters-page .transporter-unpaid-badge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.transporters-page .btn-pay-amount {
+  padding: 0.45rem 0.7rem;
+  border-radius: 6px;
+  border: none;
+  background: #101036;
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.transporters-page .btn-pay-amount:hover {
+  background: #1b1b57;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(16, 16, 54, 0.15);
+}
+
+.transporters-page .transporter-no-cost {
+  color: #6b7280;
+}
+
+.transporters-page .assigned-jobs-table td:last-child,
+.transporters-page .assigned-jobs-table th:last-child {
+  text-align: center;
+}
+
+.transporters-page .payment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: capitalize;
+}
+
+.transporters-page .payment-paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.transporters-page .payment-unpaid,
+.transporters-page .payment-pending-payment {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.transporters-page .payment-partially-paid,
+.transporters-page .payment-overdue {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.transporters-page .payment-not-billed {
+  background: #e5e7eb;
+  color: #374151;
+}
+
 .transporters-page .detail-item,
 .transporters-page .detail-item-block {
   display: flex;
@@ -903,5 +1060,780 @@
 
   .transporters-page .form-actions .btn {
     width: 100%;
+  }
+}
+
+/* Payment Modal */
+.payment-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 1rem;
+}
+
+.payment-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  max-width: 520px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.payment-modal-header {
+  background: linear-gradient(135deg, #101036 0%, #1e40af 100%);
+  color: white;
+  padding: 1.25rem 1.75rem;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid #0ea5e9;
+}
+
+.payment-modal-header h3 { margin: 0; font-size: 1.3rem; font-weight: 700; }
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.6rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.8;
+}
+.modal-close-btn:hover { opacity: 1; }
+
+.payment-modal-body { padding: 1.75rem; }
+
+.invoice-summary {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px solid #0ea5e9;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #bae6fd;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-row.total-row { border-top: 2px solid #0ea5e9; border-bottom: none; margin-top: 0.25rem; }
+
+.summary-label { font-weight: 600; color: #0c4a6e; font-size: 0.9rem; }
+.summary-value { font-weight: 500; color: #0369a1; font-size: 0.9rem; }
+.summary-value.amount-highlight { font-size: 1.2rem; font-weight: 700; color: #101036; font-family: 'Courier New', monospace; }
+
+.payment-form .form-group { margin-bottom: 1rem; }
+.payment-form .form-group label { display: block; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.9rem; color: #374151; }
+.payment-form .form-control {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+.payment-form .form-control:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,0.2); }
+
+.cheque-details, .bank-details {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-top: 0.75rem;
+}
+
+.cheque-notice, .bank-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.payment-modal-footer {
+  padding: 1.25rem 1.75rem;
+  border-top: 2px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: #f8f9fa;
+  border-radius: 0 0 12px 12px;
+}
+
+.payment-modal-footer .btn { min-width: 130px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.9rem; }
+
+/* Payment Details Dropdown */
+.action-cell-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.action-buttons {
+  flex: 1;
+}
+
+.btn-details-toggle {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #374151;
+  transition: all 0.2s ease;
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-details-toggle:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.btn-details-toggle.expanded {
+  background: #f3f4f6;
+}
+
+.payment-details-row {
+  background: #f9fafb;
+}
+
+.payment-details-row td {
+  padding: 1.5rem 1rem !important;
+  border-top: 1px solid #e5e7eb;
+}
+
+.payment-details-expanded {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  padding: 0.5rem 0;
+}
+
+.detail-card {
+  border-left: 4px solid #0ea5e9;
+  padding-left: 1rem;
+}
+
+.detail-card-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.4rem;
+}
+
+.detail-card-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+
+/* Expand button styling - matches Billing page */
+.expand-btn-middle {
+  padding: 0.5rem;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.expand-btn-middle:hover {
+  background: rgba(16, 16, 54, 0.15);
+  transform: scale(1.2);
+}
+
+.expand-btn-middle svg {
+  transition: transform 0.3s ease;
+}
+
+
+/* Job ID Cell */
+.job-id-cell {
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Summary Cards */
+.summary-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  transition: all 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.summary-card-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.summary-card-content {
+  flex: 1;
+}
+
+.summary-card-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #101036;
+  line-height: 1;
+}
+
+.summary-card-amount {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.summary-card.paid {
+  border-left: 4px solid #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, transparent 100%);
+}
+
+.summary-card.paid .summary-card-value {
+  color: #10b981;
+}
+
+.summary-card.unpaid {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%);
+}
+
+.summary-card.unpaid .summary-card-value {
+  color: #f59e0b;
+}
+
+@media (max-width: 768px) {
+  .summary-cards-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .summary-card {
+    padding: 1rem;
+  }
+
+  .summary-card-value {
+    font-size: 1.5rem;
+  }
+
+  .summary-card-icon {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-cards-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Settlement-style table for assigned jobs */
+.transporters-page .settlement-items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.transporters-page .settlement-items-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #101036;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.transporters-page .settlement-items-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+}
+
+.transporters-page .date-range-filter {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.transporters-page .date-range-filter .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.transporters-page .date-range-filter .filter-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.transporters-page .date-range-filter .filter-input {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  min-width: 150px;
+  box-sizing: border-box;
+}
+
+.transporters-page .date-range-filter .filter-input:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+
+.transporters-page .btn-clear-filter {
+  padding: 0.6rem 1rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.transporters-page .btn-clear-filter:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.transporters-page .settlement-review-table {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  overflow: hidden;
+}
+
+.transporters-page .settlement-table-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  gap: 0;
+  background: #f8fafc;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 0;
+}
+
+.transporters-page .settlement-table-header.with-actions {
+  grid-template-columns: 40px 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+}
+
+.transporters-page .settlement-header-cell {
+  padding: 0.85rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+}
+
+.transporters-page .settlement-header-cell:last-child {
+  border-right: none;
+}
+
+.transporters-page .settlement-num-col {
+  width: 40px;
+  min-width: 40px;
+  flex-shrink: 0;
+}
+
+.transporters-page .settlement-name-col {
+  flex: 1.2;
+  min-width: 120px;
+}
+
+.transporters-page .settlement-type-col {
+  flex: 1;
+  min-width: 100px;
+}
+
+.transporters-page .settlement-bill-col {
+  flex: 1;
+  min-width: 100px;
+}
+
+.transporters-page .settlement-amount-col {
+  flex: 1;
+  min-width: 100px;
+}
+
+.transporters-page .settlement-actions-col {
+  flex: 1;
+  min-width: 100px;
+  text-align: center;
+}
+
+.transporters-page .settlement-table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.transporters-page .settlement-table-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0;
+  align-items: center;
+  min-height: 2.4rem;
+  transition: background 0.2s ease;
+}
+
+.transporters-page .settlement-table-row.with-actions {
+  grid-template-columns: 40px 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+}
+
+.transporters-page .settlement-table-row:nth-child(odd) {
+  background: #ffffff;
+}
+
+.transporters-page .settlement-table-row:nth-child(even) {
+  background: #f6f8fc;
+}
+
+.transporters-page .settlement-table-row:hover {
+  background: #eef2ff;
+}
+
+.transporters-page .settlement-table-row.settlement-total-row {
+  background: #f0f4f8;
+  border-top: 2px solid #e5e7eb;
+  font-weight: 600;
+}
+
+.transporters-page .settlement-table-row.settlement-total-row:hover {
+  background: #f0f4f8;
+}
+
+.transporters-page .settlement-table-row.payment-details-expanded-row {
+  grid-template-columns: 1fr;
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  min-height: auto;
+  padding: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.transporters-page .settlement-table-cell {
+  padding: 0.85rem 0.7rem;
+  font-size: 0.78rem;
+  color: #1f2937;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.transporters-page .settlement-table-cell:last-child {
+  border-right: none;
+}
+
+.transporters-page .settlement-num {
+  justify-content: center;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.transporters-page .settlement-amount-value {
+  font-weight: 600;
+  color: #111827;
+}
+
+.transporters-page .type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.transporters-page .type-badge.template {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.transporters-page .type-badge.custom {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.transporters-page .bill-badge-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.transporters-page .bill-badge-small.has-bill {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.transporters-page .bill-badge-small.no-bill {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.transporters-page .inline-action-btns {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.transporters-page .inline-btn-edit,
+.transporters-page .inline-btn-delete,
+.transporters-page .inline-btn-save,
+.transporters-page .inline-btn-cancel {
+  background: none;
+  border: none;
+  padding: 0.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+}
+
+.transporters-page .inline-btn-edit:hover {
+  background: #f3f4f6;
+  color: #101036;
+  transform: scale(1.1);
+}
+
+.transporters-page .inline-btn-delete:hover {
+  background: #fee2e2;
+  color: #991b1b;
+  transform: scale(1.1);
+}
+
+.transporters-page .inline-btn-save:hover {
+  background: #dcfce7;
+  color: #166534;
+  transform: scale(1.1);
+}
+
+.transporters-page .inline-btn-cancel:hover {
+  background: #fef3c7;
+  color: #92400e;
+  transform: scale(1.1);
+}
+
+.transporters-page .no-settlement-items {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #9ca3af;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.transporters-page .no-settlement-items svg {
+  opacity: 0.5;
+}
+
+.transporters-page .no-settlement-items p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.transporters-page .payment-details-expanded {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem 0;
+  width: 100%;
+}
+
+.transporters-page .detail-card {
+  background: white;
+  border-left: 4px solid #0ea5e9;
+  padding: 1rem;
+  padding-left: 1.25rem;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #0ea5e9;
+}
+
+.transporters-page .detail-card-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.transporters-page .detail-card-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .transporters-page .settlement-table-header,
+  .transporters-page .settlement-table-row {
+    grid-template-columns: 1fr;
+  }
+
+  .transporters-page .settlement-table-header.with-actions,
+  .transporters-page .settlement-table-row.with-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .transporters-page .settlement-header-cell,
+  .transporters-page .settlement-table-cell {
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.6rem;
+  }
+
+  .transporters-page .settlement-header-cell::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: #6b7280;
+    margin-right: 0.5rem;
+  }
+
+  .transporters-page .settlement-table-header {
+    display: none;
+  }
+
+  .transporters-page .settlement-table-row {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    background: white;
+  }
+
+  .transporters-page .settlement-table-row:nth-child(even) {
+    background: white;
+  }
+
+  .transporters-page .settlement-table-row:hover {
+    background: white;
+  }
+
+  .transporters-page .settlement-table-row.settlement-total-row {
+    background: #f0f4f8;
+    margin-top: 0.5rem;
+  }
+
+  .transporters-page .settlement-table-cell {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+    border-right: none;
+  }
+
+  .transporters-page .settlement-table-cell:last-child {
+    border-bottom: none;
+  }
+
+  .transporters-page .settlement-num-col {
+    display: none;
+  }
+
+  .transporters-page .payment-details-expanded {
+    grid-template-columns: 1fr;
   }
 }
