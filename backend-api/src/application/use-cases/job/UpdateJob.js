@@ -62,6 +62,21 @@ class UpdateJob {
           throw new Error('Invalid date format for cusdecDate');
         }
       }
+
+      // Handle date conversion if transportDeliveryDate is provided
+      let processedTransportDeliveryDate = existingJob.transportDeliveryDate;
+      if (jobData.transportDeliveryDate !== undefined && jobData.transportDeliveryDate !== null && jobData.transportDeliveryDate !== '') {
+        try {
+          processedTransportDeliveryDate = new Date(jobData.transportDeliveryDate);
+          if (isNaN(processedTransportDeliveryDate.getTime())) {
+            throw new Error('Invalid date format for transportDeliveryDate');
+          }
+          console.log('UpdateJob.execute - processed transportDeliveryDate:', processedTransportDeliveryDate);
+        } catch (dateError) {
+          console.error('UpdateJob.execute - Transport delivery date conversion error:', dateError);
+          throw new Error('Invalid date format for transportDeliveryDate');
+        }
+      }
       
       // Create updated job object with existing values as defaults
       const updatedJob = {
@@ -77,7 +92,8 @@ class UpdateJob {
         lcNumber: jobData.lcNumber !== undefined ? (jobData.lcNumber || null) : existingJob.lcNumber,
         containerNumber: jobData.containerNumber !== undefined ? (jobData.containerNumber || null) : existingJob.containerNumber,
         transporter: jobData.transporter !== undefined ? (jobData.transporter || null) : existingJob.transporter,
-        status: jobData.status !== undefined ? jobData.status : existingJob.status
+        transportDeliveryDate: jobData.transportDeliveryDate !== undefined ? (jobData.transportDeliveryDate ? processedTransportDeliveryDate : null) : existingJob.transportDeliveryDate,
+        status: jobData.status !== undefined && jobData.status !== null ? jobData.status : existingJob.status
       };
       
       // Validate required fields
@@ -105,38 +121,6 @@ class UpdateJob {
       console.error('UpdateJob.execute - ERROR stack:', error.stack);
       throw error;
     }
-    console.log('UpdateJob.execute - jobId:', jobId, 'data:', jobData);
-    
-    const job = await this.jobRepository.findById(jobId);
-    console.log('UpdateJob.execute - found job:', job);
-    
-    if (!job) {
-      throw new Error('Job not found');
-    }
-    
-    // Update the job with new data
-    const updatedJob = {
-      jobId: job.jobId,
-      customerId: job.customerId, // Customer ID cannot be changed (already stored)
-      blNumber: jobData.blNumber !== undefined ? jobData.blNumber : job.blNumber,
-      cusdecNumber: jobData.cusdecNumber !== undefined ? jobData.cusdecNumber : job.cusdecNumber,
-      openDate: jobData.openDate !== undefined ? jobData.openDate : job.openDate,
-      shipmentCategory: jobData.shipmentCategory !== undefined ? jobData.shipmentCategory : job.shipmentCategory,
-      exporter: jobData.exporter !== undefined ? jobData.exporter : job.exporter,
-      transporter: jobData.transporter !== undefined ? jobData.transporter : job.transporter,
-      lcNumber: jobData.lcNumber !== undefined ? jobData.lcNumber : job.lcNumber,
-      containerNumber: jobData.containerNumber !== undefined ? jobData.containerNumber : job.containerNumber,
-      status: jobData.status !== undefined ? jobData.status : job.status,
-      assignedTo: jobData.assignedTo !== undefined ? jobData.assignedTo : job.assignedTo,
-      createdDate: job.createdDate
-    };
-    
-    console.log('UpdateJob.execute - Updating job with:', updatedJob);
-    const result = await this.jobRepository.update(jobId, updatedJob);
-    console.log('UpdateJob.execute - Update result:', result);
-    
-    // Return the updated job
-    return await this.jobRepository.findById(jobId);
   }
 }
 

@@ -1,5 +1,5 @@
 .billing-page {
-  padding: 2rem 3rem;
+  padding: 1.5rem 2rem;
   max-width: 1600px;
   margin: 0 auto;
 }
@@ -29,7 +29,7 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   overflow: hidden;
   border: 1px solid #e5e7eb;
 }
@@ -83,16 +83,16 @@
 }
 
 .job-details-section {
-  margin-top: 2rem;
-  padding-top: 2rem;
+  margin-top: 3.5rem;
+  padding-top: 3rem;
   border-top: 2px solid #e0e0e0;
 }
 
 .job-info-card {
   background: #ffffff;
-  padding: 2.5rem;
+  padding: 3rem;
   border-radius: 12px;
-  margin-bottom: 2rem;
+  margin-bottom: 3rem;
   border: 2px solid #e5e7eb;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
@@ -427,6 +427,12 @@ input[type="number"] {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+}
+
+.add-items-buttons {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .action-buttons-right {
@@ -815,8 +821,13 @@ input[type="number"] {
 }
 
 .generate-bill-section {
-  text-align: left;
-  padding: 1.25rem 0 0.5rem;
+  text-align: right;
+  padding: 1.25rem 1.5rem 0.5rem 0;
+}
+
+.generate-bill-section .btn {
+  min-width: 180px;
+  padding: 0.75rem 2rem;
 }
 
 .no-items {
@@ -3429,3 +3440,134 @@ input[type="number"] {
 .payment-modal-overlay, .payment-modal, .payment-modal-header,
 .payment-modal-body, .payment-modal-left, .payment-modal-right,
 .payment-modal-section-title, .payment-modal-footer { /* legacy — replaced */ }
+
+/* Print Styles */
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .billing-page {
+    padding: 0;
+    margin: 0;
+  }
+
+  .page-header {
+    display: none;
+  }
+
+  .card {
+    box-shadow: none;
+    border: none;
+    margin-bottom: 0;
+    page-break-inside: avoid;
+  }
+
+  .card-header {
+    display: none;
+  }
+
+  .card-body {
+    padding: 0;
+  }
+
+  .job-details-section {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  .job-info-card {
+    padding: 0;
+    margin-bottom: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .pay-items-card {
+    margin-top: 0;
+  }
+
+  .card-header-inline {
+    display: none;
+  }
+
+  .pay-items-form {
+    background: transparent;
+    padding: 0;
+    border: none;
+    margin-bottom: 0;
+  }
+
+  .pay-items-input-table {
+    box-shadow: none;
+    margin-bottom: 0;
+  }
+
+  .generate-bill-section {
+    display: none;
+  }
+
+  .alert {
+    display: none;
+  }
+
+  .search-box {
+    display: none;
+  }
+
+  .action-buttons {
+    display: none;
+  }
+
+  .expand-column {
+    display: none;
+  }
+
+  .expand-header {
+    display: none;
+  }
+
+  .expand-btn-middle,
+  .expand-btn-right {
+    display: none;
+  }
+
+  .billing-table-wrapper {
+    box-shadow: none;
+  }
+
+  .billing-table {
+    border: none;
+  }
+
+  .billing-table thead {
+    background: #f5f5f5;
+    color: #000;
+  }
+
+  .billing-table th {
+    background: #f5f5f5;
+    color: #000;
+    border-bottom: 1px solid #000;
+  }
+
+  .billing-table tbody tr {
+    page-break-inside: avoid;
+  }
+
+  .modal-overlay,
+  .validation-modal-overlay,
+  .payment-modal-overlay {
+    display: none !important;
+  }
+
+  /* Ensure proper page breaks */
+  .job-info-card,
+  .pay-items-card,
+  .billing-table {
+    page-break-inside: avoid;
+  }
+}

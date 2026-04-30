@@ -43,6 +43,18 @@ function Transporters() {
   const [formData, setFormData] = useState(initialFormData);
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState('');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedJobForPayment, setSelectedJobForPayment] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeDate, setChequeDate] = useState('');
+  const [chequeAmount, setChequeAmount] = useState('');
+  const [bankName, setBankName] = useState('Commercial Bank');
+  const [expandedPaymentDetails, setExpandedPaymentDetails] = useState(null);
+  const [dateRangeFilter, setDateRangeFilter] = useState({
+    startDate: '',
+    endDate: ''
+  });
 
   const canViewTransporters = user && (
     user.role === 'Admin' ||
@@ -469,6 +481,27 @@ function Transporters() {
     return latestBill.paymentStatus || 'Not Billed';
   };
 
+  const getBillingAmount = (jobId) => {
+    if (!jobId) return 0;
+
+    // Find the job with this ID
+    const job = jobs.find(j => j.jobId === jobId);
+    if (!job || !job.payItems) return 0;
+
+    // Get only transporter cost billing amount from job's pay items
+    const payItems = Array.isArray(job.payItems) ? job.payItems : [];
+    const transporterCostItems = payItems.filter((item) => {
+      const label = (item?.description || item?.name || '').toLowerCase().trim();
+      return label === 'transporter cost';
+    });
+
+    if (!transporterCostItems.length) return 0;
+
+    return transporterCostItems.reduce((sum, item) => {
+      return sum + (parseFloat(item.billingAmount || item.amount || 0) || 0);
+    }, 0);
+  };
+
   const getPaymentStatusClassName = (status) => {
     return String(status || 'Not Billed').toLowerCase().replace(/\s+/g, '-');
   };
@@ -486,7 +519,7 @@ function Transporters() {
     if (!transporterCostItems.length) return 0;
 
     return transporterCostItems.reduce((sum, item) => {
-      return sum + (parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0);
+      return sum + (parseFloat(item.actualCost || item.amount || 0) || 0);
     }, 0);
   };
 
@@ -508,38 +541,116 @@ function Transporters() {
 
     const paidByLabels = [...new Set(
       transporterCostItems
-        .map((item) => item.paidByName || item.paidBy || '')
+        .map((item) => {
+          const name = item.paidByName || item.paidBy || '';
+          const method = item.paymentMethod || '';
+          if (name && method) return `${name} (${method})`;
+          return name;
+        })
         .filter(Boolean)
     )];
 
     return paidByLabels.join(', ');
   };
 
-  const payTransporterCost = async (job) => {
+  const getPaymentDetails = (job) => {
     const transporterCostItems = getTransporterCostItems(job);
+    if (!transporterCostItems.length) return null;
+    return transporterCostItems[0];
+  };
 
+  const calculateTransporterSummary = () => {
+    const summary = {
+      totalTransporters: transporters.filter(t => t.isActive).length,
+      transportersWithJobs: new Set(),
+      paidTransporters: new Set(),
+      unpaidTransporters: new Set(),
+      totalPaidAmount: 0,
+      totalUnpaidAmount: 0,
+    };
+
+    jobs.forEach((job) => {
+      const transporterName = (job?.transporter || '').trim().toLowerCase();
+      const transporterId = (job?.transporterId || '').trim().toLowerCase();
+
+      if (!transporterName && !transporterId) return;
+
+      const matchingTransporter = transporters.find((t) => {
+        const tName = (t?.name || '').trim().toLowerCase();
+        const tId = (t?.transporterId || '').trim().toLowerCase();
+        return (transporterId && tId === transporterId) || (transporterName && tName === transporterName);
+      });
+
+      if (!matchingTransporter) return;
+
+      summary.transportersWithJobs.add(matchingTransporter.transporterId);
+
+      const costAmount = getTransporterCostAmount(job);
+      if (costAmount > 0) {
+        if (isTransporterCostPaid(job)) {
+          summary.paidTransporters.add(matchingTransporter.transporterId);
+          summary.totalPaidAmount += costAmount;
+        } else {
+          summary.unpaidTransporters.add(matchingTransporter.transporterId);
+          summary.totalUnpaidAmount += costAmount;
+        }
+      }
+    });
+
+    return {
+      totalTransporters: summary.totalTransporters,
+      transportersWithJobs: summary.transportersWithJobs.size,
+      paidTransporters: summary.paidTransporters.size,
+      unpaidTransporters: summary.unpaidTransporters.size,
+      totalPaidAmount: summary.totalPaidAmount,
+      totalUnpaidAmount: summary.totalUnpaidAmount,
+    };
+  };
+
+  const openPaymentModal = (job) => {
+    const transporterCostItems = getTransporterCostItems(job);
     if (!transporterCostItems.length) {
       setMessage('Transporter cost not found for this job');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-
     const amount = getTransporterCostAmount(job);
     if (amount <= 0) {
       setMessage('Transporter cost amount is not set yet');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
+    setSelectedJobForPayment(job);
+    setPaymentMethod('Cash');
+    setChequeNumber('');
+    setChequeDate('');
+    setChequeAmount('');
+    setBankName('Commercial Bank');
+    setShowPaymentModal(true);
+  };
+
+  const submitTransporterPayment = async () => {
+    if (!selectedJobForPayment) return;
+
+    if (paymentMethod === 'Cheque') {
+      if (!chequeNumber || !chequeDate || !chequeAmount) {
+        setMessage('❌ Please fill in all cheque details (Number, Date, Amount)');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+      if (isNaN(parseFloat(chequeAmount)) || parseFloat(chequeAmount) <= 0) {
+        setMessage('❌ Please enter a valid cheque amount');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+    }
 
     try {
-      const updatedPayItems = (Array.isArray(job.payItems) ? job.payItems : []).map((item) => {
+      const updatedPayItems = (Array.isArray(selectedJobForPayment.payItems) ? selectedJobForPayment.payItems : []).map((item) => {
         const label = (item?.description || item?.name || '').toLowerCase().trim();
-        if (label !== 'transporter cost') {
-          return item;
-        }
+        if (label !== 'transporter cost') return item;
 
         const itemAmount = parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0;
-
         return {
           ...item,
           paymentStatus: 'Paid',
@@ -547,21 +658,26 @@ function Transporters() {
           paidAmount: itemAmount,
           paidAt: new Date().toISOString(),
           paidBy: user?.userId || user?.username || user?.name || 'System',
-          paidByName: user?.name || user?.fullName || user?.username || user?.userId || 'System'
+          paidByName: user?.name || user?.fullName || user?.username || user?.userId || 'System',
+          paymentMethod,
+          ...(paymentMethod === 'Cheque' && { chequeNumber, chequeDate, chequeAmount: parseFloat(chequeAmount) }),
+          ...(paymentMethod === 'Bank Transfer' && { bankName }),
         };
       });
 
-      await jobService.replacePayItems(job.jobId, updatedPayItems);
+      await jobService.replacePayItems(selectedJobForPayment.jobId, updatedPayItems);
 
       setJobs((prevJobs) => prevJobs.map((currentJob) => (
-        currentJob.jobId === job.jobId ? { ...currentJob, payItems: updatedPayItems } : currentJob
+        currentJob.jobId === selectedJobForPayment.jobId ? { ...currentJob, payItems: updatedPayItems } : currentJob
       )));
 
-      setMessage(`Transporter cost marked as paid for ${job.jobId}`);
-      setTimeout(() => setMessage(''), 3000);
+      setShowPaymentModal(false);
+      setSelectedJobForPayment(null);
+      setMessage(`✅ Transporter cost marked as paid for ${selectedJobForPayment.jobId} via ${paymentMethod}`);
+      setTimeout(() => setMessage(''), 4000);
     } catch (error) {
       console.error('Error paying transporter cost:', error);
-      setMessage(error.response?.data?.message || 'Error paying transporter cost');
+      setMessage(error.response?.data?.message || '❌ Error paying transporter cost');
       setTimeout(() => setMessage(''), 3000);
     }
   };
@@ -593,6 +709,44 @@ function Transporters() {
           {message}
         </div>
       )}
+
+      {(() => {
+        const summary = calculateTransporterSummary();
+        return (
+          <div className="summary-cards-container">
+            <div className="summary-card">
+              <div className="summary-card-icon">👥</div>
+              <div className="summary-card-content">
+                <div className="summary-card-label">Total Transporters</div>
+                <div className="summary-card-value">{summary.totalTransporters}</div>
+              </div>
+            </div>
+            <div className="summary-card">
+              <div className="summary-card-icon">📋</div>
+              <div className="summary-card-content">
+                <div className="summary-card-label">With Jobs</div>
+                <div className="summary-card-value">{summary.transportersWithJobs}</div>
+              </div>
+            </div>
+            <div className="summary-card paid">
+              <div className="summary-card-icon">✅</div>
+              <div className="summary-card-content">
+                <div className="summary-card-label">Paid</div>
+                <div className="summary-card-value">{summary.paidTransporters}</div>
+                <div className="summary-card-amount">LKR {formatAmount(summary.totalPaidAmount)}</div>
+              </div>
+            </div>
+            <div className="summary-card unpaid">
+              <div className="summary-card-icon">⏳</div>
+              <div className="summary-card-content">
+                <div className="summary-card-label">Unpaid</div>
+                <div className="summary-card-value">{summary.unpaidTransporters}</div>
+                <div className="summary-card-amount">LKR {formatAmount(summary.totalUnpaidAmount)}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="card">
         <div className="card-header">
@@ -770,45 +924,114 @@ function Transporters() {
                             )}
 
                             <div className="detail-section assigned-jobs-section">
-                              <h4 className="section-title">Assigned Jobs ({assignedJobs.length})</h4>
+                              <div className="settlement-items-header">
+                                <span className="settlement-items-title">Assigned Jobs</span>
+                                <span className="settlement-items-count">{assignedJobs.length} job{assignedJobs.length !== 1 ? 's' : ''}</span>
+                              </div>
                               {assignedJobs.length === 0 ? (
-                                <div className="detail-value-block">No jobs assigned to this transporter</div>
+                                <div className="no-settlement-items">
+                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                  </svg>
+                                  <p>No jobs assigned to this transporter</p>
+                                </div>
                               ) : (
-                                <div className="assigned-jobs-table-wrapper">
-                                  <table className="assigned-jobs-table">
-                                    <colgroup>
-                                      <col style={{ width: '20%' }} />
-                                      <col style={{ width: '22%' }} />
-                                      <col style={{ width: '20%' }} />
-                                      <col style={{ width: '18%' }} />
-                                      <col style={{ width: '20%' }} />
-                                    </colgroup>
-                                    <thead>
-                                      <tr>
-                                        <th>Job ID</th>
-                                        <th>Category</th>
-                                        <th>Transporter Cost</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {assignedJobs.map((job) => (
-                                        <tr key={job.jobId}>
-                                          <td>{job.jobId || '-'}</td>
-                                          <td>{job.shipmentCategory || '-'}</td>
-                                          <td>
+                                <>
+                                  <div className="date-range-filter">
+                                    <div className="filter-group">
+                                      <label>From Date:</label>
+                                      <input
+                                        type="date"
+                                        value={dateRangeFilter.startDate}
+                                        onChange={(e) => setDateRangeFilter({...dateRangeFilter, startDate: e.target.value})}
+                                        className="filter-input"
+                                      />
+                                    </div>
+                                    <div className="filter-group">
+                                      <label>To Date:</label>
+                                      <input
+                                        type="date"
+                                        value={dateRangeFilter.endDate}
+                                        onChange={(e) => setDateRangeFilter({...dateRangeFilter, endDate: e.target.value})}
+                                        className="filter-input"
+                                      />
+                                    </div>
+                                    {(dateRangeFilter.startDate || dateRangeFilter.endDate) && (
+                                      <button
+                                        onClick={() => setDateRangeFilter({startDate: '', endDate: ''})}
+                                        className="btn-clear-filter"
+                                      >
+                                        Clear Filter
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="settlement-review-table">
+                                  <div className="settlement-table-header">
+                                    <div className="settlement-header-cell settlement-num-col">#</div>
+                                    <div className="settlement-header-cell settlement-name-col">Job ID</div>
+                                    <div className="settlement-header-cell settlement-type-col">Category</div>
+                                    <div className="settlement-header-cell settlement-type-col">Delivery Date</div>
+                                    <div className="settlement-header-cell settlement-bill-col">Cost</div>
+                                    <div className="settlement-header-cell settlement-bill-col">Billing Amount</div>
+                                    <div className="settlement-header-cell settlement-amount-col">Status</div>
+                                    <div className="settlement-header-cell settlement-actions-col">Action</div>
+                                  </div>
+                                  <div className="settlement-table-body">
+                                    {assignedJobs.filter((job) => {
+                                      if (!dateRangeFilter.startDate && !dateRangeFilter.endDate) {
+                                        return true;
+                                      }
+                                      
+                                      const jobDate = job.transportDeliveryDate ? new Date(job.transportDeliveryDate) : null;
+                                      if (!jobDate) return false;
+                                      
+                                      if (dateRangeFilter.startDate) {
+                                        const startDate = new Date(dateRangeFilter.startDate);
+                                        if (jobDate < startDate) return false;
+                                      }
+                                      
+                                      if (dateRangeFilter.endDate) {
+                                        const endDate = new Date(dateRangeFilter.endDate);
+                                        endDate.setHours(23, 59, 59, 999);
+                                        if (jobDate > endDate) return false;
+                                      }
+                                      
+                                      return true;
+                                    }).map((job, idx) => (
+                                      <React.Fragment key={job.jobId}>
+                                        <div className="settlement-table-row">
+                                          <div className="settlement-table-cell settlement-num-col settlement-num">{idx + 1}</div>
+                                          <div className="settlement-table-cell settlement-name-col">
+                                            <span className="job-id-cell">
+                                              {job.jobId || '-'}{job.cusdecNumber && ` / ${job.cusdecNumber}`}
+                                            </span>
+                                          </div>
+                                          <div className="settlement-table-cell settlement-type-col">
+                                            {job.shipmentCategory || '-'}
+                                          </div>
+                                          <div className="settlement-table-cell settlement-type-col">
+                                            {job.transportDeliveryDate ? new Date(job.transportDeliveryDate).toLocaleDateString() : '-'}
+                                          </div>
+                                          <div className="settlement-table-cell settlement-bill-col">
                                             {getTransporterCostAmount(job) > 0 ? (
-                                              <div className="transporter-cost-cell">
-                                                <span className="transporter-cost-amount">
-                                                  LKR {formatAmount(getTransporterCostAmount(job))}
-                                                </span>
-                                              </div>
+                                              <span className="transporter-cost-amount">
+                                                LKR {formatAmount(getTransporterCostAmount(job))}
+                                              </span>
                                             ) : (
                                               <span className="transporter-no-cost">-</span>
                                             )}
-                                          </td>
-                                          <td>
+                                          </div>
+                                          <div className="settlement-table-cell settlement-bill-col">
+                                            {getBillingAmount(job.jobId) > 0 ? (
+                                              <span className="billing-amount">
+                                                LKR {formatAmount(getBillingAmount(job.jobId))}
+                                              </span>
+                                            ) : (
+                                              <span className="transporter-no-cost">-</span>
+                                            )}
+                                          </div>
+                                          <div className="settlement-table-cell settlement-amount-col">
                                             {(() => {
                                               const paymentStatus = getJobPaymentStatus(job.jobId);
                                               return (
@@ -817,33 +1040,106 @@ function Transporters() {
                                                 </span>
                                               );
                                             })()}
-                                          </td>
-                                          <td>
-                                            {getTransporterCostAmount(job) > 0 ? (
-                                              isTransporterCostPaid(job) ? (
-                                                <span className="transporter-paid-badge">
-                                                  Paid{getPaidByLabel(job) ? ` by ${getPaidByLabel(job)}` : ''}
-                                                </span>
-                                              ) : canPayTransporterCosts ? (
+                                          </div>
+                                          <div className="settlement-table-cell settlement-actions-col">
+                                            <div className="inline-action-btns">
+                                              {getTransporterCostAmount(job) > 0 ? (
+                                                isTransporterCostPaid(job) ? (
+                                                  <span className="transporter-paid-badge">Paid</span>
+                                                ) : canPayTransporterCosts ? (
+                                                  <button
+                                                    type="button"
+                                                    className="inline-btn-edit"
+                                                    onClick={() => openPaymentModal(job)}
+                                                    title="Pay the amount"
+                                                  >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                  </button>
+                                                ) : (
+                                                  <span className="transporter-unpaid-badge">Unpaid</span>
+                                                )
+                                              ) : (
+                                                <span className="transporter-no-cost">-</span>
+                                              )}
+                                              {getTransporterCostAmount(job) > 0 && (
                                                 <button
                                                   type="button"
-                                                  className="btn-action btn-pay-amount"
-                                                  onClick={() => payTransporterCost(job)}
+                                                  className="inline-btn-delete"
+                                                  onClick={() => setExpandedPaymentDetails(expandedPaymentDetails === job.jobId ? null : job.jobId)}
+                                                  title={expandedPaymentDetails === job.jobId ? "Hide details" : "View details"}
                                                 >
-                                                  Pay the amount
+                                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <polyline points={expandedPaymentDetails === job.jobId ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+                                                  </svg>
                                                 </button>
-                                              ) : (
-                                                <span className="transporter-unpaid-badge">Unpaid</span>
-                                              )
-                                            ) : (
-                                              <span className="transporter-no-cost">-</span>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        {expandedPaymentDetails === job.jobId && (
+                                          <div className="settlement-table-row payment-details-expanded-row">
+                                            <div className="settlement-table-cell" style={{gridColumn: '1 / -1'}}>
+                                              <div className="payment-details-expanded">
+                                                <div className="detail-card">
+                                                  <div className="detail-card-label">AMOUNT</div>
+                                                  <div className="detail-card-value">LKR {formatAmount(getTransporterCostAmount(job))}</div>
+                                                </div>
+                                                {isTransporterCostPaid(job) && getPaymentDetails(job) && (
+                                                  <>
+                                                    <div className="detail-card">
+                                                      <div className="detail-card-label">PAID BY</div>
+                                                      <div className="detail-card-value">{getPaymentDetails(job).paidByName || '-'}</div>
+                                                    </div>
+                                                    <div className="detail-card">
+                                                      <div className="detail-card-label">PAYMENT METHOD</div>
+                                                      <div className="detail-card-value">{getPaymentDetails(job).paymentMethod || '-'}</div>
+                                                    </div>
+                                                    {getPaymentDetails(job).paymentMethod === 'Cheque' && (
+                                                      <>
+                                                        <div className="detail-card">
+                                                          <div className="detail-card-label">CHEQUE #</div>
+                                                          <div className="detail-card-value">{getPaymentDetails(job).chequeNumber || '-'}</div>
+                                                        </div>
+                                                        <div className="detail-card">
+                                                          <div className="detail-card-label">CHEQUE DATE</div>
+                                                          <div className="detail-card-value">{getPaymentDetails(job).chequeDate || '-'}</div>
+                                                        </div>
+                                                      </>
+                                                    )}
+                                                    {getPaymentDetails(job).paymentMethod === 'Bank Transfer' && (
+                                                      <div className="detail-card">
+                                                        <div className="detail-card-label">BANK</div>
+                                                        <div className="detail-card-value">{getPaymentDetails(job).bankName || '-'}</div>
+                                                      </div>
+                                                    )}
+                                                    <div className="detail-card">
+                                                      <div className="detail-card-label">PAID AT</div>
+                                                      <div className="detail-card-value">{getPaymentDetails(job).paidAt ? new Date(getPaymentDetails(job).paidAt).toLocaleDateString() : '-'}</div>
+                                                    </div>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </React.Fragment>
+                                    ))}
+                                    <div className="settlement-table-row settlement-total-row">
+                                      <div className="settlement-table-cell settlement-num-col"></div>
+                                      <div className="settlement-table-cell settlement-name-col"><strong>Total</strong></div>
+                                      <div className="settlement-table-cell settlement-type-col"></div>
+                                      <div className="settlement-table-cell settlement-bill-col settlement-amount-value">
+                                        <strong>LKR {formatAmount(assignedJobs.reduce((sum, job) => sum + getTransporterCostAmount(job), 0))}</strong>
+                                      </div>
+                                      <div className="settlement-table-cell settlement-bill-col settlement-amount-value">
+                                        <strong>LKR {formatAmount(assignedJobs.reduce((sum, job) => sum + getBillingAmount(job.jobId), 0))}</strong>
+                                      </div>
+                                      <div className="settlement-table-cell settlement-amount-col"></div>
+                                      <div className="settlement-table-cell settlement-actions-col"></div>
+                                    </div>
+                                  </div>
                                 </div>
+                                </>
                               )}
                             </div>
                           </div>
@@ -1092,6 +1388,90 @@ function Transporters() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showPaymentModal && selectedJobForPayment && (
+        <div className="payment-modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="payment-modal-header">
+              <h3>💳 Payment Details</h3>
+              <button className="modal-close-btn" onClick={() => setShowPaymentModal(false)}>×</button>
+            </div>
+
+            <div className="payment-modal-body">
+              <div className="invoice-summary">
+                <div className="summary-row">
+                  <span className="summary-label">Job ID:</span>
+                  <span className="summary-value">{selectedJobForPayment.jobId}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Category:</span>
+                  <span className="summary-value">{selectedJobForPayment.shipmentCategory || '-'}</span>
+                </div>
+                <div className="summary-row total-row">
+                  <span className="summary-label">Amount to Pay:</span>
+                  <span className="summary-value amount-highlight">LKR {formatAmount(getTransporterCostAmount(selectedJobForPayment))}</span>
+                </div>
+              </div>
+
+              <div className="payment-form">
+                <div className="form-group">
+                  <label>Payment Method <span style={{color: '#dc2626'}}>*</span></label>
+                  <select
+                    className="form-control"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
+                </div>
+
+                {paymentMethod === 'Cheque' && (
+                  <div className="cheque-details">
+                    <div className="cheque-notice">
+                      <span className="notice-icon">📝</span>
+                      <span>Please provide cheque details</span>
+                    </div>
+                    <div className="form-group">
+                      <label>Cheque Number <span style={{color: '#dc2626'}}>*</span></label>
+                      <input type="text" className="form-control" value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} placeholder="Enter cheque number" />
+                    </div>
+                    <div className="form-group">
+                      <label>Cheque Date <span style={{color: '#dc2626'}}>*</span></label>
+                      <input type="date" className="form-control" value={chequeDate} onChange={(e) => setChequeDate(e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>Cheque Amount (LKR) <span style={{color: '#dc2626'}}>*</span></label>
+                      <input type="number" step="0.01" className="form-control" value={chequeAmount} onChange={(e) => setChequeAmount(e.target.value)} placeholder="0.00" />
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === 'Bank Transfer' && (
+                  <div className="bank-details">
+                    <div className="bank-notice">
+                      <span className="notice-icon">🏦</span>
+                      <span>Please select the bank</span>
+                    </div>
+                    <div className="form-group">
+                      <label>Bank Name <span style={{color: '#dc2626'}}>*</span></label>
+                      <select className="form-control" value={bankName} onChange={(e) => setBankName(e.target.value)}>
+                        <option value="Commercial Bank">Commercial Bank</option>
+                        <option value="Peoples Bank">Peoples Bank</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="payment-modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+              <button className="btn btn-success" onClick={submitTransporterPayment}>✓ Confirm Payment</button>
+            </div>
           </div>
         </div>
       )}

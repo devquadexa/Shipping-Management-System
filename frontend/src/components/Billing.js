@@ -921,6 +921,9 @@ function Billing() {
     ) {
       missingFields.push('Chassis Number');
     }
+    if (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) {
+      missingFields.push('Transport Delivery Date');
+    }
     console.log('generateBill - missingFields:', missingFields);
     
     if (missingFields.length > 0) {
@@ -1344,13 +1347,37 @@ function Billing() {
 
     const payItemsPerPage = 25;
     const printablePayItemPages = [];
+    
+    // Create pages with exactly 25 rows each
     for (let index = 0; index < printablePayItems.length; index += payItemsPerPage) {
-      printablePayItemPages.push(printablePayItems.slice(index, index + payItemsPerPage));
+      const pageItems = printablePayItems.slice(index, index + payItemsPerPage);
+      
+      // Fill remaining rows with empty items to make exactly 25 rows
+      while (pageItems.length < payItemsPerPage) {
+        pageItems.push({
+          payItemId: '',
+          description: '',
+          amount: null
+        });
+      }
+      
+      printablePayItemPages.push(pageItems);
     }
 
     if (printablePayItemPages.length === 0) {
-      printablePayItemPages.push([{ payItemId: 'PI001', description: 'Service Charges', amount: grossTotal }]);
+      const defaultPage = [{ payItemId: 'PI001', description: 'Service Charges', amount: grossTotal }];
+      // Fill remaining rows with empty items
+      while (defaultPage.length < payItemsPerPage) {
+        defaultPage.push({
+          payItemId: '',
+          description: '',
+          amount: null
+        });
+      }
+      printablePayItemPages.push(defaultPage);
     }
+
+    const hasMultiplePages = printablePayItemPages.length > 1;
 
     // Add transporter cost for FCL shipments
     if (job.shipmentCategory === 'FCL') {
@@ -1498,7 +1525,6 @@ function Billing() {
           .items-section {
             margin: ${isCompactItemsLayout ? '2px 0 0 0' : '4px 0 0 0'};
             flex: 1;
-            padding-bottom: ${isCompactItemsLayout ? '88mm' : '96mm'};
           }
           .pay-items-page {
             width: 100%;
@@ -1522,6 +1548,10 @@ function Billing() {
           }
           .pay-items-table tbody td {
             line-height: 1.25;
+            min-height: ${isCompactItemsLayout ? '18px' : '20px'};
+          }
+          .pay-items-table tbody tr {
+            height: ${isCompactItemsLayout ? '18px' : '20px'};
           }
           .pay-items-table thead th {
             background: #e9efff;
@@ -1550,13 +1580,35 @@ function Billing() {
           }
           .invoice-summary {
             margin-top: ${isCompactItemsLayout ? '10px' : '14px'};
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 2rem;
+          }
+          .totals-box {
+            flex-shrink: 0;
+            border: 2px solid var(--theme-primary);
+            padding: ${isCompactItemsLayout ? '6px 12px' : '8px 16px'};
+            background: ${isColorMode ? 'linear-gradient(135deg, var(--theme-soft) 0%, #ffffff 100%)' : '#ffffff'};
+            border-radius: 4px;
+            min-width: 280px;
+          }
+          .totals-box .item-row {
+            margin: ${isCompactItemsLayout ? '2px 0' : '3px 0'};
+            padding: ${isCompactItemsLayout ? '1px 0' : '2px 0'};
+          }
+          .totals-box .item-row.subtotal {
+            margin-top: ${isCompactItemsLayout ? '2px' : '3px'};
+            padding-top: ${isCompactItemsLayout ? '2px' : '3px'};
+          }
+          .totals-box .item-row.total {
+            margin-top: ${isCompactItemsLayout ? '3px' : '4px'};
+            padding-top: ${isCompactItemsLayout ? '3px' : '4px'};
+            padding-bottom: ${isCompactItemsLayout ? '2px' : '3px'};
           }
           .totals-section {
-            position: fixed;
-            bottom: ${isCompactItemsLayout ? '14mm' : '18mm'};
-            left: 0;
-            right: 0;
-            margin: 0;
+            position: relative;
+            margin-top: ${isCompactItemsLayout ? '10px' : '14px'};
             background: #ffffff;
             padding-top: 4px;
             z-index: 2;
@@ -1588,20 +1640,19 @@ function Billing() {
             color: var(--theme-primary);
           }
           .signature-section {
-            position: fixed;
-            bottom: ${isCompactItemsLayout ? '0mm' : '2mm'};
-            left: 0;
+            position: relative;
             margin-top: 0;
             margin-left: 0;
             text-align: left;
             background: #ffffff;
             z-index: 3;
+            flex-shrink: 0;
           }
           .signature-space {
-            border-top: 1px solid var(--theme-primary);
-            width: 180px;
-            margin: ${isCompactItemsLayout ? '8px 0 2px 0' : '10px 0 2px 0'};
-            height: 1px;
+            border-bottom: 1px solid var(--theme-primary);
+            width: 280px;
+            margin: ${isCompactItemsLayout ? '0 0 2px 0' : '0 0 2px 0'};
+            height: 40px;
           }
           .signature-label {
             font-size: ${isCompactItemsLayout ? '8pt' : '8.5pt'};
@@ -1698,9 +1749,9 @@ function Billing() {
                 <tbody>
                   ${pageItems.map(item => `
                     <tr>
-                      <td class="id-col">${item.payItemId}</td>
-                      <td class="description-col"><span class="pay-item-description">${item.description}</span></td>
-                      <td class="amount-col">${formatAmount(item.amount)}</td>
+                      <td class="id-col">${item.payItemId || ''}</td>
+                      <td class="description-col"><span class="pay-item-description">${item.description || ''}</span></td>
+                      <td class="amount-col">${item.amount !== null && item.amount !== undefined ? formatAmount(item.amount) : ''}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -1709,28 +1760,30 @@ function Billing() {
           `).join('')}
         </div>
 
-        <div class="totals-section invoice-summary">
-          <div class="item-row subtotal">
-            <div class="item-description">GROSS TOTAL</div>
-            <div class="item-amount">${formatAmount(grossTotal)}</div>
+        <div class="invoice-summary">
+          <div class="signature-section">
+            <div class="signature-space"></div>
+            <div class="signature-label">SUPER SHINE CARGO SERVICES<br>MANAGER</div>
           </div>
-          
-          ${advancePayment > 0 ? `
-            <div class="item-row subtotal">
-              <div class="item-description">${advancePaymentLabel}</div>
-              <div class="item-amount">${formatAmount(advancePayment)}</div>
-            </div>
-          ` : ''}
-          
-          <div class="item-row total">
-            <div class="item-description">Total Due Amount</div>
-            <div class="item-amount">${formatAmount(advancePayment > 0 ? netTotal : grossTotal)}</div>
-          </div>
-        </div>
 
-        <div class="signature-section">
-          <div class="signature-space"></div>
-          <div class="signature-label">SUPER SHINE CARGO SERVICES<br>MANAGER</div>
+          <div class="totals-box">
+            <div class="item-row subtotal">
+              <div class="item-description">GROSS TOTAL</div>
+              <div class="item-amount">${formatAmount(grossTotal)}</div>
+            </div>
+            
+            ${advancePayment > 0 ? `
+              <div class="item-row subtotal">
+                <div class="item-description">${advancePaymentLabel}</div>
+                <div class="item-amount">${formatAmount(advancePayment)}</div>
+              </div>
+            ` : ''}
+            
+            <div class="item-row total">
+              <div class="item-description">Total Due Amount</div>
+              <div class="item-amount">${formatAmount(advancePayment > 0 ? netTotal : grossTotal)}</div>
+            </div>
+          </div>
         </div>
         </div>
         </div>
@@ -1884,6 +1937,12 @@ function Billing() {
                     </div>
                   )}
                   <div className="info-row">
+                    <span className="info-label">Transport Delivery Date: {(!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) && <span className="required-indicator">*Required</span>}</span>
+                    <span className={`info-value ${(!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) ? 'missing-value' : ''}`}>
+                      {selectedJob.transportDeliveryDate ? new Date(selectedJob.transportDeliveryDate).toLocaleDateString() : '-'}
+                    </span>
+                  </div>
+                  <div className="info-row">
                     <span className="info-label">Status:</span>
                     <span className="info-value">
                       <span className={`status-badge status-${(selectedJob.status || 'Open').toLowerCase()}`}>
@@ -2032,7 +2091,7 @@ function Billing() {
                               />
                             </td>
                             <td>
-                              {payItems.length > 1 && !item.paidByName && (
+                              {payItems.length > 1 && !item.paidByName && !(selectedJob?.shipmentCategory === 'FCL' && isTransporterCostLabel(item.name)) && (
                                 <button
                                   type="button"
                                   onClick={() => removePayItemRow(index)}
@@ -2071,16 +2130,18 @@ function Billing() {
                     </table>
                     
                     <div className="pay-items-actions">
-                      {selectedJob?.shipmentCategory !== 'FCL' && !hasTransporterCostItem(payItems) && (
-                        <button onClick={addTransporterCostRow} className="btn btn-primary btn-small">
-                          + Add Transporter Cost
-                        </button>
-                      )}
-                      {!(payItems.length === 1 && isTransporterCostLabel(payItems[0]?.name || payItems[0]?.description)) && (
-                        <button onClick={addPayItemRow} className="btn btn-secondary btn-small">
-                          + Add Another Item
-                        </button>
-                      )}
+                      <div className="add-items-buttons">
+                        {selectedJob?.shipmentCategory !== 'FCL' && !hasTransporterCostItem(payItems) && (
+                          <button onClick={addTransporterCostRow} className="btn btn-primary btn-small">
+                            + Add Transporter Cost
+                          </button>
+                        )}
+                        {!(payItems.length === 1 && isTransporterCostLabel(payItems[0]?.name || payItems[0]?.description)) && (
+                          <button onClick={addPayItemRow} className="btn btn-secondary btn-small">
+                            + Add Another Item
+                          </button>
+                        )}
+                      </div>
                       <div className="action-buttons-right">
                         <button onClick={savePayItems} className="btn btn-success">
                           Save Pay Items

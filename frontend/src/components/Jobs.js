@@ -32,6 +32,7 @@ function Jobs() {
     lcNumber: '',
     containerNumber: '',
     transporter: '',
+    transportDeliveryDate: '',
     assignedTo: ''
   });
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -186,6 +187,7 @@ function Jobs() {
         lcNumber: '',
         containerNumber: '',
         transporter: '',
+        transportDeliveryDate: '',
         assignedTo: '' 
       });
       setSelectedUsers([]);
@@ -338,6 +340,7 @@ function Jobs() {
       lcNumber: job.lcNumber || '',
       containerNumber: job.containerNumber || '',
       transporter: job.transporter || '',
+      transportDeliveryDate: job.transportDeliveryDate ? job.transportDeliveryDate.split('T')[0] : '',
       assignedTo: job.assignedTo || ''
     });
     // For editing, load existing assignments
@@ -383,6 +386,7 @@ function Jobs() {
         lcNumber: '',
         containerNumber: '',
         transporter: '',
+        transportDeliveryDate: '',
         assignedTo: ''
       });
       setSelectedUsers([]);
@@ -685,6 +689,10 @@ function Jobs() {
                               <span className="detail-value">{job.transporter || '-'}</span>
                             </div>
                             <div className="detail-item">
+                              <span className="detail-label">Transport Delivery Date:</span>
+                              <span className="detail-value">{job.transportDeliveryDate ? new Date(job.transportDeliveryDate).toLocaleDateString() : '-'}</span>
+                            </div>
+                            <div className="detail-item">
                               <span className="detail-label">Assigned To:</span>
                               <span className="detail-value">
                                 {job.assignments && job.assignments.length > 0 ? (
@@ -899,6 +907,11 @@ function Jobs() {
                         <option value={formData.transporter}>{formData.transporter}</option>
                       )}
                     </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Transport Delivery Date</label>
+                    <input type="date" name="transportDeliveryDate" value={formData.transportDeliveryDate} onChange={handleChange} />
                   </div>
                 </div>
               </div>

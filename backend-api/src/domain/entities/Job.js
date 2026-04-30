@@ -16,6 +16,7 @@ class Job {
     transporter = null,
     lcNumber = null,
     containerNumber = null,
+    transportDeliveryDate = null,
     status = 'Open',
     assignedTo = null, // Legacy single assignment (for backward compatibility)
     assignedUsers = [], // New: Array of assigned users
@@ -44,6 +45,7 @@ class Job {
     this.transporter = transporter;
     this.lcNumber = lcNumber;
     this.containerNumber = containerNumber;
+    this.transportDeliveryDate = transportDeliveryDate;
     this.status = status;
     this.assignedTo = assignedTo; // Legacy field
     this.assignedUsers = assignedUsers; // New field for multiple users
@@ -202,6 +204,7 @@ class Job {
       transporter: this.transporter,
       lcNumber: this.lcNumber,
       containerNumber: this.containerNumber,
+      transportDeliveryDate: this.transportDeliveryDate,
       status: this.status,
       assignedTo: this.assignedTo, // Legacy field
       assignedUsers: this.assignedUsers, // New field
