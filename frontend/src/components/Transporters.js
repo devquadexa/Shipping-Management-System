@@ -10,6 +10,7 @@ const initialFormData = {
   name: '',
   mainPhone: '',
   email: '',
+  lorryNumber: '',
   registrationDate: new Date().toISOString().split('T')[0],
   addressNumber: '',
   addressStreet1: '',
@@ -18,6 +19,9 @@ const initialFormData = {
   addressCity: '',
   addressCountry: 'Sri Lanka',
   contactPersons: [{ name: '', phone: '', email: '' }],
+  transporterType: 'Non FCL',
+  driverName: '',
+  size: '',
   isActive: true,
 };
 
@@ -172,6 +176,7 @@ function Transporters() {
       name: transporter.name || '',
       mainPhone: transporter.mainPhone || transporter.phone || '',
       email: transporter.email || '',
+      lorryNumber: transporter.lorryNumber || '',
       registrationDate: transporter.registrationDate
         ? new Date(transporter.registrationDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],
@@ -189,6 +194,9 @@ function Transporters() {
               email: contactPerson.email || '',
             }))
           : [{ name: transporter.contactPerson || '', phone: '', email: '' }],
+      transporterType: transporter.transporterType || 'Non FCL',
+      driverName: transporter.driverName || '',
+      size: transporter.size || '',
       isActive: transporter.isActive,
     });
     setFormErrors({});
@@ -210,9 +218,11 @@ function Transporters() {
       errors.mainPhone = 'Phone number must be exactly 10 digits';
     }
 
-    if (!formData.email.trim()) {
-      errors.email = 'Email address is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!formData.lorryNumber.trim()) {
+      errors.lorryNumber = 'Lorry number is required';
+    }
+
+    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Please enter a valid email address';
     }
 
@@ -234,6 +244,19 @@ function Transporters() {
 
     if (!formData.addressCountry.trim()) {
       errors.addressCountry = 'Country is required';
+    }
+
+    // FCL-specific validations
+    if (formData.transporterType === 'FCL') {
+      if (!formData.driverName.trim()) {
+        errors.driverName = 'Driver name is required for FCL transporters';
+      } else if (!/^[a-zA-Z\s-]+$/.test(formData.driverName.trim())) {
+        errors.driverName = 'Driver name can only contain letters, spaces, and hyphens (-)';
+      }
+
+      if (!formData.size.trim()) {
+        errors.size = 'Size is required for FCL transporters';
+      }
     }
 
     const validContactPersons = formData.contactPersons.filter(
@@ -293,6 +316,18 @@ function Transporters() {
       }));
       if (formErrors.mainPhone) {
         setFormErrors((prev) => ({ ...prev, mainPhone: '' }));
+      }
+      return;
+    }
+
+    if (name === 'driverName') {
+      const sanitizedName = value.replace(/[^a-zA-Z\s-]/g, '');
+      setFormData((prev) => ({
+        ...prev,
+        driverName: sanitizedName,
+      }));
+      if (formErrors.driverName) {
+        setFormErrors((prev) => ({ ...prev, driverName: '' }));
       }
       return;
     }
@@ -1194,7 +1229,18 @@ function Transporters() {
                   </div>
 
                   <div className="form-group">
-                    <label>Email Address <span className="required">*</span></label>
+                    <label>Lorry Number <span className="required">*</span></label>
+                    <input
+                      name="lorryNumber"
+                      value={formData.lorryNumber}
+                      onChange={handleChange}
+                      placeholder="e.g., ABC-1234"
+                    />
+                    {formErrors.lorryNumber && <span className="form-error">{formErrors.lorryNumber}</span>}
+                  </div>
+
+                  <div className="form-group">
+                    <label>Email Address</label>
                     <input
                       name="email"
                       value={formData.email}
@@ -1203,6 +1249,45 @@ function Transporters() {
                     />
                     {formErrors.email && <span className="form-error">{formErrors.email}</span>}
                   </div>
+
+                  <div className="form-group">
+                    <label>Transporter Type <span className="required">*</span></label>
+                    <select
+                      name="transporterType"
+                      value={formData.transporterType}
+                      onChange={handleChange}
+                    >
+                      <option value="FCL">FCL</option>
+                      <option value="Non FCL">Non FCL</option>
+                    </select>
+                  </div>
+
+                  {formData.transporterType === 'FCL' && (
+                    <>
+                      <div className="form-group">
+                        <label>Driver Name <span className="required">*</span></label>
+                        <input
+                          name="driverName"
+                          value={formData.driverName}
+                          onChange={handleChange}
+                          onKeyPress={validateNameInput}
+                          placeholder="Enter driver name"
+                        />
+                        {formErrors.driverName && <span className="form-error">{formErrors.driverName}</span>}
+                      </div>
+
+                      <div className="form-group">
+                        <label>Size <span className="required">*</span></label>
+                        <input
+                          name="size"
+                          value={formData.size}
+                          onChange={handleChange}
+                          placeholder="e.g., 20ft, 40ft"
+                        />
+                        {formErrors.size && <span className="form-error">{formErrors.size}</span>}
+                      </div>
+                    </>
+                  )}
 
                   <div className="form-group">
                     <label>Registration Date <span className="required">*</span></label>

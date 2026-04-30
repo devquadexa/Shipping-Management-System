@@ -921,8 +921,16 @@ function Billing() {
     ) {
       missingFields.push('Chassis Number');
     }
-    if (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) {
-      missingFields.push('Transport Delivery Date');
+    
+    // Transporter and Transport Delivery Date are required only for FCL jobs
+    const isFclJob = selectedJob.shipmentCategory === 'FCL';
+    if (isFclJob) {
+      if (!selectedJob.transporter || (typeof selectedJob.transporter === 'string' && selectedJob.transporter.trim() === '')) {
+        missingFields.push('Transporter');
+      }
+      if (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) {
+        missingFields.push('Transport Delivery Date');
+      }
     }
     console.log('generateBill - missingFields:', missingFields);
     
@@ -1345,14 +1353,14 @@ function Billing() {
       };
     });
 
-    const payItemsPerPage = 25;
+    const payItemsPerPage = 22;
     const printablePayItemPages = [];
     
-    // Create pages with exactly 25 rows each
+    // Create pages with exactly 22 rows each
     for (let index = 0; index < printablePayItems.length; index += payItemsPerPage) {
       const pageItems = printablePayItems.slice(index, index + payItemsPerPage);
       
-      // Fill remaining rows with empty items to make exactly 25 rows
+      // Fill remaining rows with empty items to make exactly 22 rows
       while (pageItems.length < payItemsPerPage) {
         pageItems.push({
           payItemId: '',
@@ -1537,21 +1545,21 @@ function Billing() {
             width: 100%;
             border-collapse: collapse;
             margin-top: ${isCompactItemsLayout ? '2px' : '4px'};
-            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
+            font-size: ${isCompactItemsLayout ? '8pt' : '8.5pt'};
             border: 1px solid var(--theme-primary);
           }
           .pay-items-table th,
           .pay-items-table td {
             border: 1px solid #cfd7ea;
-            padding: ${isCompactItemsLayout ? '3px 6px' : '4px 8px'};
+            padding: ${isCompactItemsLayout ? '2px 5px' : '3px 6px'};
             vertical-align: top;
           }
           .pay-items-table tbody td {
-            line-height: 1.25;
-            min-height: ${isCompactItemsLayout ? '18px' : '20px'};
+            line-height: 1.2;
+            min-height: ${isCompactItemsLayout ? '16px' : '18px'};
           }
           .pay-items-table tbody tr {
-            height: ${isCompactItemsLayout ? '18px' : '20px'};
+            height: ${isCompactItemsLayout ? '16px' : '18px'};
           }
           .pay-items-table thead th {
             background: #e9efff;
@@ -1921,7 +1929,12 @@ function Billing() {
                   </div>
                   {selectedJob.hasOwnProperty('transporter') && (
                     <div className="info-row">
-                      <span className="info-label">Transporter:</span>
+                      <span className="info-label">
+                        Transporter:
+                        {selectedJob.shipmentCategory === 'FCL' && 
+                         (!selectedJob.transporter || selectedJob.transporter.trim() === '') && 
+                         <span className="required-indicator">*Required</span>}
+                      </span>
                       <select 
                         className="info-value transporter-dropdown"
                         value={transporters.find(t => t.name === selectedJob.transporter)?.transporterId || ''}
@@ -1937,8 +1950,13 @@ function Billing() {
                     </div>
                   )}
                   <div className="info-row">
-                    <span className="info-label">Transport Delivery Date: {(!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) && <span className="required-indicator">*Required</span>}</span>
-                    <span className={`info-value ${(!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) ? 'missing-value' : ''}`}>
+                    <span className="info-label">
+                      Transport Delivery Date: 
+                      {selectedJob.shipmentCategory === 'FCL' && 
+                       (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) && 
+                       <span className="required-indicator">*Required</span>}
+                    </span>
+                    <span className={`info-value ${selectedJob.shipmentCategory === 'FCL' && (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) ? 'missing-value' : ''}`}>
                       {selectedJob.transportDeliveryDate ? new Date(selectedJob.transportDeliveryDate).toLocaleDateString() : '-'}
                     </span>
                   </div>
