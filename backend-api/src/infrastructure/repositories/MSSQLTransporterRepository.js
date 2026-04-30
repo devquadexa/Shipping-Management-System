@@ -23,6 +23,10 @@ class MSSQLTransporterRepository extends ITransporterRepository {
           name NVARCHAR(200) NOT NULL,
           phone VARCHAR(20) NOT NULL,
           email VARCHAR(100),
+          lorryNumber NVARCHAR(100),
+          transporterType NVARCHAR(50) DEFAULT 'Non FCL',
+          driverName NVARCHAR(200),
+          size NVARCHAR(100),
           registrationDate DATETIME DEFAULT GETDATE(),
           addressNumber NVARCHAR(100),
           addressStreet1 NVARCHAR(200),
@@ -63,6 +67,18 @@ class MSSQLTransporterRepository extends ITransporterRepository {
 
       IF COL_LENGTH('Transporters', 'contactPersonsJson') IS NULL
         ALTER TABLE Transporters ADD contactPersonsJson NVARCHAR(MAX);
+
+      IF COL_LENGTH('Transporters', 'lorryNumber') IS NULL
+        ALTER TABLE Transporters ADD lorryNumber NVARCHAR(100);
+
+      IF COL_LENGTH('Transporters', 'transporterType') IS NULL
+        ALTER TABLE Transporters ADD transporterType NVARCHAR(50) DEFAULT 'Non FCL';
+
+      IF COL_LENGTH('Transporters', 'driverName') IS NULL
+        ALTER TABLE Transporters ADD driverName NVARCHAR(200);
+
+      IF COL_LENGTH('Transporters', 'size') IS NULL
+        ALTER TABLE Transporters ADD size NVARCHAR(100);
     `);
 
     this.tableEnsured = true;
@@ -77,6 +93,10 @@ class MSSQLTransporterRepository extends ITransporterRepository {
       .input('name', this.sql.NVarChar, transporter.name)
       .input('phone', this.sql.VarChar, transporter.mainPhone)
       .input('email', this.sql.VarChar, transporter.email || null)
+      .input('lorryNumber', this.sql.NVarChar, transporter.lorryNumber || null)
+      .input('transporterType', this.sql.NVarChar, transporter.transporterType || 'Non FCL')
+      .input('driverName', this.sql.NVarChar, transporter.driverName || null)
+      .input('size', this.sql.NVarChar, transporter.size || null)
       .input('registrationDate', this.sql.DateTime, transporter.registrationDate)
       .input('addressNumber', this.sql.NVarChar, transporter.addressNumber)
       .input('addressStreet1', this.sql.NVarChar, transporter.addressStreet1)
@@ -93,13 +113,13 @@ class MSSQLTransporterRepository extends ITransporterRepository {
       .input('isActive', this.sql.Bit, transporter.isActive)
       .query(`
         INSERT INTO Transporters (
-          transporterId, name, phone, email, registrationDate,
+          transporterId, name, phone, email, lorryNumber, transporterType, driverName, size, registrationDate,
           addressNumber, addressStreet1, addressStreet2, addressDistrict, addressCity, addressCountry,
           contactPersonsJson, contactPerson, address,
           vehicleNumber, notes, createdDate, isActive
         )
         VALUES (
-          @transporterId, @name, @phone, @email, @registrationDate,
+          @transporterId, @name, @phone, @email, @lorryNumber, @transporterType, @driverName, @size, @registrationDate,
           @addressNumber, @addressStreet1, @addressStreet2, @addressDistrict, @addressCity, @addressCountry,
           @contactPersonsJson, @contactPerson, @address,
           @vehicleNumber, @notes, @createdDate, @isActive
@@ -149,6 +169,10 @@ class MSSQLTransporterRepository extends ITransporterRepository {
       .input('name', this.sql.NVarChar, transporter.name)
       .input('phone', this.sql.VarChar, transporter.mainPhone)
       .input('email', this.sql.VarChar, transporter.email || null)
+      .input('lorryNumber', this.sql.NVarChar, transporter.lorryNumber || null)
+      .input('transporterType', this.sql.NVarChar, transporter.transporterType || 'Non FCL')
+      .input('driverName', this.sql.NVarChar, transporter.driverName || null)
+      .input('size', this.sql.NVarChar, transporter.size || null)
       .input('registrationDate', this.sql.DateTime, transporter.registrationDate)
       .input('addressNumber', this.sql.NVarChar, transporter.addressNumber)
       .input('addressStreet1', this.sql.NVarChar, transporter.addressStreet1)
@@ -167,6 +191,10 @@ class MSSQLTransporterRepository extends ITransporterRepository {
         SET name = @name,
             phone = @phone,
             email = @email,
+            lorryNumber = @lorryNumber,
+            transporterType = @transporterType,
+            driverName = @driverName,
+            size = @size,
             registrationDate = @registrationDate,
             addressNumber = @addressNumber,
             addressStreet1 = @addressStreet1,
@@ -251,6 +279,10 @@ class MSSQLTransporterRepository extends ITransporterRepository {
       mainPhone: row.phone,
       contactPerson: row.contactPerson,
       email: row.email,
+      lorryNumber: row.lorryNumber,
+      transporterType: row.transporterType || 'Non FCL',
+      driverName: row.driverName,
+      size: row.size,
       registrationDate: row.registrationDate,
       addressNumber: row.addressNumber,
       addressStreet1: row.addressStreet1,
