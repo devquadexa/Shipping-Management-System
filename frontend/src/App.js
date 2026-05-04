@@ -9,6 +9,7 @@ import Billing from './components/Billing';
 import PettyCash from './components/PettyCash';
 import Reports from './components/Reports';
 import PettyCashReport from './components/PettyCashReport';
+import TransportersReport from './components/TransportersReport';
 import Dashboard from './components/Dashboard';
 import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
@@ -78,6 +79,11 @@ function AppContent() {
           <Route
             path="/reports/petty-cash"
             element={<PrivateRoute><AdminRoute><PettyCashReport /></AdminRoute></PrivateRoute>}
+          />
+
+          <Route
+            path="/reports/transporters"
+            element={<PrivateRoute><AdminRoute><TransportersReport /></AdminRoute></PrivateRoute>}
           />
 
           {/* Legacy redirect — keep old bookmark working */}
