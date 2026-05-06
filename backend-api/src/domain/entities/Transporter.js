@@ -9,6 +9,10 @@ class Transporter {
     phone,
     contactPerson,
     email,
+    lorryNumber,
+    transporterType = 'Non FCL',
+    driverName,
+    size,
     registrationDate = new Date(),
     addressNumber,
     addressStreet1,
@@ -29,6 +33,10 @@ class Transporter {
     this.phone = this.mainPhone;
     this.contactPerson = contactPerson;
     this.email = email;
+    this.lorryNumber = lorryNumber;
+    this.transporterType = transporterType;
+    this.driverName = driverName;
+    this.size = size;
     this.registrationDate = registrationDate;
     this.addressNumber = addressNumber;
     this.addressStreet1 = addressStreet1;
@@ -59,8 +67,12 @@ class Transporter {
       errors.push('Main phone number must be exactly 10 digits');
     }
 
-    if (!this.email || !this.isValidEmail(this.email)) {
-      errors.push('Valid email is required');
+    if (!this.lorryNumber || this.lorryNumber.trim().length === 0) {
+      errors.push('Lorry number is required');
+    }
+
+    if (this.email && !this.isValidEmail(this.email)) {
+      errors.push('Email must be valid if provided');
     }
 
     if (!this.addressNumber || this.addressNumber.trim().length === 0) {
@@ -81,6 +93,19 @@ class Transporter {
 
     if (!this.addressCountry || this.addressCountry.trim().length === 0) {
       errors.push('Country is required');
+    }
+
+    // FCL-specific validations
+    if (this.transporterType === 'FCL') {
+      if (!this.driverName || this.driverName.trim().length === 0) {
+        errors.push('Driver name is required for FCL transporters');
+      } else if (!/^[a-zA-Z\s-]+$/.test(this.driverName.trim())) {
+        errors.push('Driver name can only contain letters, spaces, and hyphens (-)');
+      }
+
+      if (!this.size || this.size.trim().length === 0) {
+        errors.push('Size is required for FCL transporters');
+      }
     }
 
     const validContactPersons = (this.contactPersons || []).filter(

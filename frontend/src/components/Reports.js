@@ -141,6 +141,24 @@ const REPORT_CARDS = [
     color: 'red',
     tags: ['P&L', 'Export', 'Period-wise'],
   },
+  {
+    id: 'transporters-report',
+    path: '/reports/transporters',
+    category: 'Financial',
+    title: 'Transporters Report',
+    description: 'Transporter-wise payment details, job assignments, paid amounts, balances and outstanding payments.',
+    available: true,
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="3" width="15" height="13"></rect>
+        <polygon points="16 8 20 8 23 11 23 16 18 16 18 8"></polygon>
+        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+      </svg>
+    ),
+    color: 'orange',
+    tags: ['Payments', 'Export', 'Transporter-wise'],
+  },
 ];
 
 const CATEGORIES = ['Financial', 'Operations'];

@@ -10,6 +10,7 @@ import PettyCash from './components/PettyCash';
 import Reports from './components/Reports';
 import PettyCashReport from './components/PettyCashReport';
 import PendingPaymentsReport from './components/PendingPaymentsReport';
+import TransportersReport from './components/TransportersReport';
 import Dashboard from './components/Dashboard';
 import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
@@ -90,6 +91,11 @@ function AppContent() {
           <Route
             path="/reports/other-expenses"
             element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
+          />
+
+          <Route
+            path="/reports/transporters"
+            element={<PrivateRoute><AdminRoute><TransportersReport /></AdminRoute></PrivateRoute>}
           />
 
           {/* Legacy redirect — keep old bookmark working */}
