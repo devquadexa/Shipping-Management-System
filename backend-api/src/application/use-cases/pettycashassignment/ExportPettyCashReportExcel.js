@@ -29,13 +29,17 @@ class ExportPettyCashReportExcel {
       assignedToName: row.assignedToName || '-',
       assignedAmount: parseFloat(row.assignedAmount) || 0,
       settledAmount:  parseFloat(row.settledAmount)  || 0,
+      balanceAmount:  parseFloat(row.balanceAmount)  || 0,
+      overAmount:     parseFloat(row.overAmount)     || 0,
       status:         row.status || 'Assigned',
       assignmentDate: row.assignedDate,
+      settlementDate: row.settlementDate,
+      assignmentCount: parseInt(row.assignmentCount) || 1,
     }));
 
     const totalAssigned = assignments.reduce((s, a) => s + a.assignedAmount, 0);
     const totalSettled  = assignments.reduce((s, a) => s + a.settledAmount,  0);
-    const totalBalance  = totalAssigned - totalSettled;
+    const netBalance    = assignments.reduce((s, a) => s + (a.balanceAmount - a.overAmount), 0);
     const jobCount      = new Set(assignments.map(a => a.jobId)).size;
 
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB') : '-';
@@ -79,19 +83,21 @@ class ExportPettyCashReportExcel {
 
     // Column widths
     sheet.columns = [
-      { key: 'num',    width: 6  },
-      { key: 'jobId',  width: 14 },
-      { key: 'cust',   width: 28 },
-      { key: 'user',   width: 22 },
-      { key: 'asgn',   width: 20 },
-      { key: 'setl',   width: 20 },
-      { key: 'out',    width: 20 },
-      { key: 'status', width: 22 },
-      { key: 'date',   width: 14 },
+      { key: 'num',        width: 6  },
+      { key: 'jobId',      width: 14 },
+      { key: 'cust',       width: 28 },
+      { key: 'user',       width: 22 },
+      { key: 'asgn',       width: 18 },
+      { key: 'setl',       width: 18 },
+      { key: 'balance',    width: 18 },
+      { key: 'overdue',    width: 18 },
+      { key: 'status',     width: 22 },
+      { key: 'assignDate', width: 14 },
+      { key: 'settleDate', width: 14 },
     ];
 
     // ── Row 1: Company header ──────────────────────────────────────────────
-    sheet.mergeCells('A1:I1');
+    sheet.mergeCells('A1:K1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = 'SUPER SHINE CARGO SERVICE';
     titleCell.font = { ...WHITE_FONT, size: 14 };
@@ -107,7 +113,7 @@ class ExportPettyCashReportExcel {
     subCell.fill = DARK_FILL;
     subCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
 
-    sheet.mergeCells('G2:I2');
+    sheet.mergeCells('G2:K2');
     const dateCell = sheet.getCell('G2');
     dateCell.value = dateLabel;
     dateCell.font = { ...WHITE_FONT, bold: false, size: 10 };
@@ -119,11 +125,15 @@ class ExportPettyCashReportExcel {
     sheet.getRow(3).height = 6;
 
     // ── Rows 4-5: Summary cards ───────────────────────────────────────────
+    const totalBalance = assignments.reduce((s, a) => s + a.balanceAmount, 0);
+    const totalOverDue = assignments.reduce((s, a) => s + a.overAmount, 0);
+    
     const summaryData = [
       { label: 'Total Assigned',      value: totalAssigned, sub: `${assignments.length} assignments`, col: 'A' },
       { label: 'Total Settled',       value: totalSettled,  sub: 'Completed',                         col: 'C' },
-      { label: 'Outstanding Balance', value: totalBalance,  sub: 'Pending settlement',                col: 'E' },
-      { label: 'Jobs Covered',        value: jobCount,      sub: 'Unique jobs',                       col: 'G', isCount: true },
+      { label: 'Total Balance',       value: totalBalance,  sub: 'To be returned',                    col: 'E' },
+      { label: 'Total Over Due',      value: totalOverDue,  sub: 'Overdue collection',                col: 'G' },
+      { label: 'Jobs Covered',        value: jobCount,      sub: 'Unique jobs',                       col: 'I', isCount: true },
     ];
 
     summaryData.forEach(({ label, value, sub, col, isCount }) => {
@@ -151,42 +161,58 @@ class ExportPettyCashReportExcel {
     sheet.getRow(6).height = 6;
 
     // ── Row 7: Table header ───────────────────────────────────────────────
-    const headers = ['#', 'Job ID', 'Customer', 'Assigned To', 'Assigned (LKR)', 'Settled (LKR)', 'Outstanding (LKR)', 'Status', 'Date'];
+    const headers = ['#', 'Job ID', 'Customer', 'Assigned To', 'Assigned (LKR)', 'Settled (LKR)', 'Balance (LKR)', 'Over Due (LKR)', 'Status', 'Assigned Date', 'Settle Date'];
     const headerRow = sheet.getRow(7);
     headers.forEach((h, i) => {
       const cell = headerRow.getCell(i + 1);
       cell.value = h;
       cell.font = WHITE_FONT;
       cell.fill = BLUE_FILL;
-      cell.alignment = { horizontal: i >= 4 && i <= 6 ? 'right' : 'center', vertical: 'middle' };
+      cell.alignment = { horizontal: i >= 4 && i <= 7 ? 'right' : 'center', vertical: 'middle' };
       cell.border = THIN_BORDER;
     });
     headerRow.height = 20;
 
     // ── Data rows ─────────────────────────────────────────────────────────
     assignments.forEach((a, idx) => {
-      const outstanding = a.assignedAmount - a.settledAmount;
       const rowNum = 8 + idx;
       const row = sheet.getRow(rowNum);
       const fill = idx % 2 === 0 ? WHITE_FILL : ALT_FILL;
+      const isGrouped = a.assignmentCount > 1;
 
       const cells = [
         { v: idx + 1,           fmt: '0',          align: 'center' },
-        { v: a.jobId || '-',    fmt: '@',           align: 'left'   },
-        { v: a.customerName,    fmt: '@',           align: 'left'   },
-        { v: a.assignedToName,  fmt: '@',           align: 'left'   },
-        { v: a.assignedAmount,  fmt: '#,##0.00',    align: 'right'  },
-        { v: a.settledAmount,   fmt: '#,##0.00',    align: 'right'  },
-        { v: outstanding,       fmt: '#,##0.00',    align: 'right', font: outstanding > 0 ? AMBER_FONT : GREEN_FONT },
-        { v: a.status,          fmt: '@',           align: 'center' },
-        { v: fmtDate(a.assignmentDate), fmt: '@',   align: 'center' },
+        { v: a.jobId || '-',    fmt: '@',          align: 'left'   },
+        { v: a.customerName,    fmt: '@',          align: 'left'   },
+        { v: a.assignedToName,  fmt: '@',          align: 'left'   },
+        { v: a.assignedAmount,  fmt: '#,##0.00',   align: 'right', isGrouped: isGrouped, count: a.assignmentCount },
+        { v: a.settledAmount,   fmt: '#,##0.00',   align: 'right', font: GREEN_FONT },
+        { v: a.balanceAmount,   fmt: '#,##0.00',   align: 'right', font: a.balanceAmount > 0 ? AMBER_FONT : BODY_FONT },
+        { v: a.overAmount,      fmt: '#,##0.00',   align: 'right', font: a.overAmount > 0 ? { color: { argb: 'FFDC2626' }, bold: true } : BODY_FONT },
+        { v: a.status,          fmt: '@',          align: 'center' },
+        { v: fmtDate(a.assignmentDate), fmt: '@', align: 'center' },
+        { v: fmtDate(a.settlementDate), fmt: '@', align: 'center' },
       ];
 
       cells.forEach((c, ci) => {
         const cell = row.getCell(ci + 1);
-        cell.value = c.v;
-        cell.numFmt = c.fmt;
-        cell.font = c.font || BODY_FONT;
+        
+        // Special handling for assigned amount with count
+        if (c.isGrouped && ci === 4) {
+          // Use rich text to make the count bold and larger (13pt)
+          cell.value = {
+            richText: [
+              { text: new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(c.v) },
+              { font: { bold: true, color: { argb: 'FF374151' }, size: 13 }, text: ` (${c.count})` }
+            ]
+          };
+          cell.font = BODY_FONT;
+        } else {
+          cell.value = c.v;
+          cell.numFmt = c.fmt;
+          cell.font = c.font || BODY_FONT;
+        }
+        
         cell.fill = fill;
         cell.alignment = { horizontal: c.align, vertical: 'middle' };
         cell.border = THIN_BORDER;
@@ -197,14 +223,14 @@ class ExportPettyCashReportExcel {
     // ── Totals row ────────────────────────────────────────────────────────
     const totalRowNum = 8 + assignments.length;
     const totalRow = sheet.getRow(totalRowNum);
-    const totalValues = ['', '', '', 'TOTAL', totalAssigned, totalSettled, totalBalance, '', ''];
+    const totalValues = ['', '', '', 'TOTAL', totalAssigned, totalSettled, totalBalance, totalOverDue, '', '', ''];
     totalValues.forEach((v, i) => {
       const cell = totalRow.getCell(i + 1);
       cell.value = v;
-      cell.numFmt = i >= 4 && i <= 6 ? '#,##0.00' : '@';
+      cell.numFmt = i >= 4 && i <= 7 ? '#,##0.00' : '@';
       cell.font = BLUE_FONT;
       cell.fill = TOTAL_FILL;
-      cell.alignment = { horizontal: i >= 4 && i <= 6 ? 'right' : i === 3 ? 'left' : 'center', vertical: 'middle', indent: i === 3 ? 1 : 0 };
+      cell.alignment = { horizontal: i >= 4 && i <= 7 ? 'right' : i === 3 ? 'left' : 'center', vertical: 'middle', indent: i === 3 ? 1 : 0 };
       cell.border = { ...THIN_BORDER, top: { style: 'medium', color: { argb: 'FF1e3a8a' } } };
     });
     totalRow.height = 20;
@@ -221,12 +247,16 @@ class ExportPettyCashReportExcel {
       r.getCell(2).font = { bold: true, color: { argb: 'FF101036' } };
     };
 
+    const summaryTotalBalance = assignments.reduce((s, a) => s + a.balanceAmount, 0);
+    const summaryTotalOverDue = assignments.reduce((s, a) => s + a.overAmount, 0);
+
     summarySheet.addRow(['PETTY CASH REPORT SUMMARY']).getCell(1).font = { bold: true, size: 13, color: { argb: 'FF101036' } };
     summarySheet.addRow([dateLabel]).getCell(1).font = { color: { argb: 'FF6B7280' } };
     summarySheet.addRow([]);
     addSummaryRow('Total Assigned (LKR)', totalAssigned);
     addSummaryRow('Total Settled (LKR)',  totalSettled);
-    addSummaryRow('Outstanding Balance (LKR)', totalBalance);
+    addSummaryRow('Total Balance (LKR)', summaryTotalBalance);
+    addSummaryRow('Total Over Due (LKR)', summaryTotalOverDue);
     summarySheet.addRow([]);
     addSummaryRow('Total Assignments', assignments.length, false);
     addSummaryRow('Unique Jobs Covered', jobCount, false);

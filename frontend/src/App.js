@@ -9,12 +9,15 @@ import Billing from './components/Billing';
 import PettyCash from './components/PettyCash';
 import Reports from './components/Reports';
 import PettyCashReport from './components/PettyCashReport';
+import PendingPaymentsReport from './components/PendingPaymentsReport';
 import Dashboard from './components/Dashboard';
 import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
 import Accounting from './components/Accounting';
 import Transporters from './components/Transporters';
 import OldInvoices from './components/OldInvoices';
+import OtherExpenses from './components/OtherExpenses';
+import OtherExpensesReport from './components/OtherExpensesReport';
 import Navbar from './components/Navbar';
 
 function PrivateRoute({ children }) {
@@ -55,6 +58,7 @@ function AppContent() {
           <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
           <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
           <Route path="/old-invoices" element={<PrivateRoute><OldInvoices /></PrivateRoute>} />
+          <Route path="/other-expenses" element={<PrivateRoute><OtherExpenses /></PrivateRoute>} />
           <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
           <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
@@ -78,6 +82,14 @@ function AppContent() {
           <Route
             path="/reports/petty-cash"
             element={<PrivateRoute><AdminRoute><PettyCashReport /></AdminRoute></PrivateRoute>}
+          />
+          <Route
+            path="/reports/pending-payments"
+            element={<PrivateRoute><AdminRoute><PendingPaymentsReport /></AdminRoute></PrivateRoute>}
+          />
+          <Route
+            path="/reports/other-expenses"
+            element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
           />
 
           {/* Legacy redirect — keep old bookmark working */}

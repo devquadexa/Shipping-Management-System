@@ -1262,8 +1262,7 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
               MIN(assignedToUser.fullName) as assignedToName,
               MIN(assignedByUser.fullName) as assignedByName,
               SUM(ISNULL(st.totalSettled, 0)) as settledAmount,
-              SUM(ISNULL(pca.balanceAmount, 0)) as totalBalanceAmount,
-              SUM(ISNULL(pca.overAmount, 0)) as totalOverAmount
+              COUNT(*) as assignmentCount
             FROM PettyCashAssignments pca
             LEFT JOIN Jobs j ON pca.jobId = j.jobId
             LEFT JOIN Customers c ON j.customerId = c.customerId
@@ -1293,8 +1292,15 @@ class MSSQLPettyCashAssignmentRepository extends IPettyCashAssignmentRepository 
             assignedToName,
             assignedByName,
             settledAmount,
-            totalBalanceAmount as balanceAmount,
-            totalOverAmount as overAmount
+            assignmentCount,
+            CASE 
+              WHEN settledAmount < assignedAmount THEN assignedAmount - settledAmount
+              ELSE 0
+            END as balanceAmount,
+            CASE 
+              WHEN settledAmount > assignedAmount THEN settledAmount - assignedAmount
+              ELSE 0
+            END as overAmount
           FROM GroupedAssignments
           ORDER BY jobId ASC, assignedTo ASC
         `);

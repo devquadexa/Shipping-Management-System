@@ -83,6 +83,8 @@ function Jobs() {
       const data = await jobService.getAll();
       console.log('Fetched jobs data:', data);
       console.log('First job details:', JSON.stringify(data[0], null, 2));
+      console.log('First job billTotalAmount:', data[0]?.billTotalAmount);
+      console.log('First job billPaidAmount:', data[0]?.billPaidAmount);
       // Ensure all jobs have a status
       const jobsWithStatus = data.map(job => ({
         ...job,
@@ -537,6 +539,8 @@ function Jobs() {
                 <th>Category</th>
                 <th>Open Date</th>
                 {user?.role !== 'Waff Clerk' && <th>Assigned To</th>}
+                <th>Total Amount</th>
+                <th>Paid Amount</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -583,6 +587,20 @@ function Jobs() {
                         </div>
                       </td>
                     )}
+                    <td data-label="Total Amount">
+                      {job.billTotalAmount !== null && job.billTotalAmount !== undefined ? (
+                        <span className="amount-value">LKR {parseFloat(job.billTotalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      ) : (
+                        <span className="no-bill-text">-</span>
+                      )}
+                    </td>
+                    <td data-label="Paid Amount">
+                      {job.billTotalAmount !== null && job.billTotalAmount !== undefined ? (
+                        <span className="amount-value">LKR {parseFloat(job.billPaidAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      ) : (
+                        <span className="no-bill-text">-</span>
+                      )}
+                    </td>
                     <td data-label="Status">
                       <div className="status-select-wrapper">
                         <select 
@@ -628,7 +646,7 @@ function Jobs() {
                   </tr>
                   {expandedRow === job.jobId && (
                     <tr className="expanded-details">
-                      <td colSpan={user?.role !== 'Waff Clerk' ? 7 : 6}>
+                      <td colSpan={user?.role !== 'Waff Clerk' ? 9 : 8}>
                         <div className="details-grid">
                           <div className="detail-section">
                             <h4 className="section-title">Basic Information</h4>
