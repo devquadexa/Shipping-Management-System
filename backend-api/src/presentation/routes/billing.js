@@ -37,6 +37,49 @@ router.put('/:id', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res
   billingController.markAsPaid(req, res)
 );
 
+// Pending Payments Report Routes
+router.get('/report/pending-payments', auth, async (req, res) => {
+  try {
+    const { fromDate, toDate, showOverdueOnly } = req.query;
+    const getPendingPaymentsReport = container.get('getPendingPaymentsReport');
+    const result = await getPendingPaymentsReport.execute(fromDate, toDate, showOverdueOnly === 'true');
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching pending payments report:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/report/pending-payments/export/pdf', auth, async (req, res) => {
+  try {
+    const { fromDate, toDate, showOverdueOnly } = req.query;
+    const exportPendingPaymentsReportPDF = container.get('exportPendingPaymentsReportPDF');
+    const pdfBuffer = await exportPendingPaymentsReportPDF.execute(fromDate, toDate, showOverdueOnly === 'true');
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=Pending_Payments_Report_${fromDate}_to_${toDate}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/report/pending-payments/export/excel', auth, async (req, res) => {
+  try {
+    const { fromDate, toDate, showOverdueOnly } = req.query;
+    const exportPendingPaymentsReportExcel = container.get('exportPendingPaymentsReportExcel');
+    const excelBuffer = await exportPendingPaymentsReportExcel.execute(fromDate, toDate, showOverdueOnly === 'true');
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=Pending_Payments_Report_${fromDate}_to_${toDate}.xlsx`);
+    res.send(excelBuffer);
+  } catch (error) {
+    console.error('Error generating Excel:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.put('/:id', auth, checkRole('Admin', 'Super Admin', 'Manager'), (req, res) => 
   billingController.markAsPaid(req, res)
 );

@@ -21,6 +21,38 @@ const REPORT_CARDS = [
     tags: ['Daily', 'Export', 'Job-wise'],
   },
   {
+    id: 'pending-payments-report',
+    path: '/reports/pending-payments',
+    category: 'Financial',
+    title: 'Pending Payments Report',
+    description: 'View all pending and overdue payment invoices with date range filtering. Track unpaid and partially paid invoices with PDF / Excel export.',
+    available: true,
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+    ),
+    color: 'red',
+    tags: ['Invoices', 'Export', 'Overdue'],
+  },
+  {
+    id: 'other-expenses-report',
+    path: '/reports/other-expenses',
+    category: 'Financial',
+    title: 'Other Expenses Report',
+    description: 'Track office expenses like food, utilities, WiFi and phone cards. Filter by date range and category with PDF / Excel export.',
+    available: true,
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+      </svg>
+    ),
+    color: 'amber',
+    tags: ['Expenses', 'Export', 'Category-wise'],
+  },
+  {
     id: 'invoice-report',
     path: null,
     category: 'Financial',

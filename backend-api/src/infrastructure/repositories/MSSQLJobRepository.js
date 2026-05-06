@@ -161,17 +161,25 @@ class MSSQLJobRepository extends IJobRepository {
       return await this.findByAssignedUser(filters.assignedTo);
     }
     
-    let query = 'SELECT * FROM Jobs WHERE 1=1';
+    let query = `
+      SELECT 
+        j.*,
+        b.netTotal as billTotalAmount,
+        b.paidAmount as billPaidAmount
+      FROM Jobs j
+      LEFT JOIN Bills b ON j.jobId = b.jobId
+      WHERE 1=1
+    `;
     
     if (filters.status) {
-      query += ` AND status = '${filters.status}'`;
+      query += ` AND j.status = '${filters.status}'`;
     }
     
     if (filters.customerId) {
-      query += ` AND customerId = '${filters.customerId}'`;
+      query += ` AND j.customerId = '${filters.customerId}'`;
     }
     
-    query += ' ORDER BY jobId ASC';
+    query += ' ORDER BY j.jobId ASC';
     
     const result = await pool.request().query(query);
     
@@ -186,13 +194,17 @@ class MSSQLJobRepository extends IJobRepository {
     try {
       console.log('findByAssignedUser called with userId:', userId);
       
-      // Get jobs assigned to this user from JobAssignments table
+      // Get jobs assigned to this user from JobAssignments table with bill data
       const assignmentResult = await pool.request()
         .input('userId', this.sql.VarChar, userId)
         .query(`
-          SELECT DISTINCT j.* 
+          SELECT DISTINCT 
+            j.*,
+            b.netTotal as billTotalAmount,
+            b.paidAmount as billPaidAmount
           FROM Jobs j
           INNER JOIN JobAssignments ja ON j.jobId = ja.jobId
+          LEFT JOIN Bills b ON j.jobId = b.jobId
           WHERE ja.userId = @userId
           ORDER BY j.openDate DESC
         `);
@@ -963,7 +975,10 @@ class MSSQLJobRepository extends IJobRepository {
       advancePaymentRecordedBy: row.advancePaymentRecordedBy || row.AdvancePaymentRecordedBy,
       payItems: payItems || [],
       officePayItems: finalOfficePayItems || [], // New field for office pay items
-      metadata: metadataFromJson
+      metadata: metadataFromJson,
+      // Add bill data
+      billTotalAmount: row.billTotalAmount ? parseFloat(row.billTotalAmount) : null,
+      billPaidAmount: row.billPaidAmount ? parseFloat(row.billPaidAmount) : 0
     });
     
     console.log('mapToEntity result:', job.toJSON());

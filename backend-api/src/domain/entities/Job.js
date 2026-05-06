@@ -31,7 +31,9 @@ class Job {
     advancePaymentCheckNo = null, // New: Check number when payment type is check
     advancePaymentNotes = null, // New: Notes about advance payment
     advancePaymentRecordedBy = null, // New: User who recorded the advance
-    metadata = {}
+    metadata = {},
+    billTotalAmount = null, // New: Total billing amount from Bills table
+    billPaidAmount = 0 // New: Paid amount from Bills table
   }) {
     this.jobId = jobId;
     this.customerId = customerId;
@@ -61,6 +63,8 @@ class Job {
     this.advancePaymentNotes = advancePaymentNotes;
     this.advancePaymentRecordedBy = advancePaymentRecordedBy;
     this.metadata = metadata;
+    this.billTotalAmount = billTotalAmount !== null ? parseFloat(billTotalAmount) : null;
+    this.billPaidAmount = parseFloat(billPaidAmount) || 0;
   }
 
   // Business logic
@@ -220,7 +224,9 @@ class Job {
       advancePaymentCheckNo: this.advancePaymentCheckNo,
       advancePaymentNotes: this.advancePaymentNotes,
       advancePaymentRecordedBy: this.advancePaymentRecordedBy,
-      metadata: this.metadata
+      metadata: this.metadata,
+      billTotalAmount: this.billTotalAmount,
+      billPaidAmount: this.billPaidAmount
     };
   }
 }

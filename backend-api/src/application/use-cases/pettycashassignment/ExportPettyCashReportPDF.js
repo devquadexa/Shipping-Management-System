@@ -33,12 +33,13 @@ class ExportPettyCashReportPDF {
       overAmount:     parseFloat(row.overAmount)     || 0,
       status:         row.status || 'Assigned',
       assignmentDate: row.assignedDate,
+      settlementDate: row.settlementDate,
+      assignmentCount: parseInt(row.assignmentCount) || 1,
     }));
 
     const totalAssigned = assignments.reduce((s, a) => s + a.assignedAmount, 0);
     const totalSettled  = assignments.reduce((s, a) => s + a.settledAmount,  0);
-    const totalBalance  = assignments.reduce((s, a) => s + a.balanceAmount,  0);
-    const totalOverDue  = assignments.reduce((s, a) => s + a.overAmount,     0);
+    const netBalance    = assignments.reduce((s, a) => s + (a.balanceAmount - a.overAmount), 0);
     const jobCount      = new Set(assignments.map(a => a.jobId)).size;
 
     const fmt = (v) =>
@@ -87,47 +88,19 @@ class ExportPettyCashReportPDF {
       doc.fontSize(7)
          .text(dateLabel, 20, 48);
 
-      // ── Summary cards (5 cards in 2 rows) ───────────────────────────────
-      const cardY = 75;
-      const cardW = (W - 40 - 10) / 3; // 3 cards per row
-      const cardH = 50;
-      const cardGap = 5;
-      
-      const cards = [
-        { label: 'Total Assigned',  value: fmt(totalAssigned), sub: `${assignments.length} assignments`, color: '#3b82f6', row: 0, col: 0 },
-        { label: 'Total Settled',   value: fmt(totalSettled),  sub: 'Completed settlements',             color: '#10b981', row: 0, col: 1 },
-        { label: 'Balance',         value: fmt(totalBalance),  sub: 'Pending settlement',                color: TEAL,      row: 0, col: 2 },
-        { label: 'Over Due',        value: fmt(totalOverDue),  sub: 'Pending collection',                color: '#f59e0b', row: 1, col: 0 },
-        { label: 'Jobs Covered',    value: String(jobCount),   sub: 'Unique jobs',                       color: '#8b5cf6', row: 1, col: 1 },
-      ];
-      
-      cards.forEach((card) => {
-        const x = 20 + card.col * (cardW + cardGap);
-        const y = cardY + card.row * (cardH + cardGap);
-        
-        doc.rect(x, y, cardW, cardH).fill(LIGHT);
-        doc.rect(x, y, 3, cardH).fill(card.color);
-        doc.fillColor(GRAY).fontSize(6.5).font('Helvetica-Bold')
-           .text(card.label.toUpperCase(), x + 8, y + 7, { width: cardW - 12 });
-        doc.fillColor(DARK).fontSize(9).font('Helvetica-Bold')
-           .text(card.value, x + 8, y + 20, { width: cardW - 12 });
-        doc.fillColor(GRAY).fontSize(6.5).font('Helvetica')
-           .text(card.sub, x + 8, y + 35, { width: cardW - 12 });
-      });
-
       // ── Table ────────────────────────────────────────────────────────────
-      const tableTop = cardY + (cardH * 2) + cardGap + 15;
+      const tableTop = 75;
       const cols = [
         { label: '#',            width: 22,  align: 'center' },
-        { label: 'Job ID',       width: 50,  align: 'left'   },
-        { label: 'Customer',     width: 75,  align: 'left'   },
-        { label: 'Assigned To',  width: 85,  align: 'left'   },
-        { label: 'Assigned',     width: 68,  align: 'left'   },
-        { label: 'Settled',      width: 68,  align: 'left'   },
-        { label: 'Balance',      width: 65,  align: 'left'   },
-        { label: 'Over Due',     width: 65,  align: 'left'   },
-        { label: 'Status',       width: 70,  align: 'left'   },
-        { label: 'Date',         width: 50,  align: 'center' },
+        { label: 'Job ID',       width: 45,  align: 'left'   },
+        { label: 'Customer',     width: 68,  align: 'left'   },
+        { label: 'Assigned To',  width: 73,  align: 'left'   },
+        { label: 'Assigned',     width: 65,  align: 'left'   },
+        { label: 'Settled',      width: 58,  align: 'left'   },
+        { label: 'Balance',      width: 58,  align: 'left'   },
+        { label: 'Status',       width: 55,  align: 'left'   },
+        { label: 'Assigned Date', width: 50, align: 'center' },
+        { label: 'Settle Date',  width: 50,  align: 'center' },
       ];
 
       // Header row
@@ -146,23 +119,45 @@ class ExportPettyCashReportPDF {
         const bg = idx % 2 === 0 ? 'white' : '#f9fafb';
         doc.rect(20, rowY, W - 40, rowH).fill(bg);
 
+        const netBalance = a.balanceAmount - a.overAmount;
+        const balanceColor = netBalance < 0 ? '#dc2626' : (netBalance > 0 ? AMBER : '#374151');
+        const balanceText = netBalance === 0 ? '-' : (netBalance < 0 ? '-' + fmt(Math.abs(netBalance)) : fmt(netBalance));
+        const isGrouped = a.assignmentCount > 1;
+        
         const cells = [
           { v: String(idx + 1),          align: 'center' },
           { v: a.jobId || '-',            align: 'left'   },
           { v: a.customerName,            align: 'left'   },
           { v: a.assignedToName,          align: 'left'   },
-          { v: fmt(a.assignedAmount),     align: 'left'   },
+          { v: fmt(a.assignedAmount),     align: 'left', showCount: isGrouped, count: a.assignmentCount },
           { v: fmt(a.settledAmount),      align: 'left', color: GREEN },
-          { v: a.balanceAmount > 0 ? fmt(a.balanceAmount) : '-', align: 'left', color: AMBER },
-          { v: a.overAmount > 0 ? fmt(a.overAmount) : '-',       align: 'left', color: '#dc2626' },
+          { v: balanceText,               align: 'left', color: balanceColor },
           { v: fmtStatus(a.status),       align: 'left'   },
           { v: fmtDate(a.assignmentDate), align: 'center' },
+          { v: fmtDate(a.settlementDate), align: 'center' },
         ];
 
         cx = 20;
         cells.forEach((cell, ci) => {
-          doc.fillColor(cell.color || '#374151').fontSize(6.5).font('Helvetica')
-             .text(cell.v, cx + 3, rowY + 5, { width: cols[ci].width - 6, align: cell.align, ellipsis: true });
+          if (cell.showCount) {
+            // Render assigned amount with count on same line - smaller font for count
+            const amountText = cell.v;
+            const countText = ` (${cell.count})`;
+            
+            // Render amount
+            doc.fillColor(cell.color || '#374151').fontSize(6.5).font('Helvetica')
+               .text(amountText, cx + 3, rowY + 5, { width: cols[ci].width - 20, align: cell.align, continued: false });
+            
+            // Calculate position for count (right after amount with minimal spacing)
+            const amountWidth = doc.widthOfString(amountText);
+            
+            // Render count with smaller font (7pt instead of 10pt) and bold
+            doc.fontSize(7).font('Helvetica-Bold').fillColor('#374151')
+               .text(countText, cx + 3 + amountWidth + 1, rowY + 5.5, { width: 18, align: 'left' });
+          } else {
+            doc.fillColor(cell.color || '#374151').fontSize(6.5).font('Helvetica')
+               .text(cell.v, cx + 3, rowY + 5, { width: cols[ci].width - 6, align: cell.align, ellipsis: true });
+          }
           cx += cols[ci].width;
         });
 
@@ -197,9 +192,9 @@ class ExportPettyCashReportPDF {
         { v: 'TOTAL',               align: 'left'   },
         { v: fmt(totalAssigned),    align: 'left'   },
         { v: fmt(totalSettled),     align: 'left'   },
-        { v: fmt(totalBalance),     align: 'left'   },
-        { v: fmt(totalOverDue),     align: 'left'   },
         { v: '',                    align: 'left'   },
+        { v: '',                    align: 'left'   },
+        { v: '',                    align: 'center' },
         { v: '',                    align: 'center' },
       ];
       totalCells.forEach((cell, ci) => {
