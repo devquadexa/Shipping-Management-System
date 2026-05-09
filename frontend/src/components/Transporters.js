@@ -57,6 +57,7 @@ function Transporters() {
   const [chequeAmount, setChequeAmount] = useState('');
   const [bankName, setBankName] = useState('Commercial Bank');
   const [expandedPaymentDetails, setExpandedPaymentDetails] = useState(null);
+  const [selectedChequeId, setSelectedChequeId] = useState('');
   const [dateRangeFilter, setDateRangeFilter] = useState({
     startDate: '',
     endDate: ''
@@ -646,6 +647,50 @@ function Transporters() {
     return [];
   };
 
+  const getAvailableChequesWithBalance = () => {
+    const chequeMap = new Map();
+
+    // Collect all cheques from all jobs
+    jobs.forEach((job) => {
+      const paymentRecords = getAllPaymentRecords(job);
+      paymentRecords.forEach((payment) => {
+        if (payment.paymentMethod === 'Cheque' && payment.chequeNumber) {
+          const key = `${payment.chequeNumber}-${payment.chequeDate}`;
+          if (!chequeMap.has(key)) {
+            chequeMap.set(key, {
+              chequeNumber: payment.chequeNumber,
+              chequeDate: payment.chequeDate,
+              chequeAmount: parseFloat(payment.chequeAmount || 0),
+              bankName: payment.bankName,
+              totalUsed: 0
+            });
+          }
+        }
+      });
+    });
+
+    // Calculate used amount for each cheque
+    jobs.forEach((job) => {
+      const paymentRecords = getAllPaymentRecords(job);
+      paymentRecords.forEach((payment) => {
+        if (payment.paymentMethod === 'Cheque' && payment.chequeNumber) {
+          const key = `${payment.chequeNumber}-${payment.chequeDate}`;
+          if (chequeMap.has(key)) {
+            const cheque = chequeMap.get(key);
+            cheque.totalUsed += parseFloat(payment.amount || 0);
+          }
+        }
+      });
+    });
+
+    // Filter cheques with remaining balance
+    const availableCheques = Array.from(chequeMap.values()).filter(
+      (cheque) => cheque.chequeAmount > cheque.totalUsed
+    );
+
+    return availableCheques;
+  };
+
   const calculateTransporterSummary = () => {
     const summary = {
       totalTransporters: transporters.filter(t => t.isActive).length,
@@ -715,6 +760,7 @@ function Transporters() {
     setChequeDate('');
     setChequeAmount('');
     setBankName('Commercial Bank');
+    setSelectedChequeId('');
     setShowPaymentModal(true);
   };
 
@@ -1179,48 +1225,31 @@ function Transporters() {
                                           </div>
                                           <div className="settlement-table-cell settlement-amount-col">
                                             {(() => {
-                                              const paymentStatus = getJobPaymentStatus(job.jobId);
-                                              return (
-                                                <span className={`payment-status-badge payment-${getPaymentStatusClassName(paymentStatus)}`}>
-                                                  {paymentStatus}
-                                                </span>
-                                              );
+                                              if (getTransporterCostAmount(job) > 0) {
+                                                if (isTransporterCostPaid(job)) {
+                                                  return <span className="transporter-paid-badge">Paid</span>;
+                                                } else if (isTransporterCostPartiallyPaid(job)) {
+                                                  return <span className="transporter-partial-badge">Partial</span>;
+                                                } else {
+                                                  return <span className="transporter-unpaid-badge">Unpaid</span>;
+                                                }
+                                              } else {
+                                                return <span className="transporter-no-cost">-</span>;
+                                              }
                                             })()}
                                           </div>
                                           <div className="settlement-table-cell settlement-actions-col">
                                             <div className="inline-action-btns">
-                                              {getTransporterCostAmount(job) > 0 ? (
-                                                isTransporterCostPaid(job) ? (
-                                                  <span className="transporter-paid-badge">Paid</span>
-                                                ) : isTransporterCostPartiallyPaid(job) ? (
-                                                  <>
-                                                    <span className="transporter-partial-badge">Partial</span>
-                                                    {canPayTransporterCosts && (
-                                                      <button
-                                                        type="button"
-                                                        className="inline-btn-edit"
-                                                        onClick={() => openPaymentModal(job)}
-                                                        title="Pay remaining amount"
-                                                      >
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                                      </button>
-                                                    )}
-                                                  </>
-                                                ) : canPayTransporterCosts ? (
-                                                  <button
-                                                    type="button"
-                                                    className="inline-btn-edit"
-                                                    onClick={() => openPaymentModal(job)}
-                                                    title="Pay the amount"
-                                                  >
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                                  </button>
-                                                ) : (
-                                                  <span className="transporter-unpaid-badge">Unpaid</span>
-                                                )
-                                              ) : (
-                                                <span className="transporter-no-cost">-</span>
-                                              )}
+                                              {getTransporterCostAmount(job) > 0 && canPayTransporterCosts && !isTransporterCostPaid(job) ? (
+                                                <button
+                                                  type="button"
+                                                  className="inline-btn-edit"
+                                                  onClick={() => openPaymentModal(job)}
+                                                  title="Record payment"
+                                                >
+                                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                </button>
+                                              ) : null}
                                               {getTransporterCostAmount(job) > 0 && (
                                                 <button
                                                   type="button"
@@ -1340,12 +1369,15 @@ function Transporters() {
                                       <div className="settlement-table-cell settlement-num-col"></div>
                                       <div className="settlement-table-cell settlement-name-col"><strong>Total</strong></div>
                                       <div className="settlement-table-cell settlement-type-col"></div>
+                                      <div className="settlement-table-cell settlement-type-col"></div>
                                       <div className="settlement-table-cell settlement-bill-col settlement-amount-value">
                                         <strong>LKR {formatAmount(assignedJobs.reduce((sum, job) => sum + getTransporterCostAmount(job), 0))}</strong>
                                       </div>
                                       <div className="settlement-table-cell settlement-bill-col settlement-amount-value">
                                         <strong>LKR {formatAmount(assignedJobs.reduce((sum, job) => sum + getBillingAmount(job.jobId), 0))}</strong>
                                       </div>
+                                      <div className="settlement-table-cell settlement-bill-col"></div>
+                                      <div className="settlement-table-cell settlement-bill-col"></div>
                                       <div className="settlement-table-cell settlement-amount-col"></div>
                                       <div className="settlement-table-cell settlement-actions-col"></div>
                                     </div>
@@ -1819,6 +1851,7 @@ function Transporters() {
                       setChequeDate('');
                       setChequeAmount('');
                       setBankName('Commercial Bank');
+                      setSelectedChequeId('');
                     }}
                   >
                     {m === 'Cash' && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>}
@@ -1850,28 +1883,78 @@ function Transporters() {
                   <p className="pm-panel-label">Cheque Details</p>
                   <div className="pm-fields-grid">
                     <div className="pm-field">
-                      <label className="pm-field-label">Cheque Number <span className="pm-req">*</span></label>
-                      <input type="text" className="pm-input"
-                        value={chequeNumber}
-                        onChange={e => setChequeNumber(e.target.value)}
-                        placeholder="e.g. 001234"
-                      />
+                      <label className="pm-field-label">Select Cheque <span className="pm-req">*</span></label>
+                      <select 
+                        className="pm-input"
+                        value={selectedChequeId}
+                        onChange={(e) => {
+                          const selected = e.target.value;
+                          setSelectedChequeId(selected);
+                          if (selected) {
+                            const availableCheques = getAvailableChequesWithBalance();
+                            const cheque = availableCheques.find(c => `${c.chequeNumber}-${c.chequeDate}` === selected);
+                            if (cheque) {
+                              setChequeNumber(cheque.chequeNumber);
+                              setChequeDate(cheque.chequeDate);
+                              setChequeAmount(String(cheque.chequeAmount - cheque.totalUsed));
+                              setBankName(cheque.bankName || 'Commercial Bank');
+                            }
+                          } else {
+                            setChequeNumber('');
+                            setChequeDate('');
+                            setChequeAmount('');
+                          }
+                        }}
+                      >
+                        <option value="">-- New Cheque --</option>
+                        {getAvailableChequesWithBalance().map((cheque) => {
+                          const remaining = cheque.chequeAmount - cheque.totalUsed;
+                          return (
+                            <option key={`${cheque.chequeNumber}-${cheque.chequeDate}`} value={`${cheque.chequeNumber}-${cheque.chequeDate}`}>
+                              CHQ {cheque.chequeNumber} ({cheque.chequeDate}) - Remaining: LKR {formatAmount(remaining)}
+                            </option>
+                          );
+                        })}
+                      </select>
                     </div>
-                    <div className="pm-field">
-                      <label className="pm-field-label">Cheque Date <span className="pm-req">*</span></label>
-                      <input type="date" className="pm-input"
-                        value={chequeDate}
-                        onChange={e => setChequeDate(e.target.value)}
-                      />
-                    </div>
-                    <div className="pm-field">
-                      <label className="pm-field-label">Cheque Amount (LKR) <span className="pm-req">*</span></label>
-                      <input type="number" step="0.01" className="pm-input"
-                        value={chequeAmount}
-                        onChange={e => setChequeAmount(e.target.value)}
-                        placeholder="0.00"
-                      />
-                    </div>
+                    {selectedChequeId && (
+                      <div className="pm-field">
+                        <label className="pm-field-label">Remaining Balance</label>
+                        <input 
+                          type="text" 
+                          className="pm-input" 
+                          value={`LKR ${formatAmount(chequeAmount)}`}
+                          disabled
+                        />
+                      </div>
+                    )}
+                    {!selectedChequeId && (
+                      <>
+                        <div className="pm-field">
+                          <label className="pm-field-label">Cheque Number <span className="pm-req">*</span></label>
+                          <input type="text" className="pm-input"
+                            value={chequeNumber}
+                            onChange={e => setChequeNumber(e.target.value)}
+                            placeholder="e.g. 001234"
+                          />
+                        </div>
+                        <div className="pm-field">
+                          <label className="pm-field-label">Cheque Date <span className="pm-req">*</span></label>
+                          <input type="date" className="pm-input"
+                            value={chequeDate}
+                            onChange={e => setChequeDate(e.target.value)}
+                          />
+                        </div>
+                        <div className="pm-field">
+                          <label className="pm-field-label">Cheque Amount (LKR) <span className="pm-req">*</span></label>
+                          <input type="number" step="0.01" className="pm-input"
+                            value={chequeAmount}
+                            onChange={e => setChequeAmount(e.target.value)}
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </>
+                    )}
                     <div className="pm-field">
                       <label className="pm-field-label">Bank Name</label>
                       <select className="pm-input" value={bankName} onChange={e => setBankName(e.target.value)}>
