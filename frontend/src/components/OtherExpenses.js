@@ -47,9 +47,19 @@ function OtherExpenses() {
     notes: ''
   });
 
-  // Check if user has access
+  // Check if user has access to view the page
   const hasAccess = () => {
-    return user && ['Admin', 'Super Admin', 'Manager'].includes(user.role);
+    return user && ['Admin', 'Super Admin', 'Manager', 'Staff'].includes(user.role);
+  };
+
+  // Check if user can create expenses
+  const canCreate = () => {
+    return user && ['Admin', 'Super Admin', 'Manager', 'Staff'].includes(user.role);
+  };
+
+  // Check if user can edit/delete expenses (only Admin and Super Admin)
+  const canEditDelete = () => {
+    return user && ['Admin', 'Super Admin'].includes(user.role);
   };
 
   useEffect(() => {
@@ -196,9 +206,11 @@ function OtherExpenses() {
           <h1>Other Expenses</h1>
           <p>Track office expenses like food, utilities, WiFi, and phone cards</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary">
-          + New Expense
-        </button>
+        {canCreate() && (
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            + New Expense
+          </button>
+        )}
       </div>
 
       {message && (
@@ -257,7 +269,7 @@ function OtherExpenses() {
                     <th>Amount</th>
                     <th>Payment Method</th>
                     <th>Recorded By</th>
-                    <th>Actions</th>
+                    {canEditDelete() && <th>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -276,24 +288,26 @@ function OtherExpenses() {
                       </td>
                       <td data-label="Payment Method">{expense.paymentMethod || '-'}</td>
                       <td data-label="Recorded By">{expense.recordedByName || '-'}</td>
-                      <td data-label="Actions">
-                        <div className="action-buttons">
-                          <button
-                            className="btn-action btn-edit"
-                            onClick={() => handleEdit(expense)}
-                            title="Edit Expense"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn-action btn-delete"
-                            onClick={() => handleDelete(expense.expenseId)}
-                            title="Delete Expense"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+                      {canEditDelete() && (
+                        <td data-label="Actions">
+                          <div className="action-buttons">
+                            <button
+                              className="btn-action btn-edit"
+                              onClick={() => handleEdit(expense)}
+                              title="Edit Expense"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn-action btn-delete"
+                              onClick={() => handleDelete(expense.expenseId)}
+                              title="Delete Expense"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -405,16 +419,30 @@ function OtherExpenses() {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Reference Number</label>
-                <input
-                  type="text"
-                  name="referenceNumber"
-                  value={formData.referenceNumber}
-                  onChange={handleChange}
-                  placeholder="Cheque number, transaction ID, etc."
-                />
-              </div>
+              {formData.paymentMethod === 'Cheque' && (
+                <div className="form-group">
+                  <label>Cheque Number</label>
+                  <input
+                    type="text"
+                    name="referenceNumber"
+                    value={formData.referenceNumber}
+                    onChange={handleChange}
+                    placeholder="Enter cheque number"
+                  />
+                </div>
+              )}
+              {formData.paymentMethod !== 'Cheque' && formData.paymentMethod && (
+                <div className="form-group">
+                  <label>Reference Number</label>
+                  <input
+                    type="text"
+                    name="referenceNumber"
+                    value={formData.referenceNumber}
+                    onChange={handleChange}
+                    placeholder="Transaction ID, reference number, etc."
+                  />
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Notes</label>
