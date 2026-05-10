@@ -220,7 +220,7 @@ class Container {
     this.dependencies.getUserBalancesSummary = new GetUserBalancesSummary(pettyCashAssignmentRepository);
     this.dependencies.getGroupedAssignments = new GetGroupedAssignments(pettyCashAssignmentRepository);
     this.dependencies.settleGroupedAssignments = new SettleGroupedAssignments(pettyCashAssignmentRepository);
-    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository);
+    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository, jobRepository);
     this.dependencies.getAssignmentsWithChildren = new GetAssignmentsWithChildren(pettyCashAssignmentRepository);
     this.dependencies.getAggregatedAssignments = new GetAggregatedAssignments(pettyCashAssignmentRepository);
     
