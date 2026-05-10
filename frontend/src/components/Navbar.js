@@ -63,6 +63,9 @@ function Navbar() {
             {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Office Executive') && (
               <li><Link to="/old-invoices" className={isActive('/old-invoices')}>Old Invoices</Link></li>
             )}
+            {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
+              <li><Link to="/other-expenses" className={isActive('/other-expenses')}>Other Expenses</Link></li>
+            )}
             {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager' || user?.role === 'Waff Clerk') && (
               <li><Link to="/petty-cash" className={isActive('/petty-cash')}>Petty Cash</Link></li>
             )}
@@ -202,6 +205,18 @@ function Navbar() {
                   <line x1="16" y1="17" x2="8" y2="17"></line>
                 </svg>
               </span> Old Invoices
+            </Link></li>
+          )}
+
+          {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
+            <li><Link to="/other-expenses" className={isActive('/other-expenses')} onClick={closeMobileMenu}>
+              <span className="menu-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                  <line x1="1" y1="10" x2="23" y2="10"></line>
+                  <circle cx="12" cy="14" r="2"></circle>
+                </svg>
+              </span> Other Expenses
             </Link></li>
           )}
 

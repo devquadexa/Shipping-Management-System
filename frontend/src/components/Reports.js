@@ -21,6 +21,38 @@ const REPORT_CARDS = [
     tags: ['Daily', 'Export', 'Job-wise'],
   },
   {
+    id: 'pending-payments-report',
+    path: '/reports/pending-payments',
+    category: 'Financial',
+    title: 'Pending Payments Report',
+    description: 'View all pending and overdue payment invoices with date range filtering. Track unpaid and partially paid invoices with PDF / Excel export.',
+    available: true,
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+    ),
+    color: 'red',
+    tags: ['Invoices', 'Export', 'Overdue'],
+  },
+  {
+    id: 'other-expenses-report',
+    path: '/reports/other-expenses',
+    category: 'Financial',
+    title: 'Other Expenses Report',
+    description: 'Track office expenses like food, utilities, WiFi and phone cards. Filter by date range and category with PDF / Excel export.',
+    available: true,
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+      </svg>
+    ),
+    color: 'amber',
+    tags: ['Expenses', 'Export', 'Category-wise'],
+  },
+  {
     id: 'invoice-report',
     path: null,
     category: 'Financial',
@@ -108,6 +140,24 @@ const REPORT_CARDS = [
     ),
     color: 'red',
     tags: ['P&L', 'Export', 'Period-wise'],
+  },
+  {
+    id: 'transporters-report',
+    path: '/reports/transporters',
+    category: 'Financial',
+    title: 'Transporters Report',
+    description: 'Transporter-wise payment details, job assignments, paid amounts, balances and outstanding payments.',
+    available: true,
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="3" width="15" height="13"></rect>
+        <polygon points="16 8 20 8 23 11 23 16 18 16 18 8"></polygon>
+        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+      </svg>
+    ),
+    color: 'orange',
+    tags: ['Payments', 'Export', 'Transporter-wise'],
   },
 ];
 

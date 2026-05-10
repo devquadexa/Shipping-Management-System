@@ -7,6 +7,7 @@ import { transporterService } from '../api/services/transporterService';
 import API_BASE from '../api/config';
 import apiClient from '../api/client';
 import Pagination from './Pagination';
+import { formatDate, formatDateWithMonth, formatDateWithFullMonth } from '../utils/dateFormatter';
 import '../styles/Billing.css';
 
 function Billing() {
@@ -110,20 +111,6 @@ function Billing() {
     return ensureFclTransporterCost([], shipmentCategory);
   };
 
-  const formatDateDDMMYYYY = (dateValue) => {
-    if (!dateValue) return '';
-
-    const normalized = String(dateValue).split('T')[0];
-    const dateParts = normalized.split('-');
-    if (dateParts.length === 3) {
-      const [year, month, day] = dateParts;
-      return `${day}/${month}/${year}`;
-    }
-
-    const parsed = new Date(dateValue);
-    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleDateString('en-GB');
-  };
-
   const formatCusdecNumberForDisplay = (value) => {
     const rawValue = (value || '').trim();
     if (!rawValue) return '';
@@ -136,7 +123,7 @@ function Billing() {
     const formattedNumber = formatCusdecNumberForDisplay(cusdecNumber);
     if (!formattedNumber) return '-';
 
-    const formattedDate = formatDateDDMMYYYY(cusdecDate);
+    const formattedDate = formatDate(cusdecDate);
     return formattedDate ? `${formattedNumber} of ${formattedDate}` : formattedNumber;
   };
 
@@ -175,6 +162,8 @@ function Billing() {
   const [partialPaymentAmount, setPartialPaymentAmount] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(20);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [customerFilter, setCustomerFilter] = useState('All');
 
   useEffect(() => {
     fetchBills();
@@ -921,8 +910,16 @@ function Billing() {
     ) {
       missingFields.push('Chassis Number');
     }
-    if (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) {
-      missingFields.push('Transport Delivery Date');
+    
+    // Transporter and Transport Delivery Date are required only for FCL jobs
+    const isFclJob = selectedJob.shipmentCategory === 'FCL';
+    if (isFclJob) {
+      if (!selectedJob.transporter || (typeof selectedJob.transporter === 'string' && selectedJob.transporter.trim() === '')) {
+        missingFields.push('Transporter');
+      }
+      if (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) {
+        missingFields.push('Transport Delivery Date');
+      }
     }
     console.log('generateBill - missingFields:', missingFields);
     
@@ -1280,7 +1277,7 @@ function Billing() {
 
   const generateBillHTML = (bill, job, customer, mode = 'color') => {
     const isColorMode = mode === 'color';
-    const billDate = new Date(bill.billDate || bill.createdDate).toLocaleDateString('en-GB');
+    const billDate = formatDate(bill.billDate || bill.createdDate);
     const invoiceNumber = bill.invoiceNumber || bill.billId;
     const invoiceLogoUrl = `${window.location.origin}/logo2.png`;
     
@@ -1294,10 +1291,7 @@ function Billing() {
     // Use job's advance payment if bill doesn't have it
     const advancePayment = parseFloat(bill.advancePayment || job.advancePayment || 0);
     const rawAdvancePaymentDate = bill.advancePaymentDate || bill.paymentMadeDate || job.advancePaymentDate || job.paymentMadeDate;
-    const parsedAdvancePaymentDate = rawAdvancePaymentDate ? new Date(rawAdvancePaymentDate) : null;
-    const advancePaymentDateText = parsedAdvancePaymentDate && !Number.isNaN(parsedAdvancePaymentDate.getTime())
-      ? parsedAdvancePaymentDate.toLocaleDateString('en-GB')
-      : '-';
+    const advancePaymentDateText = formatDate(rawAdvancePaymentDate);
     const advancePaymentLabel = `Advance payment (${advancePaymentDateText})`;
     const grossTotal = parseFloat(bill.grossTotal || bill.billingAmount || 0);
     const netTotal = grossTotal - advancePayment; // Always calculate, don't use bill.netTotal
@@ -1345,14 +1339,14 @@ function Billing() {
       };
     });
 
-    const payItemsPerPage = 25;
+    const payItemsPerPage = 22;
     const printablePayItemPages = [];
     
-    // Create pages with exactly 25 rows each
+    // Create pages with exactly 22 rows each
     for (let index = 0; index < printablePayItems.length; index += payItemsPerPage) {
       const pageItems = printablePayItems.slice(index, index + payItemsPerPage);
       
-      // Fill remaining rows with empty items to make exactly 25 rows
+      // Fill remaining rows with empty items to make exactly 22 rows
       while (pageItems.length < payItemsPerPage) {
         pageItems.push({
           payItemId: '',
@@ -1537,21 +1531,21 @@ function Billing() {
             width: 100%;
             border-collapse: collapse;
             margin-top: ${isCompactItemsLayout ? '2px' : '4px'};
-            font-size: ${isCompactItemsLayout ? '8.5pt' : '9pt'};
+            font-size: ${isCompactItemsLayout ? '8pt' : '8.5pt'};
             border: 1px solid var(--theme-primary);
           }
           .pay-items-table th,
           .pay-items-table td {
             border: 1px solid #cfd7ea;
-            padding: ${isCompactItemsLayout ? '3px 6px' : '4px 8px'};
+            padding: ${isCompactItemsLayout ? '2px 5px' : '3px 6px'};
             vertical-align: top;
           }
           .pay-items-table tbody td {
-            line-height: 1.25;
-            min-height: ${isCompactItemsLayout ? '18px' : '20px'};
+            line-height: 1.2;
+            min-height: ${isCompactItemsLayout ? '16px' : '18px'};
           }
           .pay-items-table tbody tr {
-            height: ${isCompactItemsLayout ? '18px' : '20px'};
+            height: ${isCompactItemsLayout ? '16px' : '18px'};
           }
           .pay-items-table thead th {
             background: #e9efff;
@@ -1800,11 +1794,18 @@ function Billing() {
     );
   }
 
+  // Filter bills based on status and customer
+  const filteredBills = bills.filter(bill => {
+    const matchesStatus = statusFilter === 'All' || (bill.paymentStatus || 'Unpaid') === statusFilter;
+    const matchesCustomer = customerFilter === 'All' || bill.customerId === customerFilter;
+    return matchesStatus && matchesCustomer;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(bills.length / recordsPerPage);
+  const totalPages = Math.ceil(filteredBills.length / recordsPerPage);
   const indexOfLastRecord = currentPage * recordsPerPage;
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
-  const currentRecords = bills.slice(indexOfFirstRecord, indexOfLastRecord);
+  const currentRecords = filteredBills.slice(indexOfFirstRecord, indexOfLastRecord);
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
@@ -1921,7 +1922,12 @@ function Billing() {
                   </div>
                   {selectedJob.hasOwnProperty('transporter') && (
                     <div className="info-row">
-                      <span className="info-label">Transporter:</span>
+                      <span className="info-label">
+                        Transporter:
+                        {selectedJob.shipmentCategory === 'FCL' && 
+                         (!selectedJob.transporter || selectedJob.transporter.trim() === '') && 
+                         <span className="required-indicator">*Required</span>}
+                      </span>
                       <select 
                         className="info-value transporter-dropdown"
                         value={transporters.find(t => t.name === selectedJob.transporter)?.transporterId || ''}
@@ -1937,9 +1943,14 @@ function Billing() {
                     </div>
                   )}
                   <div className="info-row">
-                    <span className="info-label">Transport Delivery Date: {(!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) && <span className="required-indicator">*Required</span>}</span>
-                    <span className={`info-value ${(!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) ? 'missing-value' : ''}`}>
-                      {selectedJob.transportDeliveryDate ? new Date(selectedJob.transportDeliveryDate).toLocaleDateString() : '-'}
+                    <span className="info-label">
+                      Transport Delivery Date: 
+                      {selectedJob.shipmentCategory === 'FCL' && 
+                       (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) && 
+                       <span className="required-indicator">*Required</span>}
+                    </span>
+                    <span className={`info-value ${selectedJob.shipmentCategory === 'FCL' && (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) ? 'missing-value' : ''}`}>
+                      {formatDate(selectedJob.transportDeliveryDate)}
                     </span>
                   </div>
                   <div className="info-row">
@@ -2328,24 +2339,86 @@ function Billing() {
 
       <div className="card">
         <div className="card-header">
-          <h2>Generated Invoices ({bills.length})</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Print Mode</span>
-            <select
-              value={printMode}
-              onChange={(e) => setPrintMode(e.target.value)}
-              className="form-control"
-              style={{ minWidth: '180px', padding: '6px 10px' }}
-            >
-              <option value="color">Color (Theme)</option>
-              <option value="bw">Black & White</option>
-            </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h2>Generated Invoices ({filteredBills.length})</h2>
+            {(statusFilter !== 'All' || customerFilter !== 'All') && (
+              <button
+                onClick={() => {
+                  setStatusFilter('All');
+                  setCustomerFilter('All');
+                  setCurrentPage(1);
+                }}
+                className="btn-secondary"
+                style={{ 
+                  padding: '4px 12px', 
+                  fontSize: '12px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+                title="Clear all filters"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Status</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="form-control"
+                style={{ minWidth: '150px', padding: '6px 10px' }}
+              >
+                <option value="All">All Status</option>
+                <option value="Paid">Paid</option>
+                <option value="Partially Paid">Partially Paid</option>
+                <option value="Unpaid">Unpaid</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Customer</span>
+              <select
+                value={customerFilter}
+                onChange={(e) => {
+                  setCustomerFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="form-control"
+                style={{ minWidth: '200px', padding: '6px 10px' }}
+              >
+                <option value="All">All Customers</option>
+                {customers.map(customer => (
+                  <option key={customer.customerId} value={customer.customerId}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Print Mode</span>
+              <select
+                value={printMode}
+                onChange={(e) => setPrintMode(e.target.value)}
+                className="form-control"
+                style={{ minWidth: '180px', padding: '6px 10px' }}
+              >
+                <option value="color">Color (Theme)</option>
+                <option value="bw">Black & White</option>
+              </select>
+            </div>
           </div>
         </div>
-        {bills.length === 0 ? (
+        {filteredBills.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">📄</div>
-            <p>No invoices generated yet</p>
+            <p>{bills.length === 0 ? 'No invoices generated yet' : 'No invoices match the selected filters'}</p>
           </div>
         ) : (
           <div className="billing-table-wrapper">
@@ -2370,12 +2443,12 @@ function Billing() {
                       <td data-label="Job ID">{bill.jobId}</td>
                       <td data-label="Customer">{getCustomerName(bill.customerId)}</td>
                       <td data-label="Invoice Date">
-                        {bill.invoiceDate ? new Date(bill.invoiceDate).toLocaleDateString() : '-'}
+                        {formatDate(bill.invoiceDate)}
                       </td>
                       <td data-label="Due Date">
                         {bill.dueDate ? (
                           <div className="due-date-cell">
-                            {new Date(bill.dueDate).toLocaleDateString()}
+                            {formatDate(bill.dueDate)}
                             {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
                           </div>
                         ) : '-'}
@@ -2510,11 +2583,7 @@ function Billing() {
                                               <span className="payment-num">{idx + 1}</span>
                                             </div>
                                             <div className="payment-table-cell payment-date-col">
-                                              {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('en-US', {
-                                                year: 'numeric',
-                                                month: 'short',
-                                                day: 'numeric'
-                                              }) : '-'}
+                                              {formatDateWithMonth(payment.paymentDate)}
                                             </div>
                                             <div className="payment-table-cell payment-method-col">
                                               <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
@@ -2550,11 +2619,7 @@ function Billing() {
                                           <span className="payment-num">1</span>
                                         </div>
                                         <div className="payment-table-cell payment-date-col">
-                                          {bill.paidDate ? new Date(bill.paidDate).toLocaleDateString('en-US', {
-                                            year: 'numeric',
-                                            month: 'short',
-                                            day: 'numeric'
-                                          }) : '-'}
+                                          {formatDateWithMonth(bill.paidDate)}
                                         </div>
                                         <div className="payment-table-cell payment-method-col">
                                           <span className={`payment-method-badge payment-method-${bill.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
@@ -2624,11 +2689,7 @@ function Billing() {
                                     <div className="payment-detail-card">
                                       <div className="payment-detail-label">Payment Date</div>
                                       <div className="payment-detail-value">
-                                        {new Date(bill.paidDate).toLocaleDateString('en-US', {
-                                          year: 'numeric',
-                                          month: 'long',
-                                          day: 'numeric'
-                                        })}
+                                        {formatDateWithFullMonth(bill.paidDate)}
                                       </div>
                                     </div>
                                   )}
@@ -2647,11 +2708,7 @@ function Billing() {
                                         <div className="payment-detail-card">
                                           <div className="payment-detail-label">Cheque Date</div>
                                           <div className="payment-detail-value">
-                                            {new Date(bill.chequeDate).toLocaleDateString('en-US', {
-                                              year: 'numeric',
-                                              month: 'long',
-                                              day: 'numeric'
-                                            })}
+                                            {formatDateWithFullMonth(bill.chequeDate)}
                                           </div>
                                         </div>
                                       )}

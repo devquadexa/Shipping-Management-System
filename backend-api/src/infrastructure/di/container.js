@@ -52,6 +52,9 @@ const GetBillById = require('../../application/use-cases/billing/GetBillById');
 const MarkBillAsPaid = require('../../application/use-cases/billing/MarkBillAsPaid');
 const CheckOverdueInvoices = require('../../application/use-cases/billing/CheckOverdueInvoices');
 const ApplyPartialPayment = require('../../application/use-cases/billing/ApplyPartialPayment');
+const GetPendingPaymentsReport = require('../../application/use-cases/billing/GetPendingPaymentsReport');
+const ExportPendingPaymentsReportPDF = require('../../application/use-cases/billing/ExportPendingPaymentsReportPDF');
+const ExportPendingPaymentsReportExcel = require('../../application/use-cases/billing/ExportPendingPaymentsReportExcel');
 
 // Accounting Use Cases
 const GetAccountingDashboard = require('../../application/use-cases/accounting/GetAccountingDashboard');
@@ -191,6 +194,9 @@ class Container {
     this.dependencies.markBillAsPaid = new MarkBillAsPaid(billRepository, paymentRepository, jobRepository, customerRepository);
     this.dependencies.checkOverdueInvoices = new CheckOverdueInvoices(billRepository, jobRepository);
     this.dependencies.applyPartialPayment = new ApplyPartialPayment(billRepository, paymentRepository, customerRepository, jobRepository);
+    this.dependencies.getPendingPaymentsReport = new GetPendingPaymentsReport(billRepository);
+    this.dependencies.exportPendingPaymentsReportPDF = new ExportPendingPaymentsReportPDF(billRepository);
+    this.dependencies.exportPendingPaymentsReportExcel = new ExportPendingPaymentsReportExcel(billRepository);
     
     // Petty Cash use cases
     this.dependencies.createPettyCashEntry = new CreatePettyCashEntry(pettyCashRepository);
@@ -214,7 +220,7 @@ class Container {
     this.dependencies.getUserBalancesSummary = new GetUserBalancesSummary(pettyCashAssignmentRepository);
     this.dependencies.getGroupedAssignments = new GetGroupedAssignments(pettyCashAssignmentRepository);
     this.dependencies.settleGroupedAssignments = new SettleGroupedAssignments(pettyCashAssignmentRepository);
-    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository);
+    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository, jobRepository);
     this.dependencies.getAssignmentsWithChildren = new GetAssignmentsWithChildren(pettyCashAssignmentRepository);
     this.dependencies.getAggregatedAssignments = new GetAggregatedAssignments(pettyCashAssignmentRepository);
     
@@ -256,6 +262,25 @@ class Container {
     this.dependencies.deleteOldInvoice = new DeleteOldInvoice(oldInvoiceRepository);
     this.dependencies.addPaymentToOldInvoice = new AddPaymentToOldInvoice(oldInvoiceRepository);
     this.dependencies.deletePaymentFromOldInvoice = new DeletePaymentFromOldInvoice(oldInvoiceRepository);
+    
+    // Other Expense use cases
+    const MSSQLOtherExpenseRepository = require('../repositories/MSSQLOtherExpenseRepository');
+    const CreateOtherExpense = require('../../application/use-cases/otherexpense/CreateOtherExpense');
+    const GetAllOtherExpenses = require('../../application/use-cases/otherexpense/GetAllOtherExpenses');
+    const UpdateOtherExpense = require('../../application/use-cases/otherexpense/UpdateOtherExpense');
+    const DeleteOtherExpense = require('../../application/use-cases/otherexpense/DeleteOtherExpense');
+    const GetOtherExpensesReport = require('../../application/use-cases/otherexpense/GetOtherExpensesReport');
+    const ExportOtherExpensesReportPDF = require('../../application/use-cases/otherexpense/ExportOtherExpensesReportPDF');
+    const ExportOtherExpensesReportExcel = require('../../application/use-cases/otherexpense/ExportOtherExpensesReportExcel');
+    
+    const otherExpenseRepository = new MSSQLOtherExpenseRepository(getConnection, sql);
+    this.dependencies.createOtherExpense = new CreateOtherExpense(otherExpenseRepository);
+    this.dependencies.getAllOtherExpenses = new GetAllOtherExpenses(otherExpenseRepository);
+    this.dependencies.updateOtherExpense = new UpdateOtherExpense(otherExpenseRepository);
+    this.dependencies.deleteOtherExpense = new DeleteOtherExpense(otherExpenseRepository);
+    this.dependencies.getOtherExpensesReport = new GetOtherExpensesReport(otherExpenseRepository);
+    this.dependencies.exportOtherExpensesReportPDF = new ExportOtherExpensesReportPDF(otherExpenseRepository);
+    this.dependencies.exportOtherExpensesReportExcel = new ExportOtherExpensesReportExcel(otherExpenseRepository);
     
     // Controllers
     this.dependencies.CashBalanceSettlementController = new CashBalanceSettlementController(this);

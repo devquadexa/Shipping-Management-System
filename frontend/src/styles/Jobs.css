@@ -1772,3 +1772,37 @@ div.modal div.job-form div.action-buttons,
     transform: translateY(0);
   }
 }
+
+/* Amount Column Styles */
+.amount-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #101036;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.no-bill-text {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+/* Amount column cells - prevent wrapping */
+.jobs-table td[data-label="Total Amount"],
+.jobs-table td[data-label="Paid Amount"] {
+  white-space: nowrap;
+  min-width: 110px;
+}
+
+/* Responsive amount columns */
+@media (max-width: 768px) {
+  .amount-value {
+    font-size: 0.75rem;
+  }
+  
+  .jobs-table td[data-label="Total Amount"],
+  .jobs-table td[data-label="Paid Amount"] {
+    white-space: normal;
+  }
+}

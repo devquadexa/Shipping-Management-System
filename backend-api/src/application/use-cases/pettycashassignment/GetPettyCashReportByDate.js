@@ -37,6 +37,8 @@ class GetPettyCashReportByDate {
       overAmount:     parseFloat(row.overAmount)     || 0,
       status:         row.status         || 'Assigned',
       assignmentDate: row.assignedDate,
+      settlementDate: row.settlementDate,
+      assignmentCount: parseInt(row.assignmentCount) || 1,
       notes:          row.notes          || ''
     }));
   }
