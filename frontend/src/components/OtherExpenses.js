@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { otherExpenseService } from '../api/services/otherExpenseService';
+import { formatDate } from '../utils/dateFormatter';
 import '../styles/OtherExpenses.css';
 
 // Predefined expense categories
@@ -159,10 +160,6 @@ function OtherExpenses() {
 
   const formatCurrency = (amount) => {
     return `LKR ${parseFloat(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  const formatDate = (date) => {
-    return date ? new Date(date).toLocaleDateString('en-GB') : '-';
   };
 
   // Filter expenses
