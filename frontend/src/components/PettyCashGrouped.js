@@ -439,8 +439,8 @@ function PettyCashGrouped() {
 
       {/* Assignment Modal */}
       {showAssignModal && (
-        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content">
             <div className="modal-header">
               <h2>Assign Petty Cash</h2>
               <button className="close-btn" onClick={() => setShowAssignModal(false)}>×</button>
@@ -509,8 +509,8 @@ function PettyCashGrouped() {
 
       {/* Settlement Modal */}
       {showSettleModal && selectedGroup && (
-        <div className="modal-overlay" onClick={() => setShowSettleModal(false)}>
-          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content modal-large">
             <div className="modal-header">
               <h2>Settle Group: {selectedGroup.jobId}</h2>
               <button className="close-btn" onClick={() => setShowSettleModal(false)}>×</button>

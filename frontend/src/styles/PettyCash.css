@@ -4186,3 +4186,181 @@ input[type="number"] {
 .collapse-arrow.collapsed {
   transform: rotate(-90deg);
 }
+
+/* Cash Withdrawals Section */
+.withdrawals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.withdrawal-box {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.withdrawal-box:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.withdrawal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #4CAF50;
+}
+
+.withdrawal-id {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.withdrawal-amount {
+  font-weight: 700;
+  color: #4CAF50;
+  font-size: 18px;
+}
+
+.withdrawal-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.withdrawal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.withdrawal-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.withdrawal-value {
+  color: #333;
+  font-weight: 400;
+}
+
+.withdrawal-notes {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #ddd;
+}
+
+.withdrawal-notes p {
+  margin: 4px 0 0 0;
+  color: #555;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Cash Balance Summary in Assign Modal */
+.cash-balance-summary {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.balance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.balance-item.highlight {
+  background: #d1f4e0;
+  border: 1px solid #28a745;
+  font-weight: 600;
+}
+
+.balance-label {
+  color: #495057;
+  font-weight: 500;
+}
+
+.balance-value {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.balance-value.withdrawn {
+  color: #0d6efd;
+}
+
+.balance-value.assigned {
+  color: #6c757d;
+}
+
+.balance-value.positive {
+  color: #198754;
+  font-size: 16px;
+}
+
+.balance-value.negative {
+  color: #dc3545;
+  font-size: 16px;
+}
+
+.balance-warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #856404;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .cash-balance-summary {
+    padding: 12px;
+  }
+  
+  .balance-item {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  
+  .balance-value {
+    font-size: 14px;
+  }
+  
+  .balance-value.positive,
+  .balance-value.negative {
+    font-size: 15px;
+  }
+}
+
+/* Disabled button styles */
+.btn-primary:disabled {
+  background-color: #6c757d !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
+
+.btn-primary:disabled:hover {
+  background-color: #6c757d !important;
+  transform: none !important;
+}

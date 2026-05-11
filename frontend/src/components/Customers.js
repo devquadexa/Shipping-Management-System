@@ -822,8 +822,8 @@ function Customers() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => { setShowModal(false); resetForm(); }}>
-          <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large">
             <div className="modal-header">
               <h2>{editingCustomer ? 'Edit Customer' : 'Register New Customer'}</h2>
               <button className="btn-close" onClick={() => { setShowModal(false); resetForm(); }}>×</button>

@@ -2307,8 +2307,8 @@ function Billing() {
                         ✓ Generate Invoice
                       </button>
                       {showValidationModal && (
-                        <div className="validation-modal-overlay" onClick={() => setShowValidationModal(false)}>
-                          <div className="validation-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="validation-modal-overlay">
+                          <div className="validation-modal">
                             <div className="validation-modal-header">
                               <h3>⚠️ Cannot Generate Invoice</h3>
                               <button className="modal-close-btn" onClick={() => setShowValidationModal(false)}>×</button>

@@ -20,6 +20,7 @@ const MSSQLTransporterRepository = require('../repositories/MSSQLTransporterRepo
 const MSSQLCashBalanceSettlementRepository = require('../repositories/MSSQLCashBalanceSettlementRepository');
 const MSSQLOldInvoiceRepository = require('../repositories/MSSQLOldInvoiceRepository');
 const MSSQLPaymentRepository = require('../repositories/MSSQLPaymentRepository');
+const MSSQLCashWithdrawalRepository = require('../repositories/MSSQLCashWithdrawalRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -64,6 +65,10 @@ const CreatePettyCashEntry = require('../../application/use-cases/pettycash/Crea
 const GetAllPettyCashEntries = require('../../application/use-cases/pettycash/GetAllPettyCashEntries');
 const GetPettyCashBalance = require('../../application/use-cases/pettycash/GetPettyCashBalance');
 const GetAvailablePettyCashBalance = require('../../application/use-cases/pettycash/GetAvailablePettyCashBalance');
+
+// Cash Withdrawal Use Cases
+const CreateCashWithdrawal = require('../../application/use-cases/cashwithdrawal/CreateCashWithdrawal');
+const GetAllCashWithdrawals = require('../../application/use-cases/cashwithdrawal/GetAllCashWithdrawals');
 
 // Pay Item Template Use Cases
 const GetAllPayItemTemplates = require('../../application/use-cases/payitemtemplate/GetAllPayItemTemplates');
@@ -144,6 +149,7 @@ class Container {
     this.dependencies.cashBalanceSettlementRepository = new MSSQLCashBalanceSettlementRepository(getConnection, sql);
     this.dependencies.oldInvoiceRepository = new MSSQLOldInvoiceRepository(getConnection, sql);
     this.dependencies.paymentRepository = new MSSQLPaymentRepository(getConnection, sql);
+    this.dependencies.cashWithdrawalRepository = new MSSQLCashWithdrawalRepository(getConnection, sql);
   }
 
   setupUseCases() {
@@ -161,6 +167,7 @@ class Container {
       cashBalanceSettlementRepository,
       oldInvoiceRepository,
       paymentRepository,
+      cashWithdrawalRepository,
     } = this.dependencies;
     
     // Customer use cases
@@ -203,6 +210,10 @@ class Container {
     this.dependencies.getAllPettyCashEntries = new GetAllPettyCashEntries(pettyCashRepository);
     this.dependencies.getPettyCashBalance = new GetPettyCashBalance(pettyCashRepository);
     this.dependencies.getAvailablePettyCashBalance = new GetAvailablePettyCashBalance(pettyCashRepository, pettyCashAssignmentRepository);
+    
+    // Cash Withdrawal use cases
+    this.dependencies.createCashWithdrawal = new CreateCashWithdrawal(cashWithdrawalRepository, pettyCashRepository);
+    this.dependencies.getAllCashWithdrawals = new GetAllCashWithdrawals(cashWithdrawalRepository);
     
     // Pay Item Template use cases
     this.dependencies.getAllPayItemTemplates = new GetAllPayItemTemplates(payItemTemplateRepository);

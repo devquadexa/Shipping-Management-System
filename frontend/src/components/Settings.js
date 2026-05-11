@@ -309,8 +309,8 @@ function Settings() {
       </div>
 
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal modal-small" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-small">
             <div className="modal-header">
               <h2>Add Pay Item to {selectedCategory}</h2>
               <button className="btn-close" onClick={() => setShowAddModal(false)}>×</button>
