@@ -3,8 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { jobService } from '../api/services/jobService';
 import { authService } from '../api/services/authService';
 import { customerService } from '../api/services/customerService';
+import { cashWithdrawalService } from '../api/services/cashWithdrawalService';
+import CashWithdrawalModal from './CashWithdrawalModal';
 import Pagination from './Pagination';
 import '../styles/PettyCash.css';
+import '../styles/CashWithdrawals.css';
 import API_BASE from '../api/config';
 
 function PettyCash() {
@@ -74,6 +77,14 @@ function PettyCash() {
     notes: ''
   });
 
+  // Cash Withdrawal states
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [cashWithdrawals, setCashWithdrawals] = useState([]);
+  const [withdrawalsCollapsed, setWithdrawalsCollapsed] = useState(false);
+  const [totalWithdrawnCash, setTotalWithdrawnCash] = useState(0);
+  const [totalAssignedCash, setTotalAssignedCash] = useState(0);
+  const [totalOtherExpenses, setTotalOtherExpenses] = useState(0);
+
   useEffect(() => {
     fetchAssignments();
     fetchJobs();
@@ -82,9 +93,19 @@ function PettyCash() {
     if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') {
       fetchUsers();
       fetchOverallBalance();
+      fetchCashWithdrawals();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Debug: Log when totals change
+  useEffect(() => {
+    console.log('💵 Balance Update:');
+    console.log('  - Total Withdrawn:', totalWithdrawnCash);
+    console.log('  - Petty Cash Assigned:', totalAssignedCash);
+    console.log('  - Other Expenses:', totalOtherExpenses);
+    console.log('  - Available:', totalWithdrawnCash - totalAssignedCash - totalOtherExpenses);
+  }, [totalWithdrawnCash, totalAssignedCash, totalOtherExpenses]);
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -131,6 +152,13 @@ function PettyCash() {
       // Ensure data is an array
       if (Array.isArray(data)) {
         setAssignments(data);
+        
+        // Calculate total assigned cash
+        const totalAssigned = data.reduce((sum, assignment) => {
+          return sum + parseFloat(assignment.assignedAmount || 0);
+        }, 0);
+        console.log('📊 Total Assigned Cash:', totalAssigned);
+        setTotalAssignedCash(totalAssigned);
         
         // For admin/super admin, fetch user balances from dedicated endpoint
         if (user?.role === 'Admin' || user?.role === 'Super Admin') {
@@ -184,6 +212,56 @@ function PettyCash() {
       }
     } catch (error) {
       console.error('Error fetching overall balance:', error);
+    }
+  };
+
+  const fetchCashWithdrawals = async () => {
+    try {
+      const data = await cashWithdrawalService.getAll();
+      setCashWithdrawals(data);
+      
+      // Calculate total withdrawn cash
+      const total = data.reduce((sum, withdrawal) => sum + parseFloat(withdrawal.amount || 0), 0);
+      console.log('💰 Total Withdrawn Cash:', total);
+      setTotalWithdrawnCash(total);
+      
+      // Also fetch other expenses to calculate combined balance
+      await fetchOtherExpenses();
+    } catch (error) {
+      console.error('Error fetching cash withdrawals:', error);
+    }
+  };
+
+  const fetchOtherExpenses = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/other-expenses`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const totalExpenses = data.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0);
+        console.log('💸 Total Other Expenses:', totalExpenses);
+        setTotalOtherExpenses(totalExpenses);
+      }
+    } catch (error) {
+      console.error('Error fetching other expenses:', error);
+    }
+  };
+
+  const handleWithdrawalSubmit = async (withdrawalData) => {
+    try {
+      await cashWithdrawalService.create(withdrawalData);
+      setMessage('Cash withdrawal recorded successfully');
+      setTimeout(() => setMessage(''), 3000);
+      setShowWithdrawalModal(false);
+      fetchCashWithdrawals();
+      fetchOverallBalance();
+    } catch (error) {
+      console.error('Error creating cash withdrawal:', error);
+      setMessage('Error recording cash withdrawal');
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -405,6 +483,20 @@ function PettyCash() {
       return;
     }
 
+    // Check available balance
+    const availableBalance = totalWithdrawnCash - totalAssignedCash - totalOtherExpenses;
+    if (availableBalance <= 0) {
+      setMessage('❌ No available balance! Please record a cash withdrawal first.');
+      setTimeout(() => setMessage(''), 5000);
+      return;
+    }
+
+    if (assignedAmount > availableBalance) {
+      setMessage(`❌ Insufficient balance! Available: LKR ${formatAmount(availableBalance)}. You're trying to assign: LKR ${formatAmount(assignedAmount)}`);
+      setTimeout(() => setMessage(''), 5000);
+      return;
+    }
+
     console.log('Validation passed, sending request with data:', {
       jobId: assignFormData.jobId,
       assignedTo: assignFormData.assignedTo,
@@ -436,10 +528,14 @@ function PettyCash() {
       if (response.ok) {
         console.log('Success! Assignment created');
         setMessage('Petty cash assigned successfully!');
-        setShowAssignModal(false);
         setAssignFormData({ jobId: '', assignedTo: '', assignedAmount: '', notes: '' });
-        fetchAssignments();
-        fetchJobs();
+        
+        // Fetch updated data before closing modal
+        await fetchAssignments();
+        await fetchJobs();
+        
+        // Close modal after data is refreshed
+        setShowAssignModal(false);
         setTimeout(() => setMessage(''), 3000);
       } else {
         const error = await response.json();
@@ -1648,6 +1744,76 @@ function PettyCash() {
         </div>
       )}
 
+      {/* Cash Withdrawals Section */}
+      {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+        <div className="card">
+          <div className="card-header collapsible-header" onClick={() => setWithdrawalsCollapsed(c => !c)}>
+            <h2>Cash Withdrawals from Bank ({cashWithdrawals.length})</h2>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowWithdrawalModal(true);
+                }} 
+                className="btn btn-primary"
+              >
+                + Record Withdrawal
+              </button>
+              <svg
+                className={`collapse-arrow ${withdrawalsCollapsed ? 'collapsed' : ''}`}
+                width="20" height="20" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
+          </div>
+
+          {!withdrawalsCollapsed && (
+            <div className="card-body">
+              {cashWithdrawals.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
+                  No cash withdrawals recorded yet
+                </p>
+              ) : (
+                <div className="withdrawals-grid">
+                  {cashWithdrawals.map((withdrawal) => (
+                    <div key={withdrawal.withdrawalId} className="withdrawal-box">
+                      <div className="withdrawal-header">
+                        <span className="withdrawal-id">{withdrawal.withdrawalId}</span>
+                        <span className="withdrawal-amount">LKR {formatAmount(withdrawal.amount)}</span>
+                      </div>
+                      <div className="withdrawal-details">
+                        <div className="withdrawal-row">
+                          <span className="withdrawal-label">Bank:</span>
+                          <span className="withdrawal-value">{withdrawal.bankName}</span>
+                        </div>
+                        <div className="withdrawal-row">
+                          <span className="withdrawal-label">Date:</span>
+                          <span className="withdrawal-value">
+                            {new Date(withdrawal.withdrawalDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="withdrawal-row">
+                          <span className="withdrawal-label">Recorded By:</span>
+                          <span className="withdrawal-value">{withdrawal.createdByName || withdrawal.createdBy}</span>
+                        </div>
+                        {withdrawal.notes && (
+                          <div className="withdrawal-notes">
+                            <span className="withdrawal-label">Notes:</span>
+                            <p>{withdrawal.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Management Settlement Section */}
       {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
         <ManagementSettlementSection user={user} />
@@ -2350,12 +2516,40 @@ function PettyCash() {
       </div>
       {/* Assign Petty Cash Modal */}
       {showAssignModal && (
-        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-          <div className="modal modal-medium" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-medium">
             <div className="modal-header">
               <h2>Assign Petty Cash</h2>
               <button className="btn-close" onClick={() => setShowAssignModal(false)}>×</button>
             </div>
+
+            {/* Cash Balance Summary */}
+            <div className="cash-balance-summary">
+              <div className="balance-item">
+                <span className="balance-label">💰 Total Cash Withdrawn from Bank:</span>
+                <span className="balance-value withdrawn">LKR {formatAmount(totalWithdrawnCash)}</span>
+              </div>
+              <div className="balance-item">
+                <span className="balance-label">📤 Petty Cash Assigned:</span>
+                <span className="balance-value assigned">LKR {formatAmount(totalAssignedCash)}</span>
+              </div>
+              <div className="balance-item">
+                <span className="balance-label">📤 Other Expenses:</span>
+                <span className="balance-value assigned">LKR {formatAmount(totalOtherExpenses)}</span>
+              </div>
+              <div className="balance-item highlight">
+                <span className="balance-label">✅ Available to Assign:</span>
+                <span className={`balance-value ${totalWithdrawnCash - totalAssignedCash - totalOtherExpenses >= 0 ? 'positive' : 'negative'}`}>
+                  LKR {formatAmount(totalWithdrawnCash - totalAssignedCash - totalOtherExpenses)}
+                </span>
+              </div>
+              {totalWithdrawnCash - totalAssignedCash - totalOtherExpenses < 0 && (
+                <div className="balance-warning">
+                  ⚠️ Warning: Total usage exceeds withdrawn cash! Consider recording more withdrawals.
+                </div>
+              )}
+            </div>
+
             <form onSubmit={handleAssignSubmit} className="petty-cash-form">
               <div className="form-group">
                 <label>Select Job <span className="required">*</span></label>
@@ -2429,7 +2623,14 @@ function PettyCash() {
                 <button type="button" onClick={() => setShowAssignModal(false)} className="btn btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">Assign Petty Cash</button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={totalWithdrawnCash - totalAssignedCash - totalOtherExpenses <= 0}
+                  title={totalWithdrawnCash - totalAssignedCash - totalOtherExpenses <= 0 ? 'No available balance. Please record a cash withdrawal first.' : ''}
+                >
+                  Assign Petty Cash
+                </button>
               </div>
             </form>
           </div>
@@ -2438,14 +2639,8 @@ function PettyCash() {
 
       {/* Settlement Modal */}
       {showSettleModal && selectedAssignment && (
-        <div className="modal-overlay" onClick={() => {
-          if (selectedAssignment.status !== 'Settled') {
-            setShowSettleModal(false);
-            setSelectedAssignment(null);
-            setSettlementItems([]);
-          }
-        }}>
-          <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large modal-scrollable">
             <div className="modal-header">
               <h2>{(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected' || selectedAssignment.status === 'Full Petty Cash Returned') ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
               <button className="btn-close" onClick={() => {
@@ -2881,12 +3076,8 @@ function PettyCash() {
 
       {/* Edit Settlement Modal (from main table) */}
       {showEditSettlementModal && selectedAssignment && (
-        <div className="modal-overlay" onClick={() => {
-          setShowEditSettlementModal(false);
-          setEditSettlementItems([]);
-          setSelectedAssignment(null);
-        }}>
-          <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large modal-scrollable">
             <div className="modal-header">
               <h2>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px', verticalAlign: 'middle'}}>
@@ -3065,6 +3256,13 @@ function PettyCash() {
           </div>
         </div>
       )}
+
+      {/* Cash Withdrawal Modal */}
+      <CashWithdrawalModal
+        show={showWithdrawalModal}
+        onClose={() => setShowWithdrawalModal(false)}
+        onSubmit={handleWithdrawalSubmit}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { otherExpenseService } from '../api/services/otherExpenseService';
+import { cashWithdrawalService } from '../api/services/cashWithdrawalService';
 import { formatDate } from '../utils/dateFormatter';
 import '../styles/OtherExpenses.css';
 
@@ -37,6 +38,11 @@ function OtherExpenses() {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage] = useState(20);
+  
+  // Cash withdrawal tracking
+  const [totalWithdrawnCash, setTotalWithdrawnCash] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [totalPettyCashAssigned, setTotalPettyCashAssigned] = useState(0);
 
   const [formData, setFormData] = useState({
     category: '',
@@ -63,17 +69,61 @@ function OtherExpenses() {
     return user && ['Admin', 'Super Admin'].includes(user.role);
   };
 
+  // Format amount with commas
+  const formatAmount = (amount) => {
+    return parseFloat(amount || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   useEffect(() => {
     if (hasAccess()) {
       fetchExpenses();
+      fetchCashWithdrawals();
     }
   }, [user]);
+
+  const fetchCashWithdrawals = async () => {
+    try {
+      const data = await cashWithdrawalService.getAll();
+      const total = data.reduce((sum, withdrawal) => sum + parseFloat(withdrawal.amount || 0), 0);
+      setTotalWithdrawnCash(total);
+      
+      // Also fetch petty cash assignments to calculate combined balance
+      await fetchPettyCashAssignments();
+    } catch (error) {
+      console.error('Error fetching cash withdrawals:', error);
+    }
+  };
+
+  const fetchPettyCashAssignments = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/petty-cash-assignments`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const totalAssigned = data.reduce((sum, assignment) => sum + parseFloat(assignment.assignedAmount || 0), 0);
+        setTotalPettyCashAssigned(totalAssigned);
+      }
+    } catch (error) {
+      console.error('Error fetching petty cash assignments:', error);
+    }
+  };
 
   const fetchExpenses = async () => {
     try {
       setLoading(true);
       const data = await otherExpenseService.getAll();
       setExpenses(data);
+      
+      // Calculate total expenses
+      const total = data.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0);
+      setTotalExpenses(total);
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching expenses:', error);
@@ -85,6 +135,27 @@ function OtherExpenses() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate available balance for new expenses only
+    if (!isEditing) {
+      const expenseAmount = parseFloat(formData.amount);
+      const availableBalance = totalWithdrawnCash - totalPettyCashAssigned - totalExpenses;
+      
+      if (availableBalance <= 0) {
+        setMessage('❌ No available balance! Please record a cash withdrawal first.');
+        setMessageType('error');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+
+      if (expenseAmount > availableBalance) {
+        setMessage(`❌ Insufficient balance! Available: LKR ${formatAmount(availableBalance)}. You're trying to spend: LKR ${formatAmount(expenseAmount)}`);
+        setMessageType('error');
+        setTimeout(() => setMessage(''), 5000);
+        return;
+      }
+    }
+    
     try {
       if (isEditing) {
         await otherExpenseService.update(selectedExpense.expenseId, formData);
@@ -95,7 +166,8 @@ function OtherExpenses() {
       }
       setMessageType('success');
       resetForm();
-      fetchExpenses();
+      await fetchExpenses();
+      await fetchCashWithdrawals();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error saving expense:', error);
@@ -339,12 +411,42 @@ function OtherExpenses() {
 
       {/* Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={resetForm}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal">
             <div className="modal-header">
               <h2>{isEditing ? 'Edit Expense' : 'New Expense'}</h2>
               <button className="btn-close" onClick={resetForm}>×</button>
             </div>
+
+            {/* Cash Balance Summary - Only show for new expenses */}
+            {!isEditing && (
+              <div className="cash-balance-summary">
+                <div className="balance-item">
+                  <span className="balance-label">💰 Total Cash Withdrawn from Bank:</span>
+                  <span className="balance-value withdrawn">LKR {formatAmount(totalWithdrawnCash)}</span>
+                </div>
+                <div className="balance-item">
+                  <span className="balance-label">📤 Petty Cash Assigned:</span>
+                  <span className="balance-value assigned">LKR {formatAmount(totalPettyCashAssigned)}</span>
+                </div>
+                <div className="balance-item">
+                  <span className="balance-label">📤 Other Expenses:</span>
+                  <span className="balance-value assigned">LKR {formatAmount(totalExpenses)}</span>
+                </div>
+                <div className="balance-item highlight">
+                  <span className="balance-label">✅ Available Balance:</span>
+                  <span className={`balance-value ${totalWithdrawnCash - totalPettyCashAssigned - totalExpenses >= 0 ? 'positive' : 'negative'}`}>
+                    LKR {formatAmount(totalWithdrawnCash - totalPettyCashAssigned - totalExpenses)}
+                  </span>
+                </div>
+                {totalWithdrawnCash - totalPettyCashAssigned - totalExpenses < 0 && (
+                  <div className="balance-warning">
+                    ⚠️ Warning: Total usage exceeds withdrawn cash! Consider recording more withdrawals.
+                  </div>
+                )}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="expense-form">
               <div className="form-row">
                 <div className="form-group">
@@ -456,7 +558,12 @@ function OtherExpenses() {
                 <button type="button" onClick={resetForm} className="btn btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={!isEditing && (totalWithdrawnCash - totalPettyCashAssigned - totalExpenses <= 0)}
+                  title={!isEditing && (totalWithdrawnCash - totalPettyCashAssigned - totalExpenses <= 0) ? 'No available balance. Please record a cash withdrawal first.' : ''}
+                >
                   {isEditing ? 'Update Expense' : 'Create Expense'}
                 </button>
               </div>

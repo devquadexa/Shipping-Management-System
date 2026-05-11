@@ -1396,8 +1396,8 @@ function Transporters() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal modal-large" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large">
             <div className="modal-header">
               <h2>{editingTransporter ? 'Edit Transporter' : 'New Transporter'}</h2>
               <button className="btn-close" onClick={() => setShowModal(false)}>×</button>
