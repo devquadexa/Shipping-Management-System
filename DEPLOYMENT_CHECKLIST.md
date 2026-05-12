@@ -1,291 +1,323 @@
-# Payment Management Feature - Deployment Checklist
+# Password Reset Feature - Deployment Checklist
 
-## Pre-Deployment Verification
+## 🚀 Quick Deployment Guide
 
-### Local Development
-- [x] All backend files created
-- [x] All frontend files created
-- [x] Database migration script created
-- [x] Dependencies properly injected in DI container
-- [x] Routes registered in server
-- [x] Imports verified in all components
-- [x] Documentation created
+### Prerequisites
+- ✅ All code changes committed and pushed to repository
+- ✅ Frontend built and copied to `backend-api/public/`
+- ✅ Database script ready: `backend-api/add-password-reset-columns.sql`
 
-### Code Quality
-- [x] Clean Architecture principles followed
-- [x] Proper error handling implemented
-- [x] Input validation on frontend and backend
-- [x] SQL injection protection (parameterized queries)
-- [x] Authentication and authorization implemented
-- [x] Responsive design for mobile/tablet
+---
 
-## Deployment Steps
+## Step-by-Step Deployment
 
-### Step 1: Database Setup ⚠️ CRITICAL
-**Must be done FIRST before deploying code!**
-
+### 1️⃣ Run Database Migration
 ```bash
-# SSH to server
-ssh root@72.61.169.242
-
-# Navigate to project
-cd /root/Shipping-Management-System/backend-api
-
-# Create Payments table
-docker exec -i cargo_db /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrongPassword123! -d SuperShineCargoDb -Q "$(cat create-payments-table.sql)"
-
-# Verify table creation
-docker exec cargo_db /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrongPassword123! -d SuperShineCargoDb -Q "SELECT COUNT(*) as TableExists FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Payments'"
+# Connect to SQL Server and run the schema script
+sqlcmd -S localhost -d SuperShineCargoDb -i backend-api/add-password-reset-columns.sql
 ```
 
-**Expected Output**: `TableExists: 1`
-
-- [ ] Payments table created
-- [ ] Indexes created
-- [ ] Table verified in database
-
-### Step 2: Build Frontend (Local Machine)
-
-```powershell
-# Navigate to project
-cd "D:\Work and Learn\Quadexa\Shipping Management System"
-
-# Build frontend
-cd frontend
-npm run build
-
-# Copy to backend public folder
-Remove-Item -Recurse -Force ../backend-api/public/*
-Copy-Item -Recurse build/* ../backend-api/public/
+**Expected Output:**
+```
+Password reset columns and table created successfully
 ```
 
-- [ ] Frontend built successfully
-- [ ] No build errors
-- [ ] Files copied to backend/public
+**Verify:**
+```sql
+-- Check Users table has new columns
+SELECT TOP 1 isTemporaryPassword, passwordResetRequired, lastPasswordChange 
+FROM Users;
 
-### Step 3: Commit and Push (Local Machine)
+-- Check PasswordResetRequests table exists
+SELECT COUNT(*) FROM PasswordResetRequests;
+```
 
-```powershell
-# From project root
-cd ..
-git add -A
-git commit -m "Add Payment Management feature - Track cheque and bank transfer payments"
+---
+
+### 2️⃣ Commit and Push Changes
+```bash
+# Add all changes
+git add .
+
+# Commit with descriptive message
+git commit -m "feat: Implement password reset and forgot password functionality
+
+- Add database schema for password reset
+- Implement 6 backend use cases for password management
+- Create 4 frontend components (ResetPassword, ChangePassword, ForgotPassword, PasswordResetRequests)
+- Update Login, Navbar, and App.js with password reset integration
+- Add professional styling matching system theme
+- Deploy built frontend to backend-api/public/"
+
+# Push to repository
 git push origin main
 ```
 
-- [ ] All files committed
-- [ ] Pushed to main branch
-- [ ] No git errors
+---
 
-### Step 4: Deploy to Server
-
+### 3️⃣ Rebuild Docker Containers
 ```bash
-# SSH to server (if not already connected)
-ssh root@72.61.169.242
-
-# Navigate to project
-cd /root/Shipping-Management-System
-
-# Pull latest changes
+# Pull latest changes on server
 git pull origin main
 
-# Rebuild backend (includes new routes and dependencies)
+# Rebuild backend container (includes new frontend files in public/)
 docker compose build --no-cache backend
 
-# Restart backend
-docker compose up -d backend
+# Rebuild frontend container
+docker compose build --no-cache frontend
 
-# Wait 10 seconds for startup
-sleep 10
+# Restart containers
+docker compose up -d
 
-# Check logs
+# Verify containers are running
+docker ps
+```
+
+**Expected Output:**
+```
+CONTAINER ID   IMAGE                    STATUS
+xxxxx          cargo_backend            Up X seconds
+xxxxx          cargo_frontend           Up X seconds
+```
+
+---
+
+### 4️⃣ Verify Deployment
+
+#### Backend Verification
+```bash
+# Check backend logs
 docker logs cargo_backend --tail 50
+
+# Test API endpoint
+curl -X GET https://supershinecargo.cloud/api/password-reset/requests \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-- [ ] Code pulled successfully
-- [ ] Backend rebuilt without errors
-- [ ] Backend container running
-- [ ] No errors in logs
-- [ ] Payment routes registered (check logs)
-
-### Step 5: Verification Tests
-
-#### Test 1: API Endpoint
-```bash
-# Should return 401 Unauthorized (correct - needs auth)
-curl -X GET http://localhost:5000/api/payments/all
-```
-- [ ] Endpoint responds (even if unauthorized)
-
-#### Test 2: Frontend Access
+#### Frontend Verification
 1. Open browser: https://supershinecargo.cloud
-2. **Hard refresh**: `Ctrl + Shift + R` (IMPORTANT!)
-3. Login as Admin or Super Admin
-4. Go to **Accounting** tab
-5. Verify **Payment Management** tab is visible
+2. Clear browser cache: `Ctrl + Shift + Delete`
+3. Hard refresh: `Ctrl + F5`
+4. Check login page has "Forgot Password?" link
+5. Log in and check profile dropdown has "Reset Password" option
 
-- [ ] Website loads
-- [ ] Can login
-- [ ] Accounting tab accessible
-- [ ] Payment Management tab visible
+---
 
-#### Test 3: Create Payment Record
-1. Go to **Billing/Invoicing** page
-2. Find an unpaid invoice
-3. Click **Mark Paid**
-4. Select **Cheque** as payment method
-5. Fill in cheque details:
-   - Cheque Number: `TEST123`
-   - Cheque Date: Today
-   - Cheque Amount: Invoice amount
-6. Click **Confirm Payment**
+### 5️⃣ Test Complete Workflows
 
-- [ ] Payment modal opens
-- [ ] Can enter cheque details
-- [ ] Invoice marked as paid
-- [ ] Success message shown
+#### Test 1: Create User with Temporary Password
+1. Log in as Super Admin
+2. Go to Users page
+3. Create new user with temporary password
+4. Note the username and temporary password
 
-#### Test 4: View Payment in Payment Management
-1. Go to **Accounting → Payment Management**
-2. Verify the test payment appears
-3. Check summary cards show correct totals
-4. Click **View** to see details
-5. Click **Clear** to mark as cleared
-6. Verify status changes to "Cleared"
+#### Test 2: First-Time Login
+1. Log out
+2. Log in with new user credentials (temporary password)
+3. Verify redirect to `/reset-password` page
+4. Enter temporary password and new password
+5. Verify successful password reset
+6. Verify redirect to dashboard
 
-- [ ] Payment appears in list
-- [ ] Summary cards correct
-- [ ] Can view details
-- [ ] Can update status
-- [ ] Status updates successfully
+#### Test 3: Change Password (Logged In)
+1. Click profile icon (top-right)
+2. Click "Reset Password"
+3. Enter old password and new password
+4. Verify success message
+5. Log out and log in with new password
 
-#### Test 5: Search and Filter
-1. In Payment Management:
-2. Test search by cheque number
-3. Test filter by status (Pending/Cleared)
-4. Test filter by payment method (Cheques/Bank)
-5. Test pagination (change records per page)
+#### Test 4: Forgot Password Flow
+1. Log out
+2. Click "Forgot Password?" on login page
+3. Enter username
+4. Verify success message
+5. Log in as Super Admin
+6. Navigate to `/password-reset-requests`
+7. Verify request appears with "Pending" status
+8. Approve request and assign temporary password
+9. Log out
+10. Log in with temporary password
+11. Verify redirect to reset password page
+12. Create new permanent password
 
-- [ ] Search works
-- [ ] Status filter works
-- [ ] Payment method filter works
-- [ ] Pagination works
+---
 
-#### Test 6: Access Control
-1. Logout
-2. Login as **Waff Clerk**
-3. Go to Accounting tab
-4. Verify Payment Management tab is NOT visible or shows access denied
+## 🔍 Verification Checklist
 
-- [ ] Waff Clerk cannot access Payment Management
+### Database
+- [ ] Users table has `isTemporaryPassword` column
+- [ ] Users table has `passwordResetRequired` column
+- [ ] Users table has `lastPasswordChange` column
+- [ ] PasswordResetRequests table exists
+- [ ] Indexes created on PasswordResetRequests table
 
-### Step 6: Database Verification
+### Backend
+- [ ] Container `cargo_backend` is running
+- [ ] No errors in backend logs
+- [ ] API endpoint `/api/password-reset/change-password` accessible
+- [ ] API endpoint `/api/password-reset/reset-with-temp` accessible
+- [ ] API endpoint `/api/password-reset/request` accessible
+- [ ] API endpoint `/api/password-reset/requests` accessible (Super Admin only)
+- [ ] API endpoint `/api/password-reset/approve/:requestId` accessible (Super Admin only)
+- [ ] API endpoint `/api/password-reset/reject/:requestId` accessible (Super Admin only)
 
-```bash
-# Check if payment records exist
-docker exec cargo_db /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrongPassword123! -d SuperShineCargoDb -Q "SELECT TOP 5 * FROM Payments ORDER BY CreatedDate DESC"
+### Frontend
+- [ ] Container `cargo_frontend` is running
+- [ ] Login page shows "Forgot Password?" link
+- [ ] Profile dropdown shows "Reset Password" option
+- [ ] Route `/reset-password` accessible
+- [ ] Route `/forgot-password` accessible
+- [ ] Route `/password-reset-requests` accessible (Super Admin only)
+- [ ] All forms styled consistently with system theme
+- [ ] No console errors in browser
+
+### Functionality
+- [ ] User with temporary password redirected to reset page on login
+- [ ] User can reset password with temporary password
+- [ ] User can change password from profile dropdown
+- [ ] User can request password reset via forgot password
+- [ ] Super Admin can view all password reset requests
+- [ ] Super Admin can approve password reset requests
+- [ ] Super Admin can reject password reset requests
+- [ ] Non-Super Admin cannot access password reset requests page
+- [ ] Password validation works (minimum 6 characters)
+- [ ] Confirm password validation works (must match new password)
+
+---
+
+## 🐛 Common Issues and Solutions
+
+### Issue: Database script fails
+**Solution:**
+```sql
+-- Check if columns already exist
+SELECT * FROM sys.columns 
+WHERE object_id = OBJECT_ID(N'Users') 
+AND name IN ('isTemporaryPassword', 'passwordResetRequired', 'lastPasswordChange');
+
+-- Check if table already exists
+SELECT * FROM sys.tables WHERE name = 'PasswordResetRequests';
 ```
 
-- [ ] Can query Payments table
-- [ ] Test payment record exists
-- [ ] Data is correct
+### Issue: Frontend changes not visible
+**Solution:**
+```bash
+# Verify files copied correctly
+ls -la backend-api/public/static/js/
+ls -la backend-api/public/static/css/
 
-## Post-Deployment
+# Check file timestamps (should be recent)
+stat backend-api/public/static/js/main.*.js
 
-### Monitoring (First 24 Hours)
-- [ ] Check backend logs for errors: `docker logs cargo_backend --tail 100`
-- [ ] Monitor database for payment records
-- [ ] Verify no performance issues
+# Clear browser cache completely
+# Chrome: Ctrl+Shift+Delete > Cached images and files > Clear data
+# Then hard refresh: Ctrl+F5
+```
+
+### Issue: API returns 403 Forbidden
+**Solution:**
+```bash
+# Check JWT token is valid
+# Check user role in token payload
+# Verify middleware in backend routes
+
+# Check backend logs
+docker logs cargo_backend --tail 100 | grep "password-reset"
+```
+
+### Issue: User not redirected after login with temp password
+**Solution:**
+```sql
+-- Check user's temporary password flag
+SELECT userId, username, isTemporaryPassword, passwordResetRequired 
+FROM Users 
+WHERE username = 'YOUR_USERNAME';
+
+-- If not set, update manually
+UPDATE Users 
+SET isTemporaryPassword = 1, passwordResetRequired = 1 
+WHERE username = 'YOUR_USERNAME';
+```
+
+---
+
+## 📊 Post-Deployment Monitoring
+
+### Monitor for 24 Hours
+- [ ] Check backend logs for errors
+- [ ] Monitor database for new password reset requests
+- [ ] Verify no authentication issues
 - [ ] Check user feedback
 
-### User Communication
-- [ ] Notify Admin/Manager users about new feature
-- [ ] Provide quick user guide
-- [ ] Explain hard refresh requirement (Ctrl+Shift+R)
+### Metrics to Track
+- Number of password reset requests created
+- Number of requests approved/rejected
+- Average time to resolve requests
+- Number of users with temporary passwords
+- Failed login attempts
 
-### Documentation
-- [ ] Update system documentation
-- [ ] Add to user manual
-- [ ] Create training materials if needed
+---
 
-## Rollback Plan (If Issues Occur)
+## 📞 Rollback Plan (If Needed)
 
+### If Critical Issues Occur:
+
+1. **Revert Frontend:**
 ```bash
-# On server
-cd /root/Shipping-Management-System
+# Restore previous build from git
+git checkout HEAD~1 frontend/build
+cp -r frontend/build/* backend-api/public/
+docker compose restart frontend
+```
 
-# Find previous commit
-git log --oneline -5
+2. **Revert Backend Code:**
+```bash
+# Revert to previous commit
+git revert HEAD
+git push origin main
 
-# Rollback to previous version
-git checkout <previous-commit-hash>
-
-# Rebuild and restart
+# Rebuild containers
 docker compose build --no-cache backend
-docker compose up -d backend
+docker compose up -d
 ```
 
-**Note**: Payments table will remain in database (safe to keep)
+3. **Database Rollback (CAUTION):**
+```sql
+-- Only if absolutely necessary
+-- This will lose all password reset request data
 
-## Troubleshooting
+DROP TABLE PasswordResetRequests;
 
-### Issue: Payment Management tab not showing
-**Solution**: Hard refresh browser (Ctrl+Shift+R) or use incognito mode
-
-### Issue: Payments not being created
-**Check**:
-1. Payment method is Cheque or Bank Transfer (not Cash)
-2. Backend logs: `docker logs cargo_backend --tail 100`
-3. Database table exists
-4. No errors in browser console (F12)
-
-### Issue: 404 on /api/payments/all
-**Solution**:
-```bash
-docker compose restart backend
-docker logs cargo_backend --tail 50
+ALTER TABLE Users DROP COLUMN isTemporaryPassword;
+ALTER TABLE Users DROP COLUMN passwordResetRequired;
+ALTER TABLE Users DROP COLUMN lastPasswordChange;
 ```
-
-### Issue: Database connection errors
-**Check**:
-1. cargo_db container is running: `docker ps`
-2. Database credentials are correct
-3. Payments table exists
-
-## Success Criteria
-
-✅ All checklist items completed  
-✅ No errors in backend logs  
-✅ Payment Management accessible to Admin/Manager  
-✅ Can create payment records  
-✅ Can view and update payment status  
-✅ Search and filter working  
-✅ Access control working  
-✅ No performance degradation  
-
-## Sign-Off
-
-- [ ] Developer: Implementation complete
-- [ ] Tester: All tests passed
-- [ ] Admin: Feature verified in production
-- [ ] Manager: Approved for use
 
 ---
 
-**Deployment Date**: _________________  
-**Deployed By**: _________________  
-**Verified By**: _________________  
-**Status**: ⬜ Pending | ⬜ In Progress | ⬜ Complete | ⬜ Rolled Back
+## ✅ Sign-Off
 
-## Notes
+### Deployment Completed By:
+- **Name:** _________________
+- **Date:** _________________
+- **Time:** _________________
 
-_Add any deployment notes, issues encountered, or special considerations here:_
+### Verification Completed By:
+- **Name:** _________________
+- **Date:** _________________
+- **Time:** _________________
+
+### Issues Encountered:
+- [ ] None
+- [ ] Minor (documented below)
+- [ ] Major (escalated)
+
+**Notes:**
+_________________________________________________________________
+_________________________________________________________________
+_________________________________________________________________
 
 ---
 
-**Important Reminders**:
-1. ⚠️ Create database table BEFORE deploying code
-2. 🔄 Users must hard refresh (Ctrl+Shift+R) after deployment
-3. 💾 Payment records are only created for Cheque/Bank Transfer (not Cash)
-4. 🔒 Only Admin/Super Admin/Manager can access Payment Management
-5. 📊 Initial payment status is always "Pending"
+**Deployment Status:** ⏳ PENDING  
+**Last Updated:** May 11, 2026

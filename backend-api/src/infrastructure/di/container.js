@@ -112,6 +112,17 @@ const DeletePaymentFromOldInvoice = require('../../application/use-cases/oldinvo
 // Auth Use Cases
 const AuthenticateUser = require('../../application/use-cases/auth/AuthenticateUser');
 
+// Password Reset Use Cases
+const ChangePassword = require('../../application/use-cases/auth/ChangePassword');
+const ResetPasswordWithTemp = require('../../application/use-cases/auth/ResetPasswordWithTemp');
+const RequestPasswordReset = require('../../application/use-cases/auth/RequestPasswordReset');
+const GetPasswordResetRequests = require('../../application/use-cases/auth/GetPasswordResetRequests');
+const ApprovePasswordResetRequest = require('../../application/use-cases/auth/ApprovePasswordResetRequest');
+const RejectPasswordResetRequest = require('../../application/use-cases/auth/RejectPasswordResetRequest');
+
+// Repositories
+const MSSQLPasswordResetRepository = require('../repositories/MSSQLPasswordResetRepository');
+
 // Controllers
 const CashBalanceSettlementController = require('../../presentation/controllers/CashBalanceSettlementController');
 
@@ -135,6 +146,7 @@ class Container {
     this.dependencies.jobRepository = new MSSQLJobRepository(getConnection, sql);
     this.dependencies.jobAssignmentRepository = new MSSQLJobAssignmentRepository(getConnection, sql);
     this.dependencies.userRepository = new MSSQLUserRepository(getConnection, sql);
+    this.dependencies.passwordResetRepository = new MSSQLPasswordResetRepository(getConnection, sql);
     this.dependencies.billRepository = new MSSQLBillRepository(getConnection, sql);
     this.dependencies.pettyCashRepository = new MSSQLPettyCashRepository(getConnection, sql);
     this.dependencies.payItemTemplateRepository = new MSSQLPayItemTemplateRepository(getConnection, sql);
@@ -246,6 +258,15 @@ class Container {
     // Auth use cases
     const jwtSecret = process.env.JWT_SECRET || 'default_secret';
     this.dependencies.authenticateUser = new AuthenticateUser(userRepository, jwtSecret);
+    
+    // Password Reset use cases
+    const passwordResetRepository = this.dependencies.passwordResetRepository;
+    this.dependencies.changePassword = new ChangePassword(userRepository);
+    this.dependencies.resetPasswordWithTemp = new ResetPasswordWithTemp(userRepository);
+    this.dependencies.requestPasswordReset = new RequestPasswordReset(userRepository, passwordResetRepository);
+    this.dependencies.getPasswordResetRequests = new GetPasswordResetRequests(passwordResetRepository);
+    this.dependencies.approvePasswordResetRequest = new ApprovePasswordResetRequest(passwordResetRepository, userRepository);
+    this.dependencies.rejectPasswordResetRequest = new RejectPasswordResetRequest(passwordResetRepository);
     
     // Cash Balance Settlement use cases
     this.dependencies.CreateCashBalanceSettlement = new CreateCashBalanceSettlement(cashBalanceSettlementRepository, pettyCashAssignmentRepository);
