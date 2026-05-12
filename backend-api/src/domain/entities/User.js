@@ -12,6 +12,9 @@ class User {
     email,
     createdDate = new Date(),
     isActive = true,
+    isTemporaryPassword = false,
+    passwordResetRequired = false,
+    lastPasswordChange = null,
     metadata = {}
   }) {
     this.userId = userId;
@@ -22,6 +25,9 @@ class User {
     this.email = email;
     this.createdDate = createdDate;
     this.isActive = isActive;
+    this.isTemporaryPassword = isTemporaryPassword;
+    this.passwordResetRequired = passwordResetRequired;
+    this.lastPasswordChange = lastPasswordChange;
     this.metadata = metadata;
   }
 

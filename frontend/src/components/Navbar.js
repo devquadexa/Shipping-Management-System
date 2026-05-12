@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ChangePassword from './ChangePassword';
 
 function Navbar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // A route is "active" if the current path starts with the given prefix
   const isActive    = (path) => location.pathname === path ? 'active' : '';
@@ -16,6 +18,11 @@ function Navbar() {
   const closeMobileMenu   = () => setIsMobileMenuOpen(false);
   const toggleProfileDropdown = () => setIsProfileDropdownOpen(!isProfileDropdownOpen);
   const closeProfileDropdown  = () => setIsProfileDropdownOpen(false);
+
+  const handleChangePasswordClick = () => {
+    closeProfileDropdown();
+    setShowChangePasswordModal(true);
+  };
 
   const handleLogout = () => {
     closeMobileMenu();
@@ -78,6 +85,9 @@ function Navbar() {
             {user?.role === 'Super Admin' && (
               <li><Link to="/users" className={isActive('/users')}>Users</Link></li>
             )}
+            {user?.role === 'Super Admin' && (
+              <li><Link to="/password-reset-requests" className={isActive('/password-reset-requests')}>Password Resets</Link></li>
+            )}
           </ul>
         </div>
 
@@ -110,6 +120,13 @@ function Navbar() {
                         Settings
                       </Link>
                     )}
+                    <button className="profile-dropdown-item" onClick={handleChangePasswordClick}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                      Reset Password
+                    </button>
                     <button className="profile-dropdown-item logout-item" onClick={handleLogout}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -267,6 +284,17 @@ function Navbar() {
               </span> Users
             </Link></li>
           )}
+
+          {user?.role === 'Super Admin' && (
+            <li><Link to="/password-reset-requests" className={isActive('/password-reset-requests')} onClick={closeMobileMenu}>
+              <span className="menu-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </span> Password Resets
+            </Link></li>
+          )}
         </ul>
 
         <div className="mobile-sidebar-footer">
@@ -281,6 +309,12 @@ function Navbar() {
           </button>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      <ChangePassword 
+        isOpen={showChangePasswordModal} 
+        onClose={() => setShowChangePasswordModal(false)} 
+      />
     </>
   );
 }

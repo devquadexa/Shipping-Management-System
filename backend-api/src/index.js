@@ -6,6 +6,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 // Import Clean Architecture routes
 const authRoutes = require('./presentation/routes/auth');
+const passwordResetRoutes = require('./presentation/routes/passwordReset');
 const customerRoutes = require('./presentation/routes/customers');
 const jobRoutes = require('./presentation/routes/jobs');
 const jobAssignmentRoutes = require('./presentation/routes/jobAssignments');
@@ -48,6 +49,7 @@ getConnection()
   });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/password-reset', passwordResetRoutes(container));
 app.use('/api/customers', customerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/job-assignments', jobAssignmentRoutes);
