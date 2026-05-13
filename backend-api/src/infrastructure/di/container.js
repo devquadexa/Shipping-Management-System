@@ -305,6 +305,10 @@ class Container {
     const ExportOtherExpensesReportPDF = require('../../application/use-cases/otherexpense/ExportOtherExpensesReportPDF');
     const ExportOtherExpensesReportExcel = require('../../application/use-cases/otherexpense/ExportOtherExpensesReportExcel');
     
+    // Cash Summary Report Use Cases
+    const ExportCashSummaryReportPDF = require('../../application/use-cases/cashsummary/ExportCashSummaryReportPDF');
+    const ExportCashSummaryReportExcel = require('../../application/use-cases/cashsummary/ExportCashSummaryReportExcel');
+    
     const otherExpenseRepository = new MSSQLOtherExpenseRepository(getConnection, sql);
     this.dependencies.createOtherExpense = new CreateOtherExpense(otherExpenseRepository);
     this.dependencies.getAllOtherExpenses = new GetAllOtherExpenses(otherExpenseRepository);
@@ -313,6 +317,18 @@ class Container {
     this.dependencies.getOtherExpensesReport = new GetOtherExpensesReport(otherExpenseRepository);
     this.dependencies.exportOtherExpensesReportPDF = new ExportOtherExpensesReportPDF(otherExpenseRepository);
     this.dependencies.exportOtherExpensesReportExcel = new ExportOtherExpensesReportExcel(otherExpenseRepository);
+    
+    // Cash Summary Report use cases
+    this.dependencies.exportCashSummaryReportPDF = new ExportCashSummaryReportPDF(
+      cashWithdrawalRepository,
+      pettyCashAssignmentRepository,
+      otherExpenseRepository
+    );
+    this.dependencies.exportCashSummaryReportExcel = new ExportCashSummaryReportExcel(
+      cashWithdrawalRepository,
+      pettyCashAssignmentRepository,
+      otherExpenseRepository
+    );
     
     // Controllers
     this.dependencies.CashBalanceSettlementController = new CashBalanceSettlementController(this);

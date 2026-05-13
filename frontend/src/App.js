@@ -19,6 +19,7 @@ import Transporters from './components/Transporters';
 import OldInvoices from './components/OldInvoices';
 import OtherExpenses from './components/OtherExpenses';
 import OtherExpensesReport from './components/OtherExpensesReport';
+import CashSummaryReport from './components/CashSummaryReport';
 import Navbar from './components/Navbar';
 import ResetPassword from './components/ResetPassword';
 import ForgotPassword from './components/ForgotPassword';
@@ -106,6 +107,10 @@ function AppContent() {
           <Route
             path="/reports/other-expenses"
             element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
+          />
+          <Route
+            path="/reports/cash-summary"
+            element={<PrivateRoute><AdminRoute><CashSummaryReport /></AdminRoute></PrivateRoute>}
           />
 
           <Route

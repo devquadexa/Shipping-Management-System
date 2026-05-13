@@ -81,9 +81,6 @@ function PettyCash() {
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
   const [cashWithdrawals, setCashWithdrawals] = useState([]);
   const [withdrawalsCollapsed, setWithdrawalsCollapsed] = useState(false);
-  const [totalWithdrawnCash, setTotalWithdrawnCash] = useState(0);
-  const [totalAssignedCash, setTotalAssignedCash] = useState(0);
-  const [totalOtherExpenses, setTotalOtherExpenses] = useState(0);
 
   useEffect(() => {
     fetchAssignments();
@@ -97,15 +94,6 @@ function PettyCash() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
-
-  // Debug: Log when totals change
-  useEffect(() => {
-    console.log('💵 Balance Update:');
-    console.log('  - Total Withdrawn:', totalWithdrawnCash);
-    console.log('  - Petty Cash Assigned:', totalAssignedCash);
-    console.log('  - Other Expenses:', totalOtherExpenses);
-    console.log('  - Available:', totalWithdrawnCash - totalAssignedCash - totalOtherExpenses);
-  }, [totalWithdrawnCash, totalAssignedCash, totalOtherExpenses]);
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -152,13 +140,6 @@ function PettyCash() {
       // Ensure data is an array
       if (Array.isArray(data)) {
         setAssignments(data);
-        
-        // Calculate total assigned cash
-        const totalAssigned = data.reduce((sum, assignment) => {
-          return sum + parseFloat(assignment.assignedAmount || 0);
-        }, 0);
-        console.log('📊 Total Assigned Cash:', totalAssigned);
-        setTotalAssignedCash(totalAssigned);
         
         // For admin/super admin, fetch user balances from dedicated endpoint
         if (user?.role === 'Admin' || user?.role === 'Super Admin') {
@@ -219,34 +200,8 @@ function PettyCash() {
     try {
       const data = await cashWithdrawalService.getAll();
       setCashWithdrawals(data);
-      
-      // Calculate total withdrawn cash
-      const total = data.reduce((sum, withdrawal) => sum + parseFloat(withdrawal.amount || 0), 0);
-      console.log('💰 Total Withdrawn Cash:', total);
-      setTotalWithdrawnCash(total);
-      
-      // Also fetch other expenses to calculate combined balance
-      await fetchOtherExpenses();
     } catch (error) {
       console.error('Error fetching cash withdrawals:', error);
-    }
-  };
-
-  const fetchOtherExpenses = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/other-expenses`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const totalExpenses = data.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0);
-        console.log('💸 Total Other Expenses:', totalExpenses);
-        setTotalOtherExpenses(totalExpenses);
-      }
-    } catch (error) {
-      console.error('Error fetching other expenses:', error);
     }
   };
 
@@ -480,20 +435,6 @@ function PettyCash() {
       console.log('Validation failed - invalid amount value:', assignedAmount);
       setMessage('Assigned amount must be greater than 0');
       setTimeout(() => setMessage(''), 3000);
-      return;
-    }
-
-    // Check available balance
-    const availableBalance = totalWithdrawnCash - totalAssignedCash - totalOtherExpenses;
-    if (availableBalance <= 0) {
-      setMessage('❌ No available balance! Please record a cash withdrawal first.');
-      setTimeout(() => setMessage(''), 5000);
-      return;
-    }
-
-    if (assignedAmount > availableBalance) {
-      setMessage(`❌ Insufficient balance! Available: LKR ${formatAmount(availableBalance)}. You're trying to assign: LKR ${formatAmount(assignedAmount)}`);
-      setTimeout(() => setMessage(''), 5000);
       return;
     }
 
@@ -1776,37 +1717,43 @@ function PettyCash() {
                   No cash withdrawals recorded yet
                 </p>
               ) : (
-                <div className="withdrawals-grid">
-                  {cashWithdrawals.map((withdrawal) => (
-                    <div key={withdrawal.withdrawalId} className="withdrawal-box">
-                      <div className="withdrawal-header">
-                        <span className="withdrawal-id">{withdrawal.withdrawalId}</span>
-                        <span className="withdrawal-amount">LKR {formatAmount(withdrawal.amount)}</span>
-                      </div>
-                      <div className="withdrawal-details">
-                        <div className="withdrawal-row">
-                          <span className="withdrawal-label">Bank:</span>
-                          <span className="withdrawal-value">{withdrawal.bankName}</span>
-                        </div>
-                        <div className="withdrawal-row">
-                          <span className="withdrawal-label">Date:</span>
-                          <span className="withdrawal-value">
-                            {new Date(withdrawal.withdrawalDate).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="withdrawal-row">
-                          <span className="withdrawal-label">Recorded By:</span>
-                          <span className="withdrawal-value">{withdrawal.createdByName || withdrawal.createdBy}</span>
-                        </div>
-                        {withdrawal.notes && (
-                          <div className="withdrawal-notes">
-                            <span className="withdrawal-label">Notes:</span>
-                            <p>{withdrawal.notes}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <div className="assignments-table-wrapper">
+                  <table className="assignments-table-modern">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '160px' }}>Withdrawal ID</th>
+                        <th style={{ width: '140px' }}>Date</th>
+                        <th style={{ width: '220px' }}>Bank Name</th>
+                        <th style={{ width: '180px' }}>Amount</th>
+                        <th style={{ width: '200px' }}>Recorded By</th>
+                        <th style={{ minWidth: '250px' }}>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cashWithdrawals.map((withdrawal) => (
+                        <tr key={withdrawal.withdrawalId} className="assignment-row">
+                          <td>
+                            <span className="assignment-id">{withdrawal.withdrawalId}</span>
+                          </td>
+                          <td>{new Date(withdrawal.withdrawalDate).toLocaleDateString()}</td>
+                          <td>{withdrawal.bankName}</td>
+                          <td>
+                            <span className="amount-badge">
+                              LKR {formatAmount(withdrawal.amount)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="assigned-to-name">
+                              {withdrawal.createdByName || withdrawal.createdBy}
+                            </span>
+                          </td>
+                          <td style={{ color: withdrawal.notes ? '#374151' : '#9ca3af' }}>
+                            {withdrawal.notes || 'No notes'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -2523,33 +2470,6 @@ function PettyCash() {
               <button className="btn-close" onClick={() => setShowAssignModal(false)}>×</button>
             </div>
 
-            {/* Cash Balance Summary */}
-            <div className="cash-balance-summary">
-              <div className="balance-item">
-                <span className="balance-label">💰 Total Cash Withdrawn from Bank:</span>
-                <span className="balance-value withdrawn">LKR {formatAmount(totalWithdrawnCash)}</span>
-              </div>
-              <div className="balance-item">
-                <span className="balance-label">📤 Petty Cash Assigned:</span>
-                <span className="balance-value assigned">LKR {formatAmount(totalAssignedCash)}</span>
-              </div>
-              <div className="balance-item">
-                <span className="balance-label">📤 Other Expenses:</span>
-                <span className="balance-value assigned">LKR {formatAmount(totalOtherExpenses)}</span>
-              </div>
-              <div className="balance-item highlight">
-                <span className="balance-label">✅ Available to Assign:</span>
-                <span className={`balance-value ${totalWithdrawnCash - totalAssignedCash - totalOtherExpenses >= 0 ? 'positive' : 'negative'}`}>
-                  LKR {formatAmount(totalWithdrawnCash - totalAssignedCash - totalOtherExpenses)}
-                </span>
-              </div>
-              {totalWithdrawnCash - totalAssignedCash - totalOtherExpenses < 0 && (
-                <div className="balance-warning">
-                  ⚠️ Warning: Total usage exceeds withdrawn cash! Consider recording more withdrawals.
-                </div>
-              )}
-            </div>
-
             <form onSubmit={handleAssignSubmit} className="petty-cash-form">
               <div className="form-group">
                 <label>Select Job <span className="required">*</span></label>
@@ -2626,8 +2546,6 @@ function PettyCash() {
                 <button 
                   type="submit" 
                   className="btn btn-primary"
-                  disabled={totalWithdrawnCash - totalAssignedCash - totalOtherExpenses <= 0}
-                  title={totalWithdrawnCash - totalAssignedCash - totalOtherExpenses <= 0 ? 'No available balance. Please record a cash withdrawal first.' : ''}
                 >
                   Assign Petty Cash
                 </button>
