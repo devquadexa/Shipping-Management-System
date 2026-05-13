@@ -23,9 +23,18 @@ class MSSQLUserRepository extends IUserRepository {
       .input('email', this.sql.VarChar, user.email)
       .input('createdDate', this.sql.DateTime, user.createdDate)
       .input('isActive', this.sql.Bit, user.isActive)
+      .input('isTemporaryPassword', this.sql.Bit, user.isTemporaryPassword || false)
+      .input('passwordResetRequired', this.sql.Bit, user.passwordResetRequired || false)
+      .input('lastPasswordChange', this.sql.DateTime, user.lastPasswordChange || new Date())
       .query(`
-        INSERT INTO Users (UserId, Username, Password, FullName, Role, Email, CreatedDate, IsActive)
-        VALUES (@userId, @username, @password, @fullName, @role, @email, @createdDate, @isActive)
+        INSERT INTO Users (
+          UserId, Username, Password, FullName, Role, Email, CreatedDate, IsActive,
+          isTemporaryPassword, passwordResetRequired, lastPasswordChange
+        )
+        VALUES (
+          @userId, @username, @password, @fullName, @role, @email, @createdDate, @isActive,
+          @isTemporaryPassword, @passwordResetRequired, @lastPasswordChange
+        )
       `);
     
     return user;
@@ -98,16 +107,47 @@ class MSSQLUserRepository extends IUserRepository {
   async authenticate(username, password) {
     const pool = await this.db();
     
+    // Get user by username
     const result = await pool.request()
       .input('username', this.sql.VarChar, username)
-      .input('password', this.sql.VarChar, password)
-      .query('SELECT * FROM Users WHERE Username = @username AND Password = @password AND IsActive = 1');
+      .query('SELECT * FROM Users WHERE Username = @username AND IsActive = 1');
     
     if (result.recordset.length === 0) {
       return null;
     }
     
-    return this.mapToEntity(result.recordset[0]);
+    const user = this.mapToEntity(result.recordset[0]);
+    const bcrypt = require('bcryptjs');
+    
+    // Check if password is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
+    const isHashedPassword = user.password && user.password.startsWith('$2');
+    
+    let isValidPassword = false;
+    
+    if (isHashedPassword) {
+      // Compare using bcrypt for hashed passwords
+      isValidPassword = await bcrypt.compare(password, user.password);
+    } else {
+      // Direct comparison for plain text passwords (legacy users)
+      isValidPassword = (password === user.password);
+      
+      // If login successful with plain text, automatically hash the password
+      if (isValidPassword) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await pool.request()
+          .input('userId', this.sql.VarChar, user.userId)
+          .input('password', this.sql.VarChar, hashedPassword)
+          .query('UPDATE Users SET Password = @password WHERE UserId = @userId');
+        
+        console.log(`✅ Migrated password to bcrypt for user: ${username}`);
+      }
+    }
+    
+    if (!isValidPassword) {
+      return null;
+    }
+    
+    return user;
   }
 
   async generateNextId() {
@@ -120,6 +160,26 @@ class MSSQLUserRepository extends IUserRepository {
     return `USER${String(nextId).padStart(4, '0')}`;
   }
 
+  async updatePassword(userId, hashedPassword, isTemporaryPassword = false, passwordResetRequired = false) {
+    const pool = await this.db();
+    
+    await pool.request()
+      .input('userId', this.sql.VarChar, userId)
+      .input('password', this.sql.VarChar, hashedPassword)
+      .input('isTemporaryPassword', this.sql.Bit, isTemporaryPassword)
+      .input('passwordResetRequired', this.sql.Bit, passwordResetRequired)
+      .input('lastPasswordChange', this.sql.DateTime, new Date())
+      .query(`
+        UPDATE Users 
+        SET 
+          Password = @password,
+          isTemporaryPassword = @isTemporaryPassword,
+          passwordResetRequired = @passwordResetRequired,
+          lastPasswordChange = @lastPasswordChange
+        WHERE UserId = @userId
+      `);
+  }
+
   mapToEntity(row) {
     return new User({
       userId: row.UserId,
@@ -129,7 +189,10 @@ class MSSQLUserRepository extends IUserRepository {
       role: row.Role,
       email: row.Email,
       createdDate: row.CreatedDate,
-      isActive: row.IsActive
+      isActive: row.IsActive,
+      isTemporaryPassword: row.isTemporaryPassword,
+      passwordResetRequired: row.passwordResetRequired,
+      lastPasswordChange: row.lastPasswordChange
     });
   }
 }

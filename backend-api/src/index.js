@@ -6,12 +6,14 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 // Import Clean Architecture routes
 const authRoutes = require('./presentation/routes/auth');
+const passwordResetRoutes = require('./presentation/routes/passwordReset');
 const customerRoutes = require('./presentation/routes/customers');
 const jobRoutes = require('./presentation/routes/jobs');
 const jobAssignmentRoutes = require('./presentation/routes/jobAssignments');
 const billingRoutes = require('./presentation/routes/billing');
 const pettyCashRoutes = require('./presentation/routes/pettycash');
 const cashWithdrawalRoutes = require('./presentation/routes/cashWithdrawalRoutes');
+const cashSummaryRoutes = require('./presentation/routes/cashSummaryRoutes');
 const payItemTemplateRoutes = require('./presentation/routes/payItemTemplateRoutes');
 const pettyCashAssignmentRoutes = require('./presentation/routes/pettyCashAssignmentRoutes');
 const pettyCashReportRoutes = require('./presentation/routes/pettyCashReportRoutes');
@@ -48,12 +50,14 @@ getConnection()
   });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/password-reset', passwordResetRoutes(container));
 app.use('/api/customers', customerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/job-assignments', jobAssignmentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/petty-cash', pettyCashRoutes);
 app.use('/api/cash-withdrawals', cashWithdrawalRoutes);
+app.use('/api/cash-summary', cashSummaryRoutes);
 app.use('/api/pay-item-templates', payItemTemplateRoutes(container));
 app.use('/api/petty-cash-assignments', pettyCashAssignmentRoutes(container));
 app.use('/api/pettycash-assignment', pettyCashReportRoutes(container));

@@ -117,6 +117,17 @@ const DeletePaymentFromOldInvoice = require('../../application/use-cases/oldinvo
 // Auth Use Cases
 const AuthenticateUser = require('../../application/use-cases/auth/AuthenticateUser');
 
+// Password Reset Use Cases
+const ChangePassword = require('../../application/use-cases/auth/ChangePassword');
+const ResetPasswordWithTemp = require('../../application/use-cases/auth/ResetPasswordWithTemp');
+const RequestPasswordReset = require('../../application/use-cases/auth/RequestPasswordReset');
+const GetPasswordResetRequests = require('../../application/use-cases/auth/GetPasswordResetRequests');
+const ApprovePasswordResetRequest = require('../../application/use-cases/auth/ApprovePasswordResetRequest');
+const RejectPasswordResetRequest = require('../../application/use-cases/auth/RejectPasswordResetRequest');
+
+// Repositories
+const MSSQLPasswordResetRepository = require('../repositories/MSSQLPasswordResetRepository');
+
 // Controllers
 const CashBalanceSettlementController = require('../../presentation/controllers/CashBalanceSettlementController');
 
@@ -140,6 +151,7 @@ class Container {
     this.dependencies.jobRepository = new MSSQLJobRepository(getConnection, sql);
     this.dependencies.jobAssignmentRepository = new MSSQLJobAssignmentRepository(getConnection, sql);
     this.dependencies.userRepository = new MSSQLUserRepository(getConnection, sql);
+    this.dependencies.passwordResetRepository = new MSSQLPasswordResetRepository(getConnection, sql);
     this.dependencies.billRepository = new MSSQLBillRepository(getConnection, sql);
     this.dependencies.pettyCashRepository = new MSSQLPettyCashRepository(getConnection, sql);
     this.dependencies.payItemTemplateRepository = new MSSQLPayItemTemplateRepository(getConnection, sql);
@@ -258,6 +270,15 @@ class Container {
     const jwtSecret = process.env.JWT_SECRET || 'default_secret';
     this.dependencies.authenticateUser = new AuthenticateUser(userRepository, jwtSecret);
     
+    // Password Reset use cases
+    const passwordResetRepository = this.dependencies.passwordResetRepository;
+    this.dependencies.changePassword = new ChangePassword(userRepository);
+    this.dependencies.resetPasswordWithTemp = new ResetPasswordWithTemp(userRepository);
+    this.dependencies.requestPasswordReset = new RequestPasswordReset(userRepository, passwordResetRepository);
+    this.dependencies.getPasswordResetRequests = new GetPasswordResetRequests(passwordResetRepository);
+    this.dependencies.approvePasswordResetRequest = new ApprovePasswordResetRequest(passwordResetRepository, userRepository);
+    this.dependencies.rejectPasswordResetRequest = new RejectPasswordResetRequest(passwordResetRepository);
+    
     // Cash Balance Settlement use cases
     this.dependencies.CreateCashBalanceSettlement = new CreateCashBalanceSettlement(cashBalanceSettlementRepository, pettyCashAssignmentRepository);
     this.dependencies.GetCashBalanceSettlements = new GetCashBalanceSettlements(cashBalanceSettlementRepository);
@@ -284,6 +305,10 @@ class Container {
     const ExportOtherExpensesReportPDF = require('../../application/use-cases/otherexpense/ExportOtherExpensesReportPDF');
     const ExportOtherExpensesReportExcel = require('../../application/use-cases/otherexpense/ExportOtherExpensesReportExcel');
     
+    // Cash Summary Report Use Cases
+    const ExportCashSummaryReportPDF = require('../../application/use-cases/cashsummary/ExportCashSummaryReportPDF');
+    const ExportCashSummaryReportExcel = require('../../application/use-cases/cashsummary/ExportCashSummaryReportExcel');
+    
     const otherExpenseRepository = new MSSQLOtherExpenseRepository(getConnection, sql);
     this.dependencies.createOtherExpense = new CreateOtherExpense(otherExpenseRepository);
     this.dependencies.getAllOtherExpenses = new GetAllOtherExpenses(otherExpenseRepository);
@@ -292,6 +317,18 @@ class Container {
     this.dependencies.getOtherExpensesReport = new GetOtherExpensesReport(otherExpenseRepository);
     this.dependencies.exportOtherExpensesReportPDF = new ExportOtherExpensesReportPDF(otherExpenseRepository);
     this.dependencies.exportOtherExpensesReportExcel = new ExportOtherExpensesReportExcel(otherExpenseRepository);
+    
+    // Cash Summary Report use cases
+    this.dependencies.exportCashSummaryReportPDF = new ExportCashSummaryReportPDF(
+      cashWithdrawalRepository,
+      pettyCashAssignmentRepository,
+      otherExpenseRepository
+    );
+    this.dependencies.exportCashSummaryReportExcel = new ExportCashSummaryReportExcel(
+      cashWithdrawalRepository,
+      pettyCashAssignmentRepository,
+      otherExpenseRepository
+    );
     
     // Controllers
     this.dependencies.CashBalanceSettlementController = new CashBalanceSettlementController(this);

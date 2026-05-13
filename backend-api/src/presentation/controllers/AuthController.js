@@ -54,24 +54,30 @@ class AuthController {
       // Generate new user ID
       const userId = await this.userRepository.generateNextId();
       
-      // Create user (using plain text password to match current system)
-      // TODO: In production, use bcryptjs to hash passwords
+      // Hash the password (temporary password provided by Super Admin)
+      const bcrypt = require('bcryptjs');
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Create user with temporary password flags
       const User = require('../../domain/entities/User');
       const newUser = new User({
         userId,
         username,
-        password, // Plain text (matches current authenticate method)
+        password: hashedPassword,
         fullName,
         email,
         role: role || 'Waff Clerk',
         createdDate: new Date(),
-        isActive: true
+        isActive: true,
+        isTemporaryPassword: true,  // Mark as temporary password
+        passwordResetRequired: true, // Require password reset on first login
+        lastPasswordChange: new Date()
       });
 
       await this.userRepository.create(newUser);
       
       res.status(201).json({ 
-        message: 'User created successfully',
+        message: 'User created successfully. The user must reset their password on first login.',
         user: newUser.toSafeObject()
       });
     } catch (error) {

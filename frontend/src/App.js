@@ -19,7 +19,11 @@ import Transporters from './components/Transporters';
 import OldInvoices from './components/OldInvoices';
 import OtherExpenses from './components/OtherExpenses';
 import OtherExpensesReport from './components/OtherExpensesReport';
+import CashSummaryReport from './components/CashSummaryReport';
 import Navbar from './components/Navbar';
+import ResetPassword from './components/ResetPassword';
+import ForgotPassword from './components/ForgotPassword';
+import PasswordResetRequests from './components/PasswordResetRequests';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -52,6 +56,8 @@ function AppContent() {
 
         <Routes>
           <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
@@ -63,6 +69,16 @@ function AppContent() {
           <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
           <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+          
+          {/* Password Reset Requests - Super Admin only */}
+          <Route 
+            path="/password-reset-requests" 
+            element={
+              <PrivateRoute>
+                {user?.role === 'Super Admin' ? <PasswordResetRequests /> : <Navigate to="/" />}
+              </PrivateRoute>
+            } 
+          />
 
           <Route
             path="/petty-cash"
@@ -91,6 +107,10 @@ function AppContent() {
           <Route
             path="/reports/other-expenses"
             element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
+          />
+          <Route
+            path="/reports/cash-summary"
+            element={<PrivateRoute><AdminRoute><CashSummaryReport /></AdminRoute></PrivateRoute>}
           />
 
           <Route

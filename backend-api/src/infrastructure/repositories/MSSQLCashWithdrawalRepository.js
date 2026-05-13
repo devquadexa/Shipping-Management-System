@@ -86,6 +86,41 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
     return result.recordset[0] ? this.mapToEntity(result.recordset[0]) : null;
   }
 
+  async findByDateRange(fromDate, toDate) {
+    const pool = await this.db();
+    
+    // Ensure table exists
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CashWithdrawals')
+      BEGIN
+        CREATE TABLE CashWithdrawals (
+          withdrawalId NVARCHAR(50) PRIMARY KEY,
+          amount DECIMAL(18, 2) NOT NULL,
+          bankName NVARCHAR(200) NOT NULL,
+          withdrawalDate DATETIME NOT NULL,
+          notes NVARCHAR(500),
+          createdBy NVARCHAR(50) NOT NULL,
+          createdAt DATETIME DEFAULT GETDATE()
+        )
+      END
+    `);
+    
+    const result = await pool.request()
+      .input('fromDate', this.sql.Date, fromDate)
+      .input('toDate', this.sql.Date, toDate)
+      .query(`
+        SELECT 
+          cw.*,
+          u.fullName as createdByName
+        FROM CashWithdrawals cw
+        LEFT JOIN Users u ON cw.createdBy = u.userId
+        WHERE CAST(cw.withdrawalDate AS DATE) BETWEEN @fromDate AND @toDate
+        ORDER BY cw.withdrawalDate DESC, cw.createdAt DESC
+      `);
+    
+    return result.recordset.map(row => this.mapToEntity(row));
+  }
+
   async generateNextId() {
     const pool = await this.db();
     
