@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
@@ -20,6 +20,7 @@ import OldInvoices from './components/OldInvoices';
 import OtherExpenses from './components/OtherExpenses';
 import OtherExpensesReport from './components/OtherExpensesReport';
 import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import ResetPassword from './components/ResetPassword';
 import ForgotPassword from './components/ForgotPassword';
 import PasswordResetRequests from './components/PasswordResetRequests';
@@ -47,11 +48,33 @@ function AdminRoute({ children }) {
 
 function AppContent() {
   const { user } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarHidden, setIsSidebarHidden] = useState(false);
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const closeSidebar = () => setIsSidebarOpen(false);
+
+  // Listen for sidebar visibility toggle events
+  React.useEffect(() => {
+    const handleToggleSidebarVisibility = (event) => {
+      setIsSidebarHidden(event.detail.hidden);
+    };
+
+    window.addEventListener('toggleSidebarVisibility', handleToggleSidebarVisibility);
+    return () => window.removeEventListener('toggleSidebarVisibility', handleToggleSidebarVisibility);
+  }, []);
 
   return (
     <Router>
       <div className="App">
-        {user && <Navbar />}
+        {user && (
+          <>
+            {!isSidebarHidden && <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />}
+            <Navbar onMenuClick={toggleSidebar} />
+          </>
+        )}
+
+        <div className={`main-content ${user && !isSidebarHidden ? 'with-sidebar' : ''}`}>
 
         <Routes>
           <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
@@ -116,6 +139,7 @@ function AppContent() {
           {/* Legacy redirect — keep old bookmark working */}
           <Route path="/petty-cash-report" element={<Navigate to="/reports/petty-cash" replace />} />
         </Routes>
+        </div>
       </div>
     </Router>
   );

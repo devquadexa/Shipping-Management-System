@@ -7,12 +7,13 @@ const { auth, checkRole } = require('../../middleware/auth');
 module.exports = (container) => {
   const router = express.Router();
   
-  const changePassword = container.get('changePassword');
-  const resetPasswordWithTemp = container.get('resetPasswordWithTemp');
-  const requestPasswordReset = container.get('requestPasswordReset');
-  const getPasswordResetRequests = container.get('getPasswordResetRequests');
-  const approvePasswordResetRequest = container.get('approvePasswordResetRequest');
-  const rejectPasswordResetRequest = container.get('rejectPasswordResetRequest');
+  try {
+    const changePassword = container.get('changePassword');
+    const resetPasswordWithTemp = container.get('resetPasswordWithTemp');
+    const requestPasswordReset = container.get('requestPasswordReset');
+    const getPasswordResetRequests = container.get('getPasswordResetRequests');
+    const approvePasswordResetRequest = container.get('approvePasswordResetRequest');
+    const rejectPasswordResetRequest = container.get('rejectPasswordResetRequest');
 
   // Change password (user knows old password)
   router.post('/change-password', auth, async (req, res) => {
@@ -93,5 +94,9 @@ module.exports = (container) => {
     }
   });
 
-  return router;
+    return router;
+  } catch (error) {
+    console.error('Error initializing password reset routes:', error);
+    throw error;
+  }
 };
