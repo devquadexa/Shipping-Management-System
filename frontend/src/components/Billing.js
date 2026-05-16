@@ -4,9 +4,11 @@ import { billingService } from '../api/services/billingService';
 import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
 import { transporterService } from '../api/services/transporterService';
+import { invoiceReviewService } from '../api/services/invoiceReviewService';
 import API_BASE from '../api/config';
 import apiClient from '../api/client';
 import Pagination from './Pagination';
+import ReviewInvoiceModal from './ReviewInvoiceModal';
 import { formatDate, formatDateWithMonth, formatDateWithFullMonth } from '../utils/dateFormatter';
 import '../styles/Billing.css';
 
@@ -25,13 +27,35 @@ function Billing() {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
   };
 
-  const getTransporterCostItem = () => ({
-    name: 'transporter cost',
-    actualCost: '',
-    billingAmount: '',
-    sameAmount: false,
-    hasBill: false
-  });
+  const getTransporterCostItem = () => {
+    // Always build transporter cost description with place names
+    const fromPlace = selectedJob?.exporter || 'placename';
+    const toPlace = selectedJob?.exporter || 'placename';
+    const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
+    
+    return {
+      name: description,
+      actualCost: '',
+      billingAmount: '',
+      sameAmount: false,
+      hasBill: false
+    };
+  };
+
+  // Transform pay item description to add prefix if it's a transporter cost
+  const getDisplayDescription = (item, job = selectedJob) => {
+    const description = item.description || item.name || '';
+    const normalized = description.toLowerCase().trim();
+    
+    // If it's the old format transporter cost, add the prefix
+    if (normalized === 'transporter cost' && job) {
+      const fromPlace = job.exporter || 'placename';
+      const toPlace = job.transporter || 'placename';
+      return `transporter cost (from ${fromPlace} to ${toPlace})`;
+    }
+    
+    return description;
+  };
 
   const getBlankPayItem = () => ({
     name: '',
@@ -44,12 +68,15 @@ function Billing() {
   const hasTransporterCostItem = (items) => {
     return Array.isArray(items) && items.some(item => {
       const label = (item?.name || item?.description || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
   };
 
   const isTransporterCostLabel = (value) => {
-    return String(value || '').toLowerCase().trim() === 'transporter cost';
+    const normalized = String(value || '').toLowerCase().trim();
+    // Only check for new format with place names
+    return normalized.startsWith('transporter cost (from');
   };
 
   const mergeTransporterCostItems = (items) => {
@@ -70,7 +97,7 @@ function Billing() {
       if (!transporterAccumulator) {
         transporterAccumulator = {
           ...item,
-          description: 'transporter cost',
+          description: description, // Keep the full description with place names
           amount: parseFloat(item.amount || item.actualCost || 0) || 0,
           actualCost: parseFloat(item.actualCost || item.amount || 0) || 0,
           billingAmount: parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0
@@ -109,6 +136,13 @@ function Billing() {
 
   const getDefaultPayItemsForCategory = (shipmentCategory) => {
     return ensureFclTransporterCost([], shipmentCategory);
+  };
+
+  const getAssignedClerks = () => {
+    if (!selectedJob || !selectedJob.assignedUsers) {
+      return [];
+    }
+    return selectedJob.assignedUsers;
   };
 
   const formatCusdecNumberForDisplay = (value) => {
@@ -164,6 +198,10 @@ function Billing() {
   const [recordsPerPage, setRecordsPerPage] = useState(20);
   const [statusFilter, setStatusFilter] = useState('All');
   const [customerFilter, setCustomerFilter] = useState('All');
+  
+  // Review Invoice states
+  const [showReviewInvoiceModal, setShowReviewInvoiceModal] = useState(false);
+  const [reviewInvoiceLoading, setReviewInvoiceLoading] = useState(false);
 
   useEffect(() => {
     fetchBills();
@@ -493,11 +531,23 @@ function Billing() {
   };
 
   const addTransporterCostRow = () => {
+    // Check if transporter cost already exists
+    if (hasTransporterCostItem(payItems)) {
+      setMessage('Transporter cost is already added. Use the existing row or remove it first.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
     setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
     setShowPayItemsRow(true);
   };
 
   const addTransporterCostFromHeader = () => {
+    // Check if transporter cost already exists
+    if (hasTransporterCostItem(payItems)) {
+      setMessage('Transporter cost is already added. Use the existing row or remove it first.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
     setShowPayItemsRow(true);
     setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
   };
@@ -994,6 +1044,7 @@ function Billing() {
         console.warn('Could not close petty cash assignments from frontend:', err.message);
       }
 
+      const customerName = customers.find(c => c.customerId === selectedJob.customerId)?.name || selectedJob.customerId;
       setMessage('Invoice generated successfully!');
       setSelectedJob(null);
       fetchBills();
@@ -1003,6 +1054,26 @@ function Billing() {
       console.error('Error generating invoice:', error);
       setMessage('Error generating invoice');
       setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const handleReviewInvoiceSubmit = async (reviewData) => {
+    setReviewInvoiceLoading(true);
+    try {
+      console.log('Sending review data:', reviewData);
+      const response = await invoiceReviewService.sendReview(reviewData);
+      console.log('Review sent successfully:', response);
+      setMessage('Invoice review sent successfully');
+      setTimeout(() => setMessage(''), 3000);
+      setShowReviewInvoiceModal(false);
+    } catch (error) {
+      console.error('Error sending invoice review:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      const errorMessage = error.response?.data?.message || error.message || 'Error sending invoice review';
+      setMessage(errorMessage);
+      setTimeout(() => setMessage(''), 5000);
+    } finally {
+      setReviewInvoiceLoading(false);
     }
   };
 
@@ -1328,7 +1399,16 @@ function Billing() {
     }
 
     const printablePayItems = payItemsArray.map((item, index) => {
-      const description = item.description || item.name || 'Service Charge';
+      let description = item.description || item.name || 'Service Charge';
+      
+      // Always transform to new format with place names
+      const normalized = description.toLowerCase().trim();
+      if (normalized.startsWith('transporter cost')) {
+        const fromPlace = job.exporter || 'placename';
+        const toPlace = job.transporter || 'placename';
+        description = `transporter cost (from ${fromPlace} to ${toPlace})`;
+      }
+      
       const amount = parseFloat(item.billingAmount || item.amount || 0) || 0;
       const payItemId = item.id || item.payItemId || item.officePayItemId || `PI${String(index + 1).padStart(3, '0')}`;
 
@@ -1375,13 +1455,19 @@ function Billing() {
 
     // Add transporter cost for FCL shipments
     if (job.shipmentCategory === 'FCL') {
-      const hasTransporterCost = payItemsArray.some(item => 
-        (item.name || item.description)?.toLowerCase() === 'transporter cost'
-      );
+      const hasTransporterCost = payItemsArray.some(item => {
+        const label = (item?.name || item?.description || '').toLowerCase().trim();
+        // Check if any transporter cost exists (old or new format)
+        return label.startsWith('transporter cost');
+      });
       if (!hasTransporterCost) {
+        // Always use new format with place names
+        const fromPlace = job.exporter || 'placename';
+        const toPlace = job.transporter || 'placename';
+        const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
         payItemsArray.push({
-          name: 'Transporter Cost',
-          description: 'Transporter Cost',
+          name: description,
+          description: description,
           billingAmount: 0,
           amount: 0
         });
@@ -2206,9 +2292,21 @@ function Billing() {
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedJob.payItems.map((item, idx) => (
+                        {selectedJob.payItems.map((item, idx) => {
+                          const itemDescription = item.description || item.name || '';
+                          let displayDescription = itemDescription;
+                          
+                          // Always transform to new format with place names
+                          const normalized = itemDescription.toLowerCase().trim();
+                          if (normalized.startsWith('transporter cost')) {
+                            const fromPlace = selectedJob.exporter || 'placename';
+                            const toPlace = selectedJob.transporter || 'placename';
+                            displayDescription = `transporter cost (from ${fromPlace} to ${toPlace})`;
+                          }
+                          
+                          return (
                           <tr key={idx} className="pay-item-row">
-                            <td className="col-description">{item.description}</td>
+                            <td className="col-description">{displayDescription}</td>
                             <td className="col-amount">
                               {formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}
                             </td>
@@ -2249,7 +2347,8 @@ function Billing() {
                               </td>
                             )}
                           </tr>
-                        ))}
+                        );
+                        })}
                       </tbody>
                       <tfoot>
                         {/* Total Row */}
@@ -2303,6 +2402,13 @@ function Billing() {
                     </table>
 
                     <div className="generate-bill-section">
+                      <button 
+                        onClick={() => setShowReviewInvoiceModal(true)} 
+                        className="btn btn-secondary btn-small"
+                        disabled={!selectedJob || !selectedJob.payItems || selectedJob.payItems.length === 0 || !getAssignedClerks().length}
+                      >
+                        📋 Review Invoice
+                      </button>
                       <button onClick={generateBill} className="btn btn-primary btn-small">
                         ✓ Generate Invoice
                       </button>
@@ -3101,6 +3207,16 @@ function Billing() {
           </div>
         </div>
       )}
+
+      {/* Review Invoice Modal */}
+      <ReviewInvoiceModal
+        show={showReviewInvoiceModal}
+        onClose={() => setShowReviewInvoiceModal(false)}
+        job={selectedJob}
+        assignedClerks={getAssignedClerks()}
+        onSubmit={handleReviewInvoiceSubmit}
+        loading={reviewInvoiceLoading}
+      />
 
     </div>
   );

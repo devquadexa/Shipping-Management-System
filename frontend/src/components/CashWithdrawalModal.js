@@ -54,14 +54,17 @@ function CashWithdrawalModal({ show, onClose, onSubmit }) {
 
           <div className="form-group">
             <label>Bank Name <span className="required">*</span></label>
-            <input
-              type="text"
+            <select
               name="bankName"
               value={formData.bankName}
               onChange={handleChange}
               required
-              placeholder="Enter bank name"
-            />
+            >
+              <option value="">Select a bank</option>
+              <option value="Commercial Bank">Commercial Bank</option>
+              <option value="Hatton National Bank">Hatton National Bank</option>
+              <option value="Sampath Bank">Sampath Bank</option>
+            </select>
           </div>
 
           <div className="form-group">

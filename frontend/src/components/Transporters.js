@@ -531,7 +531,8 @@ function Transporters() {
     const payItems = Array.isArray(job.payItems) ? job.payItems : [];
     const transporterCostItems = payItems.filter((item) => {
       const label = (item?.description || item?.name || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
 
     if (!transporterCostItems.length) return 0;
@@ -549,7 +550,8 @@ function Transporters() {
     const payItems = Array.isArray(job?.payItems) ? job.payItems : [];
     return payItems.filter((item) => {
       const label = (item?.description || item?.name || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
   };
 

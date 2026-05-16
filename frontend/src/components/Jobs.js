@@ -176,6 +176,7 @@ function Jobs() {
         }
       }
       
+      const customerName = customers.find(c => c.customerId === formData.customerId)?.name || formData.customerId;
       setMessage(`Job created successfully${assignmentMessage}!`);
       setFormData({ 
         customerId: '', 

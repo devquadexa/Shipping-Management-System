@@ -25,9 +25,12 @@ const cashBalanceSettlementRoutes = require('./presentation/routes/cashBalanceSe
 const oldInvoiceRoutes = require('./presentation/routes/oldInvoices');
 const paymentRoutes = require('./presentation/routes/paymentRoutes');
 const otherExpenseRoutes = require('./presentation/routes/otherExpense');
+const invoiceReviewRoutes = require('./presentation/routes/invoiceReviewRoutes');
+const notificationRoutes = require('./presentation/routes/notificationRoutes');
 const { getConnection } = require('./config/database');
 const container = require('./infrastructure/di/container');
 const { startOverdueChecker } = require('./infrastructure/scheduler/overdueChecker');
+const sql = require('mssql');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -69,6 +72,8 @@ app.use('/api/cash-balance-settlements', cashBalanceSettlementRoutes(container))
 app.use('/api/old-invoices', oldInvoiceRoutes(container));
 app.use('/api/payments', paymentRoutes);
 app.use('/api/other-expenses', otherExpenseRoutes(container));
+app.use('/api/invoice-reviews', invoiceReviewRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, '../../frontend/build')));

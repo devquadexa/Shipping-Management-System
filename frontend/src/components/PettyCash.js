@@ -81,6 +81,8 @@ function PettyCash() {
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
   const [cashWithdrawals, setCashWithdrawals] = useState([]);
   const [withdrawalsCollapsed, setWithdrawalsCollapsed] = useState(false);
+  const [withdrawalFilterMonth, setWithdrawalFilterMonth] = useState(new Date().getMonth() + 1);
+  const [withdrawalFilterYear, setWithdrawalFilterYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     fetchAssignments();
@@ -203,6 +205,16 @@ function PettyCash() {
     } catch (error) {
       console.error('Error fetching cash withdrawals:', error);
     }
+  };
+
+  const getFilteredCashWithdrawals = () => {
+    return cashWithdrawals.filter(withdrawal => {
+      const withdrawalDate = new Date(withdrawal.withdrawalDate);
+      const withdrawalMonth = withdrawalDate.getMonth() + 1;
+      const withdrawalYear = withdrawalDate.getFullYear();
+      
+      return withdrawalMonth === withdrawalFilterMonth && withdrawalYear === withdrawalFilterYear;
+    });
   };
 
   const handleWithdrawalSubmit = async (withdrawalData) => {
@@ -1689,7 +1701,7 @@ function PettyCash() {
       {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
         <div className="card">
           <div className="card-header collapsible-header" onClick={() => setWithdrawalsCollapsed(c => !c)}>
-            <h2>Cash Withdrawals from Bank ({cashWithdrawals.length})</h2>
+            <h2>Cash Withdrawals from Bank ({getFilteredCashWithdrawals().length})</h2>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <button 
                 onClick={(e) => {
@@ -1712,9 +1724,58 @@ function PettyCash() {
 
           {!withdrawalsCollapsed && (
             <div className="card-body">
-              {cashWithdrawals.length === 0 ? (
+              {/* Month and Year Filters */}
+              <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Month</label>
+                  <select 
+                    value={withdrawalFilterMonth} 
+                    onChange={(e) => setWithdrawalFilterMonth(parseInt(e.target.value))}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={1}>January</option>
+                    <option value={2}>February</option>
+                    <option value={3}>March</option>
+                    <option value={4}>April</option>
+                    <option value={5}>May</option>
+                    <option value={6}>June</option>
+                    <option value={7}>July</option>
+                    <option value={8}>August</option>
+                    <option value={9}>September</option>
+                    <option value={10}>October</option>
+                    <option value={11}>November</option>
+                    <option value={12}>December</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Year</label>
+                  <select 
+                    value={withdrawalFilterYear} 
+                    onChange={(e) => setWithdrawalFilterYear(parseInt(e.target.value))}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {[2024, 2025, 2026, 2027].map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {getFilteredCashWithdrawals().length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
-                  No cash withdrawals recorded yet
+                  No cash withdrawals recorded for this period
                 </p>
               ) : (
                 <div className="assignments-table-wrapper">
@@ -1730,7 +1791,7 @@ function PettyCash() {
                       </tr>
                     </thead>
                     <tbody>
-                      {cashWithdrawals.map((withdrawal) => (
+                      {getFilteredCashWithdrawals().map((withdrawal) => (
                         <tr key={withdrawal.withdrawalId} className="assignment-row">
                           <td>
                             <span className="assignment-id">{withdrawal.withdrawalId}</span>
