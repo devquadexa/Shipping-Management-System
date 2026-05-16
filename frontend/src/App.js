@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
@@ -20,7 +20,9 @@ import OldInvoices from './components/OldInvoices';
 import OtherExpenses from './components/OtherExpenses';
 import OtherExpensesReport from './components/OtherExpensesReport';
 import CashSummaryReport from './components/CashSummaryReport';
-import Navbar from './components/Navbar';
+import InvoiceReviewPage from './components/InvoiceReviewPage';
+import Sidebar from './components/Sidebar';
+import TopBar from './components/TopBar';
 import ResetPassword from './components/ResetPassword';
 import ForgotPassword from './components/ForgotPassword';
 import PasswordResetRequests from './components/PasswordResetRequests';
@@ -48,13 +50,23 @@ function AdminRoute({ children }) {
 
 function AppContent() {
   const { user } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const closeSidebar = () => setIsSidebarOpen(false);
 
   return (
     <Router>
       <div className="App">
-        {user && <Navbar />}
+        {user && (
+          <>
+            <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
+            <TopBar onMenuToggle={toggleSidebar} />
+          </>
+        )}
 
-        <Routes>
+        <div className={user ? "main-content" : ""}>
+          <Routes>
           <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -63,6 +75,7 @@ function AppContent() {
           <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
           <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
           <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+          <Route path="/invoice-reviews" element={<PrivateRoute><InvoiceReviewPage /></PrivateRoute>} />
           <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
           <Route path="/old-invoices" element={<PrivateRoute><OldInvoices /></PrivateRoute>} />
           <Route path="/other-expenses" element={<PrivateRoute><OtherExpenses /></PrivateRoute>} />
@@ -121,6 +134,7 @@ function AppContent() {
           {/* Legacy redirect — keep old bookmark working */}
           <Route path="/petty-cash-report" element={<Navigate to="/reports/petty-cash" replace />} />
         </Routes>
+        </div>
       </div>
     </Router>
   );

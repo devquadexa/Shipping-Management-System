@@ -821,8 +821,11 @@ input[type="number"] {
 }
 
 .generate-bill-section {
-  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
   padding: 1.25rem 1.5rem 0.5rem 0;
+  flex-wrap: wrap;
 }
 
 .generate-bill-section .btn {
