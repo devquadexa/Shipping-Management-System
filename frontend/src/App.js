@@ -19,10 +19,8 @@ import Transporters from './components/Transporters';
 import OldInvoices from './components/OldInvoices';
 import OtherExpenses from './components/OtherExpenses';
 import OtherExpensesReport from './components/OtherExpensesReport';
-import CashSummaryReport from './components/CashSummaryReport';
-import InvoiceReviewPage from './components/InvoiceReviewPage';
+import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
 import ResetPassword from './components/ResetPassword';
 import ForgotPassword from './components/ForgotPassword';
 import PasswordResetRequests from './components/PasswordResetRequests';
@@ -51,19 +49,32 @@ function AdminRoute({ children }) {
 function AppContent() {
   const { user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarHidden, setIsSidebarHidden] = useState(false);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
+
+  // Listen for sidebar visibility toggle events
+  React.useEffect(() => {
+    const handleToggleSidebarVisibility = (event) => {
+      setIsSidebarHidden(event.detail.hidden);
+    };
+
+    window.addEventListener('toggleSidebarVisibility', handleToggleSidebarVisibility);
+    return () => window.removeEventListener('toggleSidebarVisibility', handleToggleSidebarVisibility);
+  }, []);
 
   return (
     <Router>
       <div className="App">
         {user && (
           <>
-            <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
-            <TopBar onMenuToggle={toggleSidebar} />
+            {!isSidebarHidden && <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />}
+            <Navbar onMenuClick={toggleSidebar} />
           </>
         )}
+
+        <div className={`main-content ${user && !isSidebarHidden ? 'with-sidebar' : ''}`}>
 
         <div className={user ? "main-content" : ""}>
           <Routes>
