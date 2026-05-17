@@ -4,6 +4,7 @@ import apiClient from '../api/client';
 import { transporterService } from '../api/services/transporterService';
 import { jobService } from '../api/services/jobService';
 import { billingService } from '../api/services/billingService';
+import { formatDate, formatDateWithMonth } from '../utils/dateFormatter';
 import '../styles/Transporters.css';
 
 const initialFormData = {
@@ -530,7 +531,8 @@ function Transporters() {
     const payItems = Array.isArray(job.payItems) ? job.payItems : [];
     const transporterCostItems = payItems.filter((item) => {
       const label = (item?.description || item?.name || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
 
     if (!transporterCostItems.length) return 0;
@@ -548,7 +550,8 @@ function Transporters() {
     const payItems = Array.isArray(job?.payItems) ? job.payItems : [];
     return payItems.filter((item) => {
       const label = (item?.description || item?.name || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
   };
 
@@ -966,9 +969,7 @@ function Transporters() {
                       <td data-label="Main Phone"><span className="cell-value">{transporter.mainPhone || transporter.phone}</span></td>
                       <td data-label="Email"><span className="cell-value">{transporter.email || '-'}</span></td>
                       <td data-label="Registration Date">
-                        <span className="cell-value">{transporter.registrationDate
-                          ? new Date(transporter.registrationDate).toLocaleDateString()
-                          : '-'}</span>
+                        <span className="cell-value">{formatDate(transporter.registrationDate)}</span>
                       </td>
                       <td data-label="Contact Person"><span className="cell-value">{transporter.contactPersons?.[0]?.name || transporter.contactPerson || '-'}</span></td>
                       <td data-label="Status">
@@ -1185,7 +1186,7 @@ function Transporters() {
                                             {job.shipmentCategory || '-'}
                                           </div>
                                           <div className="settlement-table-cell settlement-type-col">
-                                            {job.transportDeliveryDate ? new Date(job.transportDeliveryDate).toLocaleDateString() : '-'}
+                                            {formatDate(job.transportDeliveryDate)}
                                           </div>
                                           <div className="settlement-table-cell settlement-bill-col">
                                             {getTransporterCostAmount(job) > 0 ? (
@@ -1323,11 +1324,7 @@ function Transporters() {
                                                       {getAllPaymentRecords(job).map((payment, idx) => (
                                                         <div key={idx} className="payment-table-row">
                                                           <div className="payment-table-cell payment-date-col">
-                                                            {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('en-US', {
-                                                              year: 'numeric',
-                                                              month: 'short',
-                                                              day: 'numeric'
-                                                            }) : '-'}
+                                                            {formatDateWithMonth(payment.paymentDate)}
                                                           </div>
                                                           <div className="payment-table-cell payment-method-col">
                                                             <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
@@ -1401,8 +1398,8 @@ function Transporters() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal modal-large" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large">
             <div className="modal-header">
               <h2>{editingTransporter ? 'Edit Transporter' : 'New Transporter'}</h2>
               <button className="btn-close" onClick={() => setShowModal(false)}>×</button>

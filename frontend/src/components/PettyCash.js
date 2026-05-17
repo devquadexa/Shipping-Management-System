@@ -3,8 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { jobService } from '../api/services/jobService';
 import { authService } from '../api/services/authService';
 import { customerService } from '../api/services/customerService';
+import { cashWithdrawalService } from '../api/services/cashWithdrawalService';
+import CashWithdrawalModal from './CashWithdrawalModal';
 import Pagination from './Pagination';
 import '../styles/PettyCash.css';
+import '../styles/CashWithdrawals.css';
 import API_BASE from '../api/config';
 
 function PettyCash() {
@@ -74,6 +77,13 @@ function PettyCash() {
     notes: ''
   });
 
+  // Cash Withdrawal states
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [cashWithdrawals, setCashWithdrawals] = useState([]);
+  const [withdrawalsCollapsed, setWithdrawalsCollapsed] = useState(false);
+  const [withdrawalFilterMonth, setWithdrawalFilterMonth] = useState(new Date().getMonth() + 1);
+  const [withdrawalFilterYear, setWithdrawalFilterYear] = useState(new Date().getFullYear());
+
   useEffect(() => {
     fetchAssignments();
     fetchJobs();
@@ -82,6 +92,7 @@ function PettyCash() {
     if (user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') {
       fetchUsers();
       fetchOverallBalance();
+      fetchCashWithdrawals();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -184,6 +195,40 @@ function PettyCash() {
       }
     } catch (error) {
       console.error('Error fetching overall balance:', error);
+    }
+  };
+
+  const fetchCashWithdrawals = async () => {
+    try {
+      const data = await cashWithdrawalService.getAll();
+      setCashWithdrawals(data);
+    } catch (error) {
+      console.error('Error fetching cash withdrawals:', error);
+    }
+  };
+
+  const getFilteredCashWithdrawals = () => {
+    return cashWithdrawals.filter(withdrawal => {
+      const withdrawalDate = new Date(withdrawal.withdrawalDate);
+      const withdrawalMonth = withdrawalDate.getMonth() + 1;
+      const withdrawalYear = withdrawalDate.getFullYear();
+      
+      return withdrawalMonth === withdrawalFilterMonth && withdrawalYear === withdrawalFilterYear;
+    });
+  };
+
+  const handleWithdrawalSubmit = async (withdrawalData) => {
+    try {
+      await cashWithdrawalService.create(withdrawalData);
+      setMessage('Cash withdrawal recorded successfully');
+      setTimeout(() => setMessage(''), 3000);
+      setShowWithdrawalModal(false);
+      fetchCashWithdrawals();
+      fetchOverallBalance();
+    } catch (error) {
+      console.error('Error creating cash withdrawal:', error);
+      setMessage('Error recording cash withdrawal');
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -436,10 +481,14 @@ function PettyCash() {
       if (response.ok) {
         console.log('Success! Assignment created');
         setMessage('Petty cash assigned successfully!');
-        setShowAssignModal(false);
         setAssignFormData({ jobId: '', assignedTo: '', assignedAmount: '', notes: '' });
-        fetchAssignments();
-        fetchJobs();
+        
+        // Fetch updated data before closing modal
+        await fetchAssignments();
+        await fetchJobs();
+        
+        // Close modal after data is refreshed
+        setShowAssignModal(false);
         setTimeout(() => setMessage(''), 3000);
       } else {
         const error = await response.json();
@@ -1648,6 +1697,131 @@ function PettyCash() {
         </div>
       )}
 
+      {/* Cash Withdrawals Section */}
+      {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
+        <div className="card">
+          <div className="card-header collapsible-header" onClick={() => setWithdrawalsCollapsed(c => !c)}>
+            <h2>Cash Withdrawals from Bank ({getFilteredCashWithdrawals().length})</h2>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowWithdrawalModal(true);
+                }} 
+                className="btn btn-primary"
+              >
+                + Record Withdrawal
+              </button>
+              <svg
+                className={`collapse-arrow ${withdrawalsCollapsed ? 'collapsed' : ''}`}
+                width="20" height="20" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
+          </div>
+
+          {!withdrawalsCollapsed && (
+            <div className="card-body">
+              {/* Month and Year Filters */}
+              <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Month</label>
+                  <select 
+                    value={withdrawalFilterMonth} 
+                    onChange={(e) => setWithdrawalFilterMonth(parseInt(e.target.value))}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={1}>January</option>
+                    <option value={2}>February</option>
+                    <option value={3}>March</option>
+                    <option value={4}>April</option>
+                    <option value={5}>May</option>
+                    <option value={6}>June</option>
+                    <option value={7}>July</option>
+                    <option value={8}>August</option>
+                    <option value={9}>September</option>
+                    <option value={10}>October</option>
+                    <option value={11}>November</option>
+                    <option value={12}>December</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Year</label>
+                  <select 
+                    value={withdrawalFilterYear} 
+                    onChange={(e) => setWithdrawalFilterYear(parseInt(e.target.value))}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {[2024, 2025, 2026, 2027].map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {getFilteredCashWithdrawals().length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
+                  No cash withdrawals recorded for this period
+                </p>
+              ) : (
+                <div className="assignments-table-wrapper">
+                  <table className="assignments-table-modern">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '160px' }}>Withdrawal ID</th>
+                        <th style={{ width: '140px' }}>Date</th>
+                        <th style={{ width: '220px' }}>Bank Name</th>
+                        <th style={{ width: '180px' }}>Amount</th>
+                        <th style={{ width: '200px' }}>Recorded By</th>
+                        <th style={{ minWidth: '250px' }}>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getFilteredCashWithdrawals().map((withdrawal) => (
+                        <tr key={withdrawal.withdrawalId} className="assignment-row">
+                          <td>
+                            <span className="assignment-id">{withdrawal.withdrawalId}</span>
+                          </td>
+                          <td>{new Date(withdrawal.withdrawalDate).toLocaleDateString()}</td>
+                          <td>{withdrawal.bankName}</td>
+                          <td>
+                            <span className="amount-badge">
+                              LKR {formatAmount(withdrawal.amount)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="assigned-to-name">
+                              {withdrawal.createdByName || withdrawal.createdBy}
+                            </span>
+                          </td>
+                          <td style={{ color: withdrawal.notes ? '#374151' : '#9ca3af' }}>
+                            {withdrawal.notes || 'No notes'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Management Settlement Section */}
       {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
         <ManagementSettlementSection user={user} />
@@ -2350,12 +2524,13 @@ function PettyCash() {
       </div>
       {/* Assign Petty Cash Modal */}
       {showAssignModal && (
-        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-          <div className="modal modal-medium" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-medium">
             <div className="modal-header">
               <h2>Assign Petty Cash</h2>
               <button className="btn-close" onClick={() => setShowAssignModal(false)}>×</button>
             </div>
+
             <form onSubmit={handleAssignSubmit} className="petty-cash-form">
               <div className="form-group">
                 <label>Select Job <span className="required">*</span></label>
@@ -2429,7 +2604,12 @@ function PettyCash() {
                 <button type="button" onClick={() => setShowAssignModal(false)} className="btn btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">Assign Petty Cash</button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                >
+                  Assign Petty Cash
+                </button>
               </div>
             </form>
           </div>
@@ -2438,14 +2618,8 @@ function PettyCash() {
 
       {/* Settlement Modal */}
       {showSettleModal && selectedAssignment && (
-        <div className="modal-overlay" onClick={() => {
-          if (selectedAssignment.status !== 'Settled') {
-            setShowSettleModal(false);
-            setSelectedAssignment(null);
-            setSettlementItems([]);
-          }
-        }}>
-          <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large modal-scrollable">
             <div className="modal-header">
               <h2>{(selectedAssignment.status === 'Settled' || selectedAssignment.status === 'Pending Approval' || selectedAssignment.status === 'Settled/Approved' || selectedAssignment.status === 'Settled/Rejected' || selectedAssignment.status === 'Balance Returned' || selectedAssignment.status === 'Overdue Collected' || selectedAssignment.status === 'Full Petty Cash Returned') ? 'Settlement Details' : 'Settle Petty Cash'}</h2>
               <button className="btn-close" onClick={() => {
@@ -2881,12 +3055,8 @@ function PettyCash() {
 
       {/* Edit Settlement Modal (from main table) */}
       {showEditSettlementModal && selectedAssignment && (
-        <div className="modal-overlay" onClick={() => {
-          setShowEditSettlementModal(false);
-          setEditSettlementItems([]);
-          setSelectedAssignment(null);
-        }}>
-          <div className="modal modal-large modal-scrollable" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large modal-scrollable">
             <div className="modal-header">
               <h2>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px', verticalAlign: 'middle'}}>
@@ -3065,6 +3235,13 @@ function PettyCash() {
           </div>
         </div>
       )}
+
+      {/* Cash Withdrawal Modal */}
+      <CashWithdrawalModal
+        show={showWithdrawalModal}
+        onClose={() => setShowWithdrawalModal(false)}
+        onSubmit={handleWithdrawalSubmit}
+      />
     </div>
   );
 }

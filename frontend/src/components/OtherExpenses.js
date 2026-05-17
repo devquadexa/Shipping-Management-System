@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { otherExpenseService } from '../api/services/otherExpenseService';
+import { formatDate } from '../utils/dateFormatter';
 import '../styles/OtherExpenses.css';
 
 // Predefined expense categories
@@ -62,11 +63,21 @@ function OtherExpenses() {
     return user && ['Admin', 'Super Admin'].includes(user.role);
   };
 
+  // Format amount with commas
+  const formatAmount = (amount) => {
+    return parseFloat(amount || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   useEffect(() => {
     if (hasAccess()) {
       fetchExpenses();
     }
   }, [user]);
+
+
 
   const fetchExpenses = async () => {
     try {
@@ -84,6 +95,7 @@ function OtherExpenses() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     try {
       if (isEditing) {
         await otherExpenseService.update(selectedExpense.expenseId, formData);
@@ -94,13 +106,13 @@ function OtherExpenses() {
       }
       setMessageType('success');
       resetForm();
-      fetchExpenses();
+      await fetchExpenses();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error saving expense:', error);
       setMessage(error.response?.data?.message || 'Error saving expense');
       setMessageType('error');
-      setTimeout(() => setMessage(''), 5000);
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -159,10 +171,6 @@ function OtherExpenses() {
 
   const formatCurrency = (amount) => {
     return `LKR ${parseFloat(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  const formatDate = (date) => {
-    return date ? new Date(date).toLocaleDateString('en-GB') : '-';
   };
 
   // Filter expenses
@@ -342,12 +350,13 @@ function OtherExpenses() {
 
       {/* Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={resetForm}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal">
             <div className="modal-header">
               <h2>{isEditing ? 'Edit Expense' : 'New Expense'}</h2>
               <button className="btn-close" onClick={resetForm}>×</button>
             </div>
+
             <form onSubmit={handleSubmit} className="expense-form">
               <div className="form-row">
                 <div className="form-group">
@@ -459,7 +468,10 @@ function OtherExpenses() {
                 <button type="button" onClick={resetForm} className="btn btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                >
                   {isEditing ? 'Update Expense' : 'Create Expense'}
                 </button>
               </div>

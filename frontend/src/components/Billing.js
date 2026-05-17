@@ -4,9 +4,12 @@ import { billingService } from '../api/services/billingService';
 import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
 import { transporterService } from '../api/services/transporterService';
+import { invoiceReviewService } from '../api/services/invoiceReviewService';
 import API_BASE from '../api/config';
 import apiClient from '../api/client';
 import Pagination from './Pagination';
+import ReviewInvoiceModal from './ReviewInvoiceModal';
+import { formatDate, formatDateWithMonth, formatDateWithFullMonth } from '../utils/dateFormatter';
 import '../styles/Billing.css';
 
 function Billing() {
@@ -24,13 +27,35 @@ function Billing() {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
   };
 
-  const getTransporterCostItem = () => ({
-    name: 'transporter cost',
-    actualCost: '',
-    billingAmount: '',
-    sameAmount: false,
-    hasBill: false
-  });
+  const getTransporterCostItem = () => {
+    // Always build transporter cost description with place names
+    const fromPlace = selectedJob?.exporter || 'placename';
+    const toPlace = selectedJob?.exporter || 'placename';
+    const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
+    
+    return {
+      name: description,
+      actualCost: '',
+      billingAmount: '',
+      sameAmount: false,
+      hasBill: false
+    };
+  };
+
+  // Transform pay item description to add prefix if it's a transporter cost
+  const getDisplayDescription = (item, job = selectedJob) => {
+    const description = item.description || item.name || '';
+    const normalized = description.toLowerCase().trim();
+    
+    // If it's the old format transporter cost, add the prefix
+    if (normalized === 'transporter cost' && job) {
+      const fromPlace = job.exporter || 'placename';
+      const toPlace = job.transporter || 'placename';
+      return `transporter cost (from ${fromPlace} to ${toPlace})`;
+    }
+    
+    return description;
+  };
 
   const getBlankPayItem = () => ({
     name: '',
@@ -43,12 +68,15 @@ function Billing() {
   const hasTransporterCostItem = (items) => {
     return Array.isArray(items) && items.some(item => {
       const label = (item?.name || item?.description || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
   };
 
   const isTransporterCostLabel = (value) => {
-    return String(value || '').toLowerCase().trim() === 'transporter cost';
+    const normalized = String(value || '').toLowerCase().trim();
+    // Only check for new format with place names
+    return normalized.startsWith('transporter cost (from');
   };
 
   const mergeTransporterCostItems = (items) => {
@@ -69,7 +97,7 @@ function Billing() {
       if (!transporterAccumulator) {
         transporterAccumulator = {
           ...item,
-          description: 'transporter cost',
+          description: description, // Keep the full description with place names
           amount: parseFloat(item.amount || item.actualCost || 0) || 0,
           actualCost: parseFloat(item.actualCost || item.amount || 0) || 0,
           billingAmount: parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0
@@ -110,18 +138,11 @@ function Billing() {
     return ensureFclTransporterCost([], shipmentCategory);
   };
 
-  const formatDateDDMMYYYY = (dateValue) => {
-    if (!dateValue) return '';
-
-    const normalized = String(dateValue).split('T')[0];
-    const dateParts = normalized.split('-');
-    if (dateParts.length === 3) {
-      const [year, month, day] = dateParts;
-      return `${day}/${month}/${year}`;
+  const getAssignedClerks = () => {
+    if (!selectedJob || !selectedJob.assignedUsers) {
+      return [];
     }
-
-    const parsed = new Date(dateValue);
-    return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleDateString('en-GB');
+    return selectedJob.assignedUsers;
   };
 
   const formatCusdecNumberForDisplay = (value) => {
@@ -136,7 +157,7 @@ function Billing() {
     const formattedNumber = formatCusdecNumberForDisplay(cusdecNumber);
     if (!formattedNumber) return '-';
 
-    const formattedDate = formatDateDDMMYYYY(cusdecDate);
+    const formattedDate = formatDate(cusdecDate);
     return formattedDate ? `${formattedNumber} of ${formattedDate}` : formattedNumber;
   };
 
@@ -175,6 +196,12 @@ function Billing() {
   const [partialPaymentAmount, setPartialPaymentAmount] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(20);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [customerFilter, setCustomerFilter] = useState('All');
+  
+  // Review Invoice states
+  const [showReviewInvoiceModal, setShowReviewInvoiceModal] = useState(false);
+  const [reviewInvoiceLoading, setReviewInvoiceLoading] = useState(false);
 
   useEffect(() => {
     fetchBills();
@@ -504,11 +531,23 @@ function Billing() {
   };
 
   const addTransporterCostRow = () => {
+    // Check if transporter cost already exists
+    if (hasTransporterCostItem(payItems)) {
+      setMessage('Transporter cost is already added. Use the existing row or remove it first.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
     setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
     setShowPayItemsRow(true);
   };
 
   const addTransporterCostFromHeader = () => {
+    // Check if transporter cost already exists
+    if (hasTransporterCostItem(payItems)) {
+      setMessage('Transporter cost is already added. Use the existing row or remove it first.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
     setShowPayItemsRow(true);
     setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
   };
@@ -1005,6 +1044,7 @@ function Billing() {
         console.warn('Could not close petty cash assignments from frontend:', err.message);
       }
 
+      const customerName = customers.find(c => c.customerId === selectedJob.customerId)?.name || selectedJob.customerId;
       setMessage('Invoice generated successfully!');
       setSelectedJob(null);
       fetchBills();
@@ -1014,6 +1054,26 @@ function Billing() {
       console.error('Error generating invoice:', error);
       setMessage('Error generating invoice');
       setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const handleReviewInvoiceSubmit = async (reviewData) => {
+    setReviewInvoiceLoading(true);
+    try {
+      console.log('Sending review data:', reviewData);
+      const response = await invoiceReviewService.sendReview(reviewData);
+      console.log('Review sent successfully:', response);
+      setMessage('Invoice review sent successfully');
+      setTimeout(() => setMessage(''), 3000);
+      setShowReviewInvoiceModal(false);
+    } catch (error) {
+      console.error('Error sending invoice review:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      const errorMessage = error.response?.data?.message || error.message || 'Error sending invoice review';
+      setMessage(errorMessage);
+      setTimeout(() => setMessage(''), 5000);
+    } finally {
+      setReviewInvoiceLoading(false);
     }
   };
 
@@ -1288,7 +1348,7 @@ function Billing() {
 
   const generateBillHTML = (bill, job, customer, mode = 'color') => {
     const isColorMode = mode === 'color';
-    const billDate = new Date(bill.billDate || bill.createdDate).toLocaleDateString('en-GB');
+    const billDate = formatDate(bill.billDate || bill.createdDate);
     const invoiceNumber = bill.invoiceNumber || bill.billId;
     const invoiceLogoUrl = `${window.location.origin}/logo2.png`;
     
@@ -1302,10 +1362,7 @@ function Billing() {
     // Use job's advance payment if bill doesn't have it
     const advancePayment = parseFloat(bill.advancePayment || job.advancePayment || 0);
     const rawAdvancePaymentDate = bill.advancePaymentDate || bill.paymentMadeDate || job.advancePaymentDate || job.paymentMadeDate;
-    const parsedAdvancePaymentDate = rawAdvancePaymentDate ? new Date(rawAdvancePaymentDate) : null;
-    const advancePaymentDateText = parsedAdvancePaymentDate && !Number.isNaN(parsedAdvancePaymentDate.getTime())
-      ? parsedAdvancePaymentDate.toLocaleDateString('en-GB')
-      : '-';
+    const advancePaymentDateText = formatDate(rawAdvancePaymentDate);
     const advancePaymentLabel = `Advance payment (${advancePaymentDateText})`;
     const grossTotal = parseFloat(bill.grossTotal || bill.billingAmount || 0);
     const netTotal = grossTotal - advancePayment; // Always calculate, don't use bill.netTotal
@@ -1342,7 +1399,16 @@ function Billing() {
     }
 
     const printablePayItems = payItemsArray.map((item, index) => {
-      const description = item.description || item.name || 'Service Charge';
+      let description = item.description || item.name || 'Service Charge';
+      
+      // Always transform to new format with place names
+      const normalized = description.toLowerCase().trim();
+      if (normalized.startsWith('transporter cost')) {
+        const fromPlace = job.exporter || 'placename';
+        const toPlace = job.transporter || 'placename';
+        description = `transporter cost (from ${fromPlace} to ${toPlace})`;
+      }
+      
       const amount = parseFloat(item.billingAmount || item.amount || 0) || 0;
       const payItemId = item.id || item.payItemId || item.officePayItemId || `PI${String(index + 1).padStart(3, '0')}`;
 
@@ -1389,13 +1455,19 @@ function Billing() {
 
     // Add transporter cost for FCL shipments
     if (job.shipmentCategory === 'FCL') {
-      const hasTransporterCost = payItemsArray.some(item => 
-        (item.name || item.description)?.toLowerCase() === 'transporter cost'
-      );
+      const hasTransporterCost = payItemsArray.some(item => {
+        const label = (item?.name || item?.description || '').toLowerCase().trim();
+        // Check if any transporter cost exists (old or new format)
+        return label.startsWith('transporter cost');
+      });
       if (!hasTransporterCost) {
+        // Always use new format with place names
+        const fromPlace = job.exporter || 'placename';
+        const toPlace = job.transporter || 'placename';
+        const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
         payItemsArray.push({
-          name: 'Transporter Cost',
-          description: 'Transporter Cost',
+          name: description,
+          description: description,
           billingAmount: 0,
           amount: 0
         });
@@ -1808,11 +1880,18 @@ function Billing() {
     );
   }
 
+  // Filter bills based on status and customer
+  const filteredBills = bills.filter(bill => {
+    const matchesStatus = statusFilter === 'All' || (bill.paymentStatus || 'Unpaid') === statusFilter;
+    const matchesCustomer = customerFilter === 'All' || bill.customerId === customerFilter;
+    return matchesStatus && matchesCustomer;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(bills.length / recordsPerPage);
+  const totalPages = Math.ceil(filteredBills.length / recordsPerPage);
   const indexOfLastRecord = currentPage * recordsPerPage;
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage;
-  const currentRecords = bills.slice(indexOfFirstRecord, indexOfLastRecord);
+  const currentRecords = filteredBills.slice(indexOfFirstRecord, indexOfLastRecord);
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
@@ -1957,7 +2036,7 @@ function Billing() {
                        <span className="required-indicator">*Required</span>}
                     </span>
                     <span className={`info-value ${selectedJob.shipmentCategory === 'FCL' && (!selectedJob.transportDeliveryDate || (typeof selectedJob.transportDeliveryDate === 'string' && selectedJob.transportDeliveryDate.trim() === '')) ? 'missing-value' : ''}`}>
-                      {selectedJob.transportDeliveryDate ? new Date(selectedJob.transportDeliveryDate).toLocaleDateString() : '-'}
+                      {formatDate(selectedJob.transportDeliveryDate)}
                     </span>
                   </div>
                   <div className="info-row">
@@ -2213,9 +2292,21 @@ function Billing() {
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedJob.payItems.map((item, idx) => (
+                        {selectedJob.payItems.map((item, idx) => {
+                          const itemDescription = item.description || item.name || '';
+                          let displayDescription = itemDescription;
+                          
+                          // Always transform to new format with place names
+                          const normalized = itemDescription.toLowerCase().trim();
+                          if (normalized.startsWith('transporter cost')) {
+                            const fromPlace = selectedJob.exporter || 'placename';
+                            const toPlace = selectedJob.transporter || 'placename';
+                            displayDescription = `transporter cost (from ${fromPlace} to ${toPlace})`;
+                          }
+                          
+                          return (
                           <tr key={idx} className="pay-item-row">
-                            <td className="col-description">{item.description}</td>
+                            <td className="col-description">{displayDescription}</td>
                             <td className="col-amount">
                               {formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}
                             </td>
@@ -2256,7 +2347,8 @@ function Billing() {
                               </td>
                             )}
                           </tr>
-                        ))}
+                        );
+                        })}
                       </tbody>
                       <tfoot>
                         {/* Total Row */}
@@ -2310,12 +2402,19 @@ function Billing() {
                     </table>
 
                     <div className="generate-bill-section">
+                      <button 
+                        onClick={() => setShowReviewInvoiceModal(true)} 
+                        className="btn btn-secondary btn-small"
+                        disabled={!selectedJob || !selectedJob.payItems || selectedJob.payItems.length === 0 || !getAssignedClerks().length}
+                      >
+                        📋 Review Invoice
+                      </button>
                       <button onClick={generateBill} className="btn btn-primary btn-small">
                         ✓ Generate Invoice
                       </button>
                       {showValidationModal && (
-                        <div className="validation-modal-overlay" onClick={() => setShowValidationModal(false)}>
-                          <div className="validation-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="validation-modal-overlay">
+                          <div className="validation-modal">
                             <div className="validation-modal-header">
                               <h3>⚠️ Cannot Generate Invoice</h3>
                               <button className="modal-close-btn" onClick={() => setShowValidationModal(false)}>×</button>
@@ -2346,24 +2445,86 @@ function Billing() {
 
       <div className="card">
         <div className="card-header">
-          <h2>Generated Invoices ({bills.length})</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Print Mode</span>
-            <select
-              value={printMode}
-              onChange={(e) => setPrintMode(e.target.value)}
-              className="form-control"
-              style={{ minWidth: '180px', padding: '6px 10px' }}
-            >
-              <option value="color">Color (Theme)</option>
-              <option value="bw">Black & White</option>
-            </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h2>Generated Invoices ({filteredBills.length})</h2>
+            {(statusFilter !== 'All' || customerFilter !== 'All') && (
+              <button
+                onClick={() => {
+                  setStatusFilter('All');
+                  setCustomerFilter('All');
+                  setCurrentPage(1);
+                }}
+                className="btn-secondary"
+                style={{ 
+                  padding: '4px 12px', 
+                  fontSize: '12px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+                title="Clear all filters"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Status</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="form-control"
+                style={{ minWidth: '150px', padding: '6px 10px' }}
+              >
+                <option value="All">All Status</option>
+                <option value="Paid">Paid</option>
+                <option value="Partially Paid">Partially Paid</option>
+                <option value="Unpaid">Unpaid</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Customer</span>
+              <select
+                value={customerFilter}
+                onChange={(e) => {
+                  setCustomerFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="form-control"
+                style={{ minWidth: '200px', padding: '6px 10px' }}
+              >
+                <option value="All">All Customers</option>
+                {customers.map(customer => (
+                  <option key={customer.customerId} value={customer.customerId}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Print Mode</span>
+              <select
+                value={printMode}
+                onChange={(e) => setPrintMode(e.target.value)}
+                className="form-control"
+                style={{ minWidth: '180px', padding: '6px 10px' }}
+              >
+                <option value="color">Color (Theme)</option>
+                <option value="bw">Black & White</option>
+              </select>
+            </div>
           </div>
         </div>
-        {bills.length === 0 ? (
+        {filteredBills.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">📄</div>
-            <p>No invoices generated yet</p>
+            <p>{bills.length === 0 ? 'No invoices generated yet' : 'No invoices match the selected filters'}</p>
           </div>
         ) : (
           <div className="billing-table-wrapper">
@@ -2388,12 +2549,12 @@ function Billing() {
                       <td data-label="Job ID">{bill.jobId}</td>
                       <td data-label="Customer">{getCustomerName(bill.customerId)}</td>
                       <td data-label="Invoice Date">
-                        {bill.invoiceDate ? new Date(bill.invoiceDate).toLocaleDateString() : '-'}
+                        {formatDate(bill.invoiceDate)}
                       </td>
                       <td data-label="Due Date">
                         {bill.dueDate ? (
                           <div className="due-date-cell">
-                            {new Date(bill.dueDate).toLocaleDateString()}
+                            {formatDate(bill.dueDate)}
                             {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
                           </div>
                         ) : '-'}
@@ -2528,11 +2689,7 @@ function Billing() {
                                               <span className="payment-num">{idx + 1}</span>
                                             </div>
                                             <div className="payment-table-cell payment-date-col">
-                                              {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('en-US', {
-                                                year: 'numeric',
-                                                month: 'short',
-                                                day: 'numeric'
-                                              }) : '-'}
+                                              {formatDateWithMonth(payment.paymentDate)}
                                             </div>
                                             <div className="payment-table-cell payment-method-col">
                                               <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
@@ -2568,11 +2725,7 @@ function Billing() {
                                           <span className="payment-num">1</span>
                                         </div>
                                         <div className="payment-table-cell payment-date-col">
-                                          {bill.paidDate ? new Date(bill.paidDate).toLocaleDateString('en-US', {
-                                            year: 'numeric',
-                                            month: 'short',
-                                            day: 'numeric'
-                                          }) : '-'}
+                                          {formatDateWithMonth(bill.paidDate)}
                                         </div>
                                         <div className="payment-table-cell payment-method-col">
                                           <span className={`payment-method-badge payment-method-${bill.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
@@ -2642,11 +2795,7 @@ function Billing() {
                                     <div className="payment-detail-card">
                                       <div className="payment-detail-label">Payment Date</div>
                                       <div className="payment-detail-value">
-                                        {new Date(bill.paidDate).toLocaleDateString('en-US', {
-                                          year: 'numeric',
-                                          month: 'long',
-                                          day: 'numeric'
-                                        })}
+                                        {formatDateWithFullMonth(bill.paidDate)}
                                       </div>
                                     </div>
                                   )}
@@ -2665,11 +2814,7 @@ function Billing() {
                                         <div className="payment-detail-card">
                                           <div className="payment-detail-label">Cheque Date</div>
                                           <div className="payment-detail-value">
-                                            {new Date(bill.chequeDate).toLocaleDateString('en-US', {
-                                              year: 'numeric',
-                                              month: 'long',
-                                              day: 'numeric'
-                                            })}
+                                            {formatDateWithFullMonth(bill.chequeDate)}
                                           </div>
                                         </div>
                                       )}
@@ -3062,6 +3207,16 @@ function Billing() {
           </div>
         </div>
       )}
+
+      {/* Review Invoice Modal */}
+      <ReviewInvoiceModal
+        show={showReviewInvoiceModal}
+        onClose={() => setShowReviewInvoiceModal(false)}
+        job={selectedJob}
+        assignedClerks={getAssignedClerks()}
+        onSubmit={handleReviewInvoiceSubmit}
+        loading={reviewInvoiceLoading}
+      />
 
     </div>
   );

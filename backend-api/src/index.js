@@ -12,6 +12,8 @@ const jobRoutes = require('./presentation/routes/jobs');
 const jobAssignmentRoutes = require('./presentation/routes/jobAssignments');
 const billingRoutes = require('./presentation/routes/billing');
 const pettyCashRoutes = require('./presentation/routes/pettycash');
+const cashWithdrawalRoutes = require('./presentation/routes/cashWithdrawalRoutes');
+const cashSummaryRoutes = require('./presentation/routes/cashSummaryRoutes');
 const payItemTemplateRoutes = require('./presentation/routes/payItemTemplateRoutes');
 const pettyCashAssignmentRoutes = require('./presentation/routes/pettyCashAssignmentRoutes');
 const pettyCashReportRoutes = require('./presentation/routes/pettyCashReportRoutes');
@@ -23,9 +25,12 @@ const cashBalanceSettlementRoutes = require('./presentation/routes/cashBalanceSe
 const oldInvoiceRoutes = require('./presentation/routes/oldInvoices');
 const paymentRoutes = require('./presentation/routes/paymentRoutes');
 const otherExpenseRoutes = require('./presentation/routes/otherExpense');
+const invoiceReviewRoutes = require('./presentation/routes/invoiceReviewRoutes');
+const notificationRoutes = require('./presentation/routes/notificationRoutes');
 const { getConnection } = require('./config/database');
 const container = require('./infrastructure/di/container');
 const { startOverdueChecker } = require('./infrastructure/scheduler/overdueChecker');
+const sql = require('mssql');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -54,6 +59,8 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/job-assignments', jobAssignmentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/petty-cash', pettyCashRoutes);
+app.use('/api/cash-withdrawals', cashWithdrawalRoutes);
+app.use('/api/cash-summary', cashSummaryRoutes);
 app.use('/api/pay-item-templates', payItemTemplateRoutes(container));
 app.use('/api/petty-cash-assignments', pettyCashAssignmentRoutes(container));
 app.use('/api/pettycash-assignment', pettyCashReportRoutes(container));
@@ -65,6 +72,8 @@ app.use('/api/cash-balance-settlements', cashBalanceSettlementRoutes(container))
 app.use('/api/old-invoices', oldInvoiceRoutes(container));
 app.use('/api/payments', paymentRoutes);
 app.use('/api/other-expenses', otherExpenseRoutes(container));
+app.use('/api/invoice-reviews', invoiceReviewRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, '../../frontend/build')));

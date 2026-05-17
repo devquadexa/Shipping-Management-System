@@ -665,8 +665,8 @@ function OldInvoices() {
 
       {/* Add/Edit Invoice Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content">
             <div className="modal-header">
               <h2>{editingInvoice ? 'Edit Old Invoice' : 'Add Old Invoice'}</h2>
               <button className="modal-close" onClick={handleCloseModal}>×</button>
@@ -799,8 +799,8 @@ function OldInvoices() {
 
       {/* Add Payment Modal */}
       {showPaymentModal && selectedInvoice && (
-        <div className="modal-overlay" onClick={handleClosePaymentModal}>
-          <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content modal-small">
             <div className="modal-header">
               <h2>Add Payment</h2>
               <button className="modal-close" onClick={handleClosePaymentModal}>×</button>

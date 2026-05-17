@@ -176,6 +176,7 @@ function Jobs() {
         }
       }
       
+      const customerName = customers.find(c => c.customerId === formData.customerId)?.name || formData.customerId;
       setMessage(`Job created successfully${assignmentMessage}!`);
       setFormData({ 
         customerId: '', 
@@ -765,8 +766,8 @@ function Jobs() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal">
             <div className="modal-header">
               <h2>{isEditing ? 'Edit Job' : 'Create New Job'}</h2>
               <button className="btn-close" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }}>×</button>

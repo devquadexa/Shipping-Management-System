@@ -76,7 +76,8 @@ function AppContent() {
 
         <div className={`main-content ${user && !isSidebarHidden ? 'with-sidebar' : ''}`}>
 
-        <Routes>
+        <div className={user ? "main-content" : ""}>
+          <Routes>
           <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -85,6 +86,7 @@ function AppContent() {
           <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
           <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
           <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+          <Route path="/invoice-reviews" element={<PrivateRoute><InvoiceReviewPage /></PrivateRoute>} />
           <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
           <Route path="/old-invoices" element={<PrivateRoute><OldInvoices /></PrivateRoute>} />
           <Route path="/other-expenses" element={<PrivateRoute><OtherExpenses /></PrivateRoute>} />
@@ -129,6 +131,10 @@ function AppContent() {
           <Route
             path="/reports/other-expenses"
             element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
+          />
+          <Route
+            path="/reports/cash-summary"
+            element={<PrivateRoute><AdminRoute><CashSummaryReport /></AdminRoute></PrivateRoute>}
           />
 
           <Route

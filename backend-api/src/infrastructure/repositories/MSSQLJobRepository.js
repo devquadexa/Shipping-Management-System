@@ -162,7 +162,7 @@ class MSSQLJobRepository extends IJobRepository {
     }
     
     let query = `
-      SELECT 
+      SELECT DISTINCT
         j.*,
         b.netTotal as billTotalAmount,
         b.paidAmount as billPaidAmount
