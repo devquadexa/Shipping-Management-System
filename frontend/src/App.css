@@ -1033,9 +1033,13 @@
 .btn-primary {
   background: linear-gradient(135deg, #101036 0%, #1a1a4d 100%);
   color: white;
+  background-color: #101036;
+  background-attachment: fixed;
 }
 
 .btn-primary:hover {
+  background: linear-gradient(135deg, #1a1a4d 0%, #2d3561 100%);
+  color: white;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(16, 16, 54, 0.4);
 }
