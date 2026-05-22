@@ -36,7 +36,8 @@ function OtherExpenses() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
-  const [recordsPerPage] = useState(20);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
+  const [expandedRow, setExpandedRow] = useState(null);
 
   const [formData, setFormData] = useState({
     category: '',
@@ -232,7 +233,6 @@ function OtherExpenses() {
           <h2>All Expenses ({filteredExpenses.length})</h2>
           <div className="filters-container">
             <div className="filter-group">
-              <label htmlFor="categoryFilter">Category:</label>
               <select
                 id="categoryFilter"
                 value={categoryFilter}
@@ -266,7 +266,7 @@ function OtherExpenses() {
           </div>
         ) : (
           <>
-            <div className="table-wrapper">
+            <div className="expenses-table-wrapper">
               <table className="expenses-table">
                 <thead>
                   <tr>
@@ -277,46 +277,113 @@ function OtherExpenses() {
                     <th>Amount</th>
                     <th>Payment Method</th>
                     <th>Recorded By</th>
-                    {canEditDelete() && <th>Actions</th>}
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {currentRecords.map(expense => (
-                    <tr key={expense.expenseId}>
-                      <td data-label="Expense ID">
-                        <span className="expense-id">{expense.expenseId}</span>
-                      </td>
-                      <td data-label="Date">{formatDate(expense.expenseDate)}</td>
-                      <td data-label="Category">
-                        <span className="category-badge">{expense.category}</span>
-                      </td>
-                      <td data-label="Description">{expense.description}</td>
-                      <td data-label="Amount" className="amount-cell">
-                        {formatCurrency(expense.amount)}
-                      </td>
-                      <td data-label="Payment Method">{expense.paymentMethod || '-'}</td>
-                      <td data-label="Recorded By">{expense.recordedByName || '-'}</td>
-                      {canEditDelete() && (
+                    <React.Fragment key={expense.expenseId}>
+                      <tr className={expandedRow === expense.expenseId ? 'expanded' : ''}>
+                        <td data-label="Expense ID">
+                          <strong className="expense-id">{expense.expenseId}</strong>
+                        </td>
+                        <td data-label="Date">{formatDate(expense.expenseDate)}</td>
+                        <td data-label="Category">
+                          <span className="category-badge">{expense.category}</span>
+                        </td>
+                        <td data-label="Description">{expense.description}</td>
+                        <td data-label="Amount" className="amount-cell">
+                          {formatCurrency(expense.amount)}
+                        </td>
+                        <td data-label="Payment Method">{expense.paymentMethod || '-'}</td>
+                        <td data-label="Recorded By">{expense.recordedByName || '-'}</td>
                         <td data-label="Actions">
-                          <div className="action-buttons">
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {canEditDelete() && (
+                              <button
+                                className="btn-action btn-edit"
+                                onClick={() => handleEdit(expense)}
+                                title="Edit Expense"
+                              >
+                                Edit
+                              </button>
+                            )}
                             <button
-                              className="btn-action btn-edit"
-                              onClick={() => handleEdit(expense)}
-                              title="Edit Expense"
+                              className="btn-action btn-view"
+                              onClick={() => setExpandedRow(expandedRow === expense.expenseId ? null : expense.expenseId)}
+                              title="View Details"
                             >
-                              Edit
+                              {expandedRow === expense.expenseId ? 'Hide' : 'View'}
                             </button>
-                            <button
-                              className="btn-action btn-delete"
-                              onClick={() => handleDelete(expense.expenseId)}
-                              title="Delete Expense"
-                            >
-                              Delete
-                            </button>
+                            {canEditDelete() && (
+                              <button
+                                className="btn-action btn-delete"
+                                onClick={() => handleDelete(expense.expenseId)}
+                                title="Delete Expense"
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </td>
+                      </tr>
+                      {expandedRow === expense.expenseId && (
+                        <tr className="expanded-details">
+                          <td colSpan="8">
+                            <div className="details-grid">
+                              <div className="detail-section">
+                                <h4 className="section-title">Expense Details</h4>
+                                <div className="detail-item">
+                                  <span className="detail-label">Category:</span>
+                                  <span className="detail-value">{expense.category}</span>
+                                </div>
+                                <div className="detail-item">
+                                  <span className="detail-label">Date:</span>
+                                  <span className="detail-value">{formatDate(expense.expenseDate)}</span>
+                                </div>
+                                <div className="detail-item">
+                                  <span className="detail-label">Amount:</span>
+                                  <span className="detail-value">{formatCurrency(expense.amount)}</span>
+                                </div>
+                              </div>
+
+                              <div className="detail-section">
+                                <h4 className="section-title">Payment Information</h4>
+                                <div className="detail-item">
+                                  <span className="detail-label">Payment Method:</span>
+                                  <span className="detail-value">{expense.paymentMethod || '-'}</span>
+                                </div>
+                                {expense.referenceNumber && (
+                                  <div className="detail-item">
+                                    <span className="detail-label">Reference Number:</span>
+                                    <span className="detail-value">{expense.referenceNumber}</span>
+                                  </div>
+                                )}
+                                <div className="detail-item">
+                                  <span className="detail-label">Recorded By:</span>
+                                  <span className="detail-value">{expense.recordedByName || '-'}</span>
+                                </div>
+                              </div>
+
+                              <div className="detail-section">
+                                <h4 className="section-title">Description</h4>
+                                <div className="detail-item-block">
+                                  <span className="detail-value-block">{expense.description}</span>
+                                </div>
+                                {expense.notes && (
+                                  <>
+                                    <h4 className="section-title" style={{ marginTop: '0.75rem' }}>Notes</h4>
+                                    <div className="detail-item-block">
+                                      <span className="detail-value-block">{expense.notes}</span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </tr>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

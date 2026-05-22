@@ -34,8 +34,8 @@ function Sidebar({ isOpen, onClose }) {
   const isSuperAdmin = user?.role === 'Super Admin';
   const canAccessTransporters = ['Admin', 'Super Admin', 'Manager', 'Office Executive'].includes(user?.role);
   const canAccessBilling = ['Admin', 'Super Admin', 'Manager'].includes(user?.role);
-  const canAccessOldInvoices = ['Admin', 'Super Admin', 'Manager', 'Office Executive'].includes(user?.role);
   const canAccessPettyCash = ['Admin', 'Super Admin', 'Manager', 'Waff Clerk'].includes(user?.role);
+  const canAccessInvoiceReviews = user?.role === 'Waff Clerk';
   const canAccessOtherExpenses = ['Admin', 'Super Admin', 'Manager'].includes(user?.role);
   const canAccessAccounting = isSuperAdmin;
 
@@ -181,6 +181,22 @@ function Sidebar({ isOpen, onClose }) {
                   </Link>
                 )}
 
+                {canAccessInvoiceReviews && (
+                  <Link 
+                    to="/invoice-reviews" 
+                    className={`nav-item ${isActive('/invoice-reviews') ? 'active' : ''}`}
+                    onClick={handleLinkClick}
+                  >
+                    <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="12" y1="13" x2="8" y2="13"></line>
+                      <line x1="12" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <span>Invoice Reviews</span>
+                  </Link>
+                )}
+
                 {canAccessBilling && (
                   <Link 
                     to="/billing" 
@@ -192,22 +208,6 @@ function Sidebar({ isOpen, onClose }) {
                       <line x1="1" y1="10" x2="23" y2="10"></line>
                     </svg>
                     <span>Invoicing</span>
-                  </Link>
-                )}
-
-                {canAccessOldInvoices && (
-                  <Link 
-                    to="/old-invoices" 
-                    className={`nav-item ${isActive('/old-invoices') ? 'active' : ''}`}
-                    onClick={handleLinkClick}
-                  >
-                    <svg className="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                      <line x1="16" y1="13" x2="8" y2="13"></line>
-                      <line x1="16" y1="17" x2="8" y2="17"></line>
-                    </svg>
-                    <span>Old Invoices</span>
                   </Link>
                 )}
               </div>

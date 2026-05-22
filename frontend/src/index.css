@@ -17,3 +17,35 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Button Focus and Hover Styles */
+button {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 2px solid #101036;
+  outline-offset: 2px;
+}
+
+button:hover {
+  outline: none;
+}
+
+/* Prevent white flash on all button states */
+.btn,
+[class*="btn-"] {
+  outline: none;
+  background-clip: padding-box;
+}
+
+.btn:focus-visible,
+[class*="btn-"]:focus-visible {
+  outline: 2px solid #101036;
+  outline-offset: 2px;
+}
+
+.btn:hover,
+[class*="btn-"]:hover {
+  outline: none;
+}

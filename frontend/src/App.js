@@ -96,6 +96,7 @@ function AppContent() {
           <div className={`main-content ${!isSidebarHidden ? 'with-sidebar' : ''}`}>
             <Routes>
               <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+              <Route path="/reset-password" element={<PrivateRoute><ResetPassword /></PrivateRoute>} />
               <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
               <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
               <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
