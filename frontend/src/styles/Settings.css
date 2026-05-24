@@ -359,14 +359,31 @@
 }
 
 .btn-primary {
-  background: #101036;
-  color: white;
+  background: #101036 !important;
+  color: white !important;
+  padding: 12px 24px !important;
+  border-radius: 6px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
 }
 
 .btn-primary:hover {
-  background: #1a1a4d;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(16, 16, 54, 0.25);
+  background: #1a1a4d !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(16, 16, 54, 0.25) !important;
+  color: white !important;
+}
+
+.btn-primary:focus,
+.btn-primary:focus-visible {
+  outline: none !important;
+  background: #1a1a4d !important;
 }
 
 .btn-secondary {
