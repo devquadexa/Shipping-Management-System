@@ -140,6 +140,33 @@
   gap: 1.5rem;
 }
 
+.navbar-icon-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.navbar-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(180deg);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Profile Dropdown */
 .profile-container {
   position: relative;
@@ -960,7 +987,7 @@
 }
 
 .form-group {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.85rem;
 }
 
 .form-group label {
@@ -1006,9 +1033,13 @@
 .btn-primary {
   background: linear-gradient(135deg, #101036 0%, #1a1a4d 100%);
   color: white;
+  background-color: #101036;
+  background-attachment: fixed;
 }
 
 .btn-primary:hover {
+  background: linear-gradient(135deg, #1a1a4d 0%, #2d3561 100%);
+  color: white;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(16, 16, 54, 0.4);
 }

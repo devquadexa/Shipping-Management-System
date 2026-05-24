@@ -20,4 +20,27 @@ export const transporterService = {
     const response = await apiClient.delete(`/transporters/${transporterId}`);
     return response.data;
   },
+
+  // Payment methods
+  recordPayment: async (jobId, paymentData) => {
+    const response = await apiClient.post('/transporters/payments/record', {
+      jobId,
+      ...paymentData,
+    });
+    return response.data;
+  },
+
+  getPaymentHistory: async (transporterId, filters = {}) => {
+    const response = await apiClient.get(`/transporters/${transporterId}/payments`, {
+      params: filters,
+    });
+    return response.data;
+  },
+
+  updatePaymentStatus: async (paymentId, status) => {
+    const response = await apiClient.put(`/transporters/payments/${paymentId}/status`, {
+      status,
+    });
+    return response.data;
+  },
 };

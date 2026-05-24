@@ -797,12 +797,30 @@ function Transporters() {
     }
 
     try {
-      // Get the latest job data from the jobs array to ensure we have all existing payment records
+      // Record payment using dedicated transporter payment endpoint
+      const paymentData = {
+        amount: paymentAmount,
+        paymentMethod,
+        ...(paymentMethod === 'Cheque' && { 
+          chequeNumber, 
+          chequeDate, 
+          chequeAmount: parseFloat(chequeAmount) 
+        }),
+        ...(paymentMethod === 'Bank Transfer' && { bankName }),
+      };
+
+      const paymentResponse = await transporterService.recordPayment(
+        selectedJobForPayment.jobId,
+        paymentData
+      );
+
+      // Also update the job pay items for UI consistency
       const latestJob = jobs.find(j => j.jobId === selectedJobForPayment.jobId) || selectedJobForPayment;
       
       const updatedPayItems = (Array.isArray(latestJob.payItems) ? latestJob.payItems : []).map((item) => {
         const label = (item?.description || item?.name || '').toLowerCase().trim();
-        if (label !== 'transporter cost') return item;
+        // Match both old format "transporter cost" and new format "transporter cost (from ...)"
+        if (label !== 'transporter cost' && !label.startsWith('transporter cost (from')) return item;
 
         const itemAmount = parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0;
         const currentPaidAmount = parseFloat(item.paidAmount || 0) || 0;

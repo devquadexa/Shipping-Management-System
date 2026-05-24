@@ -70,6 +70,23 @@ function Navbar({ onMenuClick }) {
 
         {/* Profile Section */}
         <div className="navbar-right">
+          {/* Refresh Button */}
+          <button 
+            className="navbar-icon-btn" 
+            onClick={() => window.location.reload()}
+            title="Refresh page"
+            aria-label="Refresh page"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36M20.49 15a9 9 0 0 1-14.85 3.36"></path>
+            </svg>
+          </button>
+
+          {/* Notification Bell */}
+          <NotificationBell />
+
           <div className="profile-container">
             <button className="profile-button" onClick={toggleProfileDropdown} aria-label="User menu">
               <div className="profile-avatar">{getUserInitials()}</div>

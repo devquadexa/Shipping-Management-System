@@ -432,15 +432,12 @@
 }
 
 .btn-secondary {
-  background: #6b7280;
-  color: white;
-  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.2);
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #4b5563;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+  background: #bfdbfe;
 }
 
 .btn-danger {

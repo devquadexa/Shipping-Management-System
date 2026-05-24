@@ -28,6 +28,35 @@
   color: #6b7280;
 }
 
+/* Petty Cash Page Header Button Styling */
+.petty-cash-page .page-header .btn-primary {
+  background: #101036 !important;
+  color: white !important;
+  padding: 12px 24px !important;
+  border-radius: 6px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+
+.petty-cash-page .page-header .btn-primary:hover {
+  background: #1a1a4d !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(16, 16, 54, 0.25) !important;
+  color: white !important;
+}
+
+.petty-cash-page .page-header .btn-primary:focus,
+.petty-cash-page .page-header .btn-primary:focus-visible {
+  outline: none !important;
+  background: #1a1a4d !important;
+}
+
 .assignments-table-wrapper {
   overflow-x: auto;
   padding: 2rem;

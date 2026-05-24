@@ -9,13 +9,16 @@
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  position: relative;
-  padding: 0.5rem;
-  transition: transform 0.2s;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: color 0.2s ease;
 }
 
-.bell-button:hover {
-  transform: scale(1.1);
+.notification-bell-btn:hover {
+  color: #e0e0e0;
 }
 
 .badge {
