@@ -21,6 +21,7 @@ const MSSQLCashBalanceSettlementRepository = require('../repositories/MSSQLCashB
 const MSSQLOldInvoiceRepository = require('../repositories/MSSQLOldInvoiceRepository');
 const MSSQLPaymentRepository = require('../repositories/MSSQLPaymentRepository');
 const MSSQLCashWithdrawalRepository = require('../repositories/MSSQLCashWithdrawalRepository');
+const MSSQLNotificationRepository = require('../repositories/MSSQLNotificationRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -125,6 +126,13 @@ const GetPasswordResetRequests = require('../../application/use-cases/auth/GetPa
 const ApprovePasswordResetRequest = require('../../application/use-cases/auth/ApprovePasswordResetRequest');
 const RejectPasswordResetRequest = require('../../application/use-cases/auth/RejectPasswordResetRequest');
 
+// Notification Use Cases
+const CreateNotification = require('../../application/use-cases/notification/CreateNotification');
+const GetUserNotifications = require('../../application/use-cases/notification/GetUserNotifications');
+const GetUnreadNotifications = require('../../application/use-cases/notification/GetUnreadNotifications');
+const MarkNotificationAsRead = require('../../application/use-cases/notification/MarkNotificationAsRead');
+const MarkAllNotificationsAsRead = require('../../application/use-cases/notification/MarkAllNotificationsAsRead');
+
 // Repositories
 const MSSQLPasswordResetRepository = require('../repositories/MSSQLPasswordResetRepository');
 
@@ -162,6 +170,7 @@ class Container {
     this.dependencies.oldInvoiceRepository = new MSSQLOldInvoiceRepository(getConnection, sql);
     this.dependencies.paymentRepository = new MSSQLPaymentRepository(getConnection, sql);
     this.dependencies.cashWithdrawalRepository = new MSSQLCashWithdrawalRepository(getConnection, sql);
+    this.dependencies.notificationRepository = new MSSQLNotificationRepository(getConnection, sql);
   }
 
   setupUseCases() {
@@ -329,6 +338,14 @@ class Container {
       pettyCashAssignmentRepository,
       otherExpenseRepository
     );
+    
+    // Notification use cases
+    const notificationRepository = this.dependencies.notificationRepository;
+    this.dependencies.createNotification = new CreateNotification(notificationRepository);
+    this.dependencies.getUserNotifications = new GetUserNotifications(notificationRepository);
+    this.dependencies.getUnreadNotifications = new GetUnreadNotifications(notificationRepository);
+    this.dependencies.markNotificationAsRead = new MarkNotificationAsRead(notificationRepository);
+    this.dependencies.markAllNotificationsAsRead = new MarkAllNotificationsAsRead(notificationRepository);
     
     // Controllers
     this.dependencies.CashBalanceSettlementController = new CashBalanceSettlementController(this);

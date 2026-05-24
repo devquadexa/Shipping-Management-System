@@ -75,76 +75,69 @@ function AppContent() {
         )}
 
         <div className={`main-content ${user && !isSidebarHidden ? 'with-sidebar' : ''}`}>
-
-        <div className={user ? "main-content" : ""}>
           <Routes>
-          <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
-          <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
-          <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
-          <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
-          <Route path="/invoice-reviews" element={<PrivateRoute><InvoiceReviewPage /></PrivateRoute>} />
-          <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
-          <Route path="/old-invoices" element={<PrivateRoute><OldInvoices /></PrivateRoute>} />
-          <Route path="/other-expenses" element={<PrivateRoute><OtherExpenses /></PrivateRoute>} />
-          <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
-          <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
-          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
-          
-          {/* Password Reset Requests - Super Admin only */}
-          <Route 
-            path="/password-reset-requests" 
-            element={
-              <PrivateRoute>
-                {user?.role === 'Super Admin' ? <PasswordResetRequests /> : <Navigate to="/" />}
-              </PrivateRoute>
-            } 
-          />
+            <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
+            <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
+            <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+            <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
+            <Route path="/old-invoices" element={<PrivateRoute><OldInvoices /></PrivateRoute>} />
+            <Route path="/other-expenses" element={<PrivateRoute><OtherExpenses /></PrivateRoute>} />
+            <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
+            <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
+            <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+            
+            {/* Password Reset Requests - Super Admin only */}
+            <Route 
+              path="/password-reset-requests" 
+              element={
+                <PrivateRoute>
+                  {user?.role === 'Super Admin' ? <PasswordResetRequests /> : <Navigate to="/" />}
+                </PrivateRoute>
+              } 
+            />
 
-          <Route
-            path="/petty-cash"
-            element={
-              <PrivateRoute>
-                {user?.role === 'Office Executive' ? <Navigate to="/" /> : <PettyCash />}
-              </PrivateRoute>
-            }
-          />
+            <Route
+              path="/petty-cash"
+              element={
+                <PrivateRoute>
+                  {user?.role === 'Office Executive' ? <Navigate to="/" /> : <PettyCash />}
+                </PrivateRoute>
+              }
+            />
 
-          {/* Reports hub */}
-          <Route
-            path="/reports"
-            element={<PrivateRoute><AdminRoute><Reports /></AdminRoute></PrivateRoute>}
-          />
+            {/* Reports hub */}
+            <Route
+              path="/reports"
+              element={<PrivateRoute><AdminRoute><Reports /></AdminRoute></PrivateRoute>}
+            />
 
-          {/* Individual report pages — all nested under /reports/ */}
-          <Route
-            path="/reports/petty-cash"
-            element={<PrivateRoute><AdminRoute><PettyCashReport /></AdminRoute></PrivateRoute>}
-          />
-          <Route
-            path="/reports/pending-payments"
-            element={<PrivateRoute><AdminRoute><PendingPaymentsReport /></AdminRoute></PrivateRoute>}
-          />
-          <Route
-            path="/reports/other-expenses"
-            element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
-          />
-          <Route
-            path="/reports/cash-summary"
-            element={<PrivateRoute><AdminRoute><CashSummaryReport /></AdminRoute></PrivateRoute>}
-          />
+            {/* Individual report pages — all nested under /reports/ */}
+            <Route
+              path="/reports/petty-cash"
+              element={<PrivateRoute><AdminRoute><PettyCashReport /></AdminRoute></PrivateRoute>}
+            />
+            <Route
+              path="/reports/pending-payments"
+              element={<PrivateRoute><AdminRoute><PendingPaymentsReport /></AdminRoute></PrivateRoute>}
+            />
+            <Route
+              path="/reports/other-expenses"
+              element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
+            />
 
-          <Route
-            path="/reports/transporters"
-            element={<PrivateRoute><AdminRoute><TransportersReport /></AdminRoute></PrivateRoute>}
-          />
+            <Route
+              path="/reports/transporters"
+              element={<PrivateRoute><AdminRoute><TransportersReport /></AdminRoute></PrivateRoute>}
+            />
 
-          {/* Legacy redirect — keep old bookmark working */}
-          <Route path="/petty-cash-report" element={<Navigate to="/reports/petty-cash" replace />} />
-        </Routes>
+            {/* Legacy redirect — keep old bookmark working */}
+            <Route path="/petty-cash-report" element={<Navigate to="/reports/petty-cash" replace />} />
+          </Routes>
         </div>
       </div>
     </Router>

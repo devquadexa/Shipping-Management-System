@@ -1,13 +1,17 @@
 import apiClient from '../client';
 
 export const notificationService = {
-  getNotifications: async () => {
-    const response = await apiClient.get('/notifications');
+  getNotifications: async (limit = 50, offset = 0) => {
+    const response = await apiClient.get('/notifications', {
+      params: { limit, offset }
+    });
     return response.data;
   },
 
-  getUnreadCount: async () => {
-    const response = await apiClient.get('/notifications/unread-count');
+  getUnreadNotifications: async (limit = 50, offset = 0) => {
+    const response = await apiClient.get('/notifications/unread', {
+      params: { limit, offset }
+    });
     return response.data;
   },
 
@@ -17,7 +21,7 @@ export const notificationService = {
   },
 
   markAllAsRead: async () => {
-    const response = await apiClient.patch('/notifications/read-all');
+    const response = await apiClient.patch('/notifications/mark-all-read');
     return response.data;
-  },
+  }
 };

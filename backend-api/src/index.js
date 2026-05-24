@@ -26,7 +26,7 @@ const oldInvoiceRoutes = require('./presentation/routes/oldInvoices');
 const paymentRoutes = require('./presentation/routes/paymentRoutes');
 const otherExpenseRoutes = require('./presentation/routes/otherExpense');
 const invoiceReviewRoutes = require('./presentation/routes/invoiceReviewRoutes');
-const notificationRoutes = require('./presentation/routes/notificationRoutes');
+const notificationRoutes = require('./presentation/routes/notifications');
 const { getConnection } = require('./config/database');
 const container = require('./infrastructure/di/container');
 const { startOverdueChecker } = require('./infrastructure/scheduler/overdueChecker');
@@ -73,7 +73,7 @@ app.use('/api/old-invoices', oldInvoiceRoutes(container));
 app.use('/api/payments', paymentRoutes);
 app.use('/api/other-expenses', otherExpenseRoutes(container));
 app.use('/api/invoice-reviews', invoiceReviewRoutes);
-app.use('/api/notifications', notificationRoutes);
+app.use('/api/notifications', notificationRoutes(container));
 
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, '../../frontend/build')));

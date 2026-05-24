@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ChangePassword from './ChangePassword';
+import NotificationBell from './NotificationBell';
 
 function Navbar({ onMenuClick }) {
   const { user, logout } = useAuth();
@@ -63,6 +64,9 @@ function Navbar({ onMenuClick }) {
 
         {/* Spacer */}
         <div style={{ flex: 1 }}></div>
+
+        {/* Notification Bell */}
+        {user && <NotificationBell />}
 
         {/* Profile Section */}
         <div className="navbar-right">
