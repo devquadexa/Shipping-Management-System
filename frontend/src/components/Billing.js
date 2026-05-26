@@ -1829,6 +1829,9 @@ function Billing() {
         <div class="invoice-page">
         <div style="font-size: 10pt; font-weight: bold; margin-bottom: 6px; margin-top: 0;">
           INV No: ${invoiceNumber}
+          <div style="font-size: 9pt; font-weight: normal; margin-top: 2px;">
+            Date: ${formatDate(bill.invoiceDate || bill.billDate || bill.createdDate)}
+          </div>
         </div>
 
         <div class="recipient">
