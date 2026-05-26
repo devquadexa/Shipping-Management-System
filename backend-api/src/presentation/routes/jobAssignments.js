@@ -18,7 +18,9 @@ router.get('/test', (req, res) => {
 // Assign multiple users to a job
 router.post('/jobs/:jobId/assign-users', auth, async (req, res) => {
   try {
-    console.log('=== Assign Users to Job ===');
+    console.log('\n========================================');
+    console.log('=== ASSIGN USERS TO JOB ENDPOINT ===');
+    console.log('========================================');
     console.log('Job ID:', req.params.jobId);
     console.log('Request body:', req.body);
     console.log('User:', req.user);
@@ -55,19 +57,27 @@ router.post('/jobs/:jobId/assign-users', auth, async (req, res) => {
       });
     }
 
-    console.log('Getting assignMultipleUsersToJob from container...');
+    console.log('[ROUTE] Getting assignMultipleUsersToJob from container...');
     const assignMultipleUsersToJob = container.get('assignMultipleUsersToJob');
-    console.log('Executing use case...');
+    console.log('[ROUTE] assignMultipleUsersToJob retrieved:', !!assignMultipleUsersToJob);
+    console.log('[ROUTE] Has createNotification:', !!assignMultipleUsersToJob.createNotification);
+    
+    console.log('[ROUTE] Executing use case...');
     const result = await assignMultipleUsersToJob.execute(jobId, userIds, assignedBy, notes);
-    console.log('Success! Result:', result);
+    console.log('[ROUTE] Success! Result:', result);
+    console.log('========================================\n');
 
     res.status(200).json({
       success: true,
       data: result
     });
   } catch (error) {
-    console.error('=== Error assigning users to job ===');
+    console.error('========================================');
+    console.error('=== ERROR ASSIGNING USERS TO JOB ===');
+    console.error('========================================');
     console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('========================================\n');
     console.error('Error stack:', error.stack);
     res.status(400).json({ 
       success: false,

@@ -1,4 +1,6 @@
 /* Mobile Responsive Styles for Super Shine Cargo Service */
+/* Version 2.0 - FIXED CONTAINER MARGIN - Last Updated: 2026-05-27 */
+/* IMPORTANT: Container margin changed from 1rem auto to 0 auto (removes gap) */
 
 /* Base responsive utilities */
 @media (max-width: 768px) {
@@ -58,10 +60,10 @@
     width: 100%;
   }
 
-  /* Container */
+  /* Container - NO TOP MARGIN FOR PROFESSIONAL LAYOUT */
   .container {
     padding: 0 1rem;
-    margin: 1rem auto;
+    margin: 0 auto;  /* Changed from 1rem auto to 0 auto - removes gap */
   }
 
   /* Cards */

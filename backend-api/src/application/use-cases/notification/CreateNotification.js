@@ -14,8 +14,11 @@ class CreateNotification {
       throw new Error('userId, type, title, and message are required');
     }
 
+    console.log(`[CreateNotification] Creating notification for user ${notificationData.userId}, type: ${notificationData.type}`);
+
     // Generate notification ID
     const notificationId = await this.notificationRepository.generateNextId();
+    console.log(`[CreateNotification] Generated notification ID: ${notificationId}`);
 
     // Create notification entity
     const notification = new Notification({
@@ -38,7 +41,9 @@ class CreateNotification {
     }
 
     // Persist
+    console.log(`[CreateNotification] Persisting notification to database`);
     const createdNotification = await this.notificationRepository.create(notification);
+    console.log(`[CreateNotification] Notification created successfully: ${JSON.stringify(createdNotification)}`);
     
     return createdNotification;
   }

@@ -208,7 +208,18 @@ class Container {
     this.dependencies.updateJob = new UpdateJob(jobRepository);
     this.dependencies.updateJobStatus = new UpdateJobStatus(jobRepository);
     this.dependencies.assignJob = new AssignJob(jobRepository, userRepository);
-    this.dependencies.assignMultipleUsersToJob = new AssignMultipleUsersToJob(jobRepository, userRepository, jobAssignmentRepository);
+    
+    // Notification use cases (set up early for job assignment notifications)
+    const notificationRepository = this.dependencies.notificationRepository;
+    const createNotification = new CreateNotification(notificationRepository);
+    this.dependencies.createNotification = createNotification;
+    this.dependencies.getUserNotifications = new GetUserNotifications(notificationRepository);
+    this.dependencies.getUnreadNotifications = new GetUnreadNotifications(notificationRepository);
+    this.dependencies.markNotificationAsRead = new MarkNotificationAsRead(notificationRepository);
+    this.dependencies.markAllNotificationsAsRead = new MarkAllNotificationsAsRead(notificationRepository);
+    
+    // Now create AssignMultipleUsersToJob with notification support
+    this.dependencies.assignMultipleUsersToJob = new AssignMultipleUsersToJob(jobRepository, userRepository, jobAssignmentRepository, createNotification);
     this.dependencies.removeUserFromJob = new RemoveUserFromJob(jobRepository, userRepository, jobAssignmentRepository);
     this.dependencies.getJobAssignments = new GetJobAssignments(jobRepository, jobAssignmentRepository);
     this.dependencies.getUserJobs = new GetUserJobs(userRepository, jobAssignmentRepository);
@@ -244,7 +255,7 @@ class Container {
     this.dependencies.deletePayItemTemplate = new DeletePayItemTemplate(payItemTemplateRepository);
     
     // Petty Cash Assignment use cases
-    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository, billRepository, jobRepository);
+    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository, billRepository, jobRepository, createNotification);
     this.dependencies.getAllPettyCashAssignments = new GetAllPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getUserPettyCashAssignments = new GetUserPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getPettyCashAssignmentByJob = new GetPettyCashAssignmentByJob(pettyCashAssignmentRepository);
@@ -252,7 +263,7 @@ class Container {
     this.dependencies.getUserBalancesSummary = new GetUserBalancesSummary(pettyCashAssignmentRepository);
     this.dependencies.getGroupedAssignments = new GetGroupedAssignments(pettyCashAssignmentRepository);
     this.dependencies.settleGroupedAssignments = new SettleGroupedAssignments(pettyCashAssignmentRepository);
-    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository, jobRepository);
+    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository, jobRepository, createNotification);
     this.dependencies.getAssignmentsWithChildren = new GetAssignmentsWithChildren(pettyCashAssignmentRepository);
     this.dependencies.getAggregatedAssignments = new GetAggregatedAssignments(pettyCashAssignmentRepository);
     
@@ -338,14 +349,6 @@ class Container {
       pettyCashAssignmentRepository,
       otherExpenseRepository
     );
-    
-    // Notification use cases
-    const notificationRepository = this.dependencies.notificationRepository;
-    this.dependencies.createNotification = new CreateNotification(notificationRepository);
-    this.dependencies.getUserNotifications = new GetUserNotifications(notificationRepository);
-    this.dependencies.getUnreadNotifications = new GetUnreadNotifications(notificationRepository);
-    this.dependencies.markNotificationAsRead = new MarkNotificationAsRead(notificationRepository);
-    this.dependencies.markAllNotificationsAsRead = new MarkAllNotificationsAsRead(notificationRepository);
     
     // Controllers
     this.dependencies.CashBalanceSettlementController = new CashBalanceSettlementController(this);

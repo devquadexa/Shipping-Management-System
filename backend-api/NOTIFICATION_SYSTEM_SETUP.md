@@ -97,6 +97,8 @@ Run the SQL script to create the notifications table:
 ### Notification Types
 Currently implemented:
 - `invoice_review` - When a new invoice review is sent to a clerk
+- `JOB_ASSIGNED` - When a user is assigned to a job ✅ NEW
+- `PETTY_CASH_ASSIGNED` - When petty cash is assigned to a user ✅ NEW
 
 ### Future Enhancement Opportunities
 - Real-time notifications using WebSockets

@@ -65,9 +65,6 @@ function Navbar({ onMenuClick }) {
         {/* Spacer */}
         <div style={{ flex: 1 }}></div>
 
-        {/* Notification Bell */}
-        {user && <NotificationBell />}
-
         {/* Profile Section */}
         <div className="navbar-right">
           {/* Refresh Button */}

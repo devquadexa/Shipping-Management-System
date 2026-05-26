@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 function Navbar() {
   const { user, logout } = useAuth();
@@ -34,6 +35,7 @@ function Navbar() {
         </ul>
       </div>
       <div className="navbar-right">
+        <NotificationBell />
         <div className="user-info">
           <div className="user-name">{user?.fullName}</div>
           <div className="user-role">{user?.role}</div>
