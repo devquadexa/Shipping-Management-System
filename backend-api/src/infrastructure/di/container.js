@@ -21,6 +21,7 @@ const MSSQLCashBalanceSettlementRepository = require('../repositories/MSSQLCashB
 const MSSQLOldInvoiceRepository = require('../repositories/MSSQLOldInvoiceRepository');
 const MSSQLPaymentRepository = require('../repositories/MSSQLPaymentRepository');
 const MSSQLCashWithdrawalRepository = require('../repositories/MSSQLCashWithdrawalRepository');
+const MSSQLNotificationRepository = require('../repositories/MSSQLNotificationRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -125,6 +126,13 @@ const GetPasswordResetRequests = require('../../application/use-cases/auth/GetPa
 const ApprovePasswordResetRequest = require('../../application/use-cases/auth/ApprovePasswordResetRequest');
 const RejectPasswordResetRequest = require('../../application/use-cases/auth/RejectPasswordResetRequest');
 
+// Notification Use Cases
+const CreateNotification = require('../../application/use-cases/notification/CreateNotification');
+const GetUserNotifications = require('../../application/use-cases/notification/GetUserNotifications');
+const GetUnreadNotifications = require('../../application/use-cases/notification/GetUnreadNotifications');
+const MarkNotificationAsRead = require('../../application/use-cases/notification/MarkNotificationAsRead');
+const MarkAllNotificationsAsRead = require('../../application/use-cases/notification/MarkAllNotificationsAsRead');
+
 // Repositories
 const MSSQLPasswordResetRepository = require('../repositories/MSSQLPasswordResetRepository');
 
@@ -162,6 +170,7 @@ class Container {
     this.dependencies.oldInvoiceRepository = new MSSQLOldInvoiceRepository(getConnection, sql);
     this.dependencies.paymentRepository = new MSSQLPaymentRepository(getConnection, sql);
     this.dependencies.cashWithdrawalRepository = new MSSQLCashWithdrawalRepository(getConnection, sql);
+    this.dependencies.notificationRepository = new MSSQLNotificationRepository(getConnection, sql);
   }
 
   setupUseCases() {
@@ -199,7 +208,18 @@ class Container {
     this.dependencies.updateJob = new UpdateJob(jobRepository);
     this.dependencies.updateJobStatus = new UpdateJobStatus(jobRepository);
     this.dependencies.assignJob = new AssignJob(jobRepository, userRepository);
-    this.dependencies.assignMultipleUsersToJob = new AssignMultipleUsersToJob(jobRepository, userRepository, jobAssignmentRepository);
+    
+    // Notification use cases (set up early for job assignment notifications)
+    const notificationRepository = this.dependencies.notificationRepository;
+    const createNotification = new CreateNotification(notificationRepository);
+    this.dependencies.createNotification = createNotification;
+    this.dependencies.getUserNotifications = new GetUserNotifications(notificationRepository);
+    this.dependencies.getUnreadNotifications = new GetUnreadNotifications(notificationRepository);
+    this.dependencies.markNotificationAsRead = new MarkNotificationAsRead(notificationRepository);
+    this.dependencies.markAllNotificationsAsRead = new MarkAllNotificationsAsRead(notificationRepository);
+    
+    // Now create AssignMultipleUsersToJob with notification support
+    this.dependencies.assignMultipleUsersToJob = new AssignMultipleUsersToJob(jobRepository, userRepository, jobAssignmentRepository, createNotification);
     this.dependencies.removeUserFromJob = new RemoveUserFromJob(jobRepository, userRepository, jobAssignmentRepository);
     this.dependencies.getJobAssignments = new GetJobAssignments(jobRepository, jobAssignmentRepository);
     this.dependencies.getUserJobs = new GetUserJobs(userRepository, jobAssignmentRepository);
@@ -235,7 +255,7 @@ class Container {
     this.dependencies.deletePayItemTemplate = new DeletePayItemTemplate(payItemTemplateRepository);
     
     // Petty Cash Assignment use cases
-    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository, billRepository, jobRepository);
+    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository, billRepository, jobRepository, createNotification);
     this.dependencies.getAllPettyCashAssignments = new GetAllPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getUserPettyCashAssignments = new GetUserPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getPettyCashAssignmentByJob = new GetPettyCashAssignmentByJob(pettyCashAssignmentRepository);
@@ -243,7 +263,7 @@ class Container {
     this.dependencies.getUserBalancesSummary = new GetUserBalancesSummary(pettyCashAssignmentRepository);
     this.dependencies.getGroupedAssignments = new GetGroupedAssignments(pettyCashAssignmentRepository);
     this.dependencies.settleGroupedAssignments = new SettleGroupedAssignments(pettyCashAssignmentRepository);
-    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository, jobRepository);
+    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository, jobRepository, createNotification);
     this.dependencies.getAssignmentsWithChildren = new GetAssignmentsWithChildren(pettyCashAssignmentRepository);
     this.dependencies.getAggregatedAssignments = new GetAggregatedAssignments(pettyCashAssignmentRepository);
     

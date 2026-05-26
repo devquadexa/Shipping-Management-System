@@ -1,267 +1,269 @@
-# Notification System Testing Guide
+# Notification System - Testing Guide
 
-## Setup
-1. Ensure backend is running: `npm start` in `backend-api` folder
-2. Ensure frontend is built: `npm run build` in `frontend` folder
-3. Open the application in browser
+## Quick Test Scenario
 
-## Test Scenario 1: Invoice Review Sent Notification
+### Prerequisites
+- Backend running on port 5000
+- Frontend running or deployed to backend-api/public
+- Database with Notifications table created
+- At least 2 users: 1 Admin/Manager and 1 Waff Clerk
 
-### Steps:
-1. Login as **Admin** or **Manager**
-2. Go to **Invoicing** section
-3. Create or select a job
-4. Click **Review Invoice** button
-5. Select a **Waff Clerk** from dropdown
-6. Add review notes
-7. Click **Submit**
+### Test Steps
 
-### Expected Result:
-- Success message appears
-- Notification is saved to database
+#### 1. Login as Admin/Manager
+```
+URL: http://localhost:5000/login
+Username: admin_user
+Password: admin_password
+```
 
-### Verify in Frontend:
-1. Logout from Admin account
-2. Login as the **Waff Clerk** who received the review
-3. Look at top navigation bar
-4. Bell icon should show **badge with number 1**
-5. Click bell icon
-6. Dropdown should show:
-   - **Icon:** 📋
-   - **Title:** "New Invoice Review"
-   - **Message:** "{AdminName} sent you a new invoice review for job {JobId}"
-   - **Background:** Blue (#f0f7ff)
-   - **Indicator:** Blue dot on right side
+#### 2. Create a New Job
+```
+Navigate to: Jobs → Create New Job
+Fill in:
+  - Customer: Select any customer
+  - Shipment Category: Select category
+  - Other required fields
+Click: Save Job
+```
 
----
+#### 3. Assign Job to Waff Clerk
+```
+In Job Details:
+  - Click "Assign Users" button
+  - Select one or more Waff Clerks
+  - Add notes (optional)
+  - Click "Assign"
+Expected: Success message appears
+```
 
-## Test Scenario 2: Invoice Review Approved Notification
+#### 4. Verify Notification Created
+```
+Backend Check:
+  - Query: SELECT * FROM Notifications WHERE type = 'JOB_ASSIGNED'
+  - Should see new notification record
+  - Verify userId matches assigned waff clerk
+  - Verify isRead = 0 (unread)
+```
 
-### Steps:
-1. Login as **Waff Clerk** (from previous test)
-2. Go to **Invoice Reviews** page
-3. Find the pending review
-4. Click **Approve** button
+#### 5. Login as Assigned Waff Clerk
+```
+URL: http://localhost:5000/login
+Username: waff_clerk_user
+Password: waff_clerk_password
+```
 
-### Expected Result:
-- Review status changes to "Approved"
-- Notification is created for the Admin/Manager
+#### 6. Check Notification Bell
+```
+Expected:
+  - Bell icon visible in top navbar
+  - Red badge showing "1" (unread count)
+  - Click bell to open dropdown
+  - See notification: "New Job Assigned - You have been assigned to Job #[jobId]"
+```
 
-### Verify in Frontend:
-1. Logout from Clerk account
-2. Login as the **Admin/Manager** who sent the review
-3. Look at bell icon
-4. Badge should show **1** (or increment if there were previous notifications)
-5. Click bell icon
-6. Dropdown should show:
-   - **Icon:** ✅
-   - **Title:** "Invoice Review Approved"
-   - **Message:** "{ClerkName} approved the invoice review for job {JobId}"
-   - **Background:** Green (#f0fdf4)
-   - **Left Border:** Green line
-   - **Indicator:** Blue dot on right side
+#### 7. Mark Notification as Read
+```
+In Notification Dropdown:
+  - Click checkmark (✓) on notification
+Expected:
+  - Notification disappears from dropdown
+  - Badge count decreases
+  - Database: isRead = 1
+```
 
----
+#### 8. Mark All as Read
+```
+In Notification Dropdown:
+  - Click "Mark all as read" button
+Expected:
+  - All notifications disappear
+  - Badge disappears
+  - Database: All notifications have isRead = 1
+```
 
-## Test Scenario 3: Invoice Review Rejected Notification
+## API Testing with cURL
 
-### Steps:
-1. Login as **Admin/Manager**
-2. Send another invoice review to a **Waff Clerk**
-3. Logout and login as the **Waff Clerk**
-4. Go to **Invoice Reviews** page
-5. Find the pending review
-6. Click **Reject** button
-7. Enter rejection reason (e.g., "Missing transporter payment details")
-8. Click **Submit**
+### Get Unread Notifications
+```bash
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  http://localhost:5000/api/notifications/unread
+```
 
-### Expected Result:
-- Review status changes to "Rejected"
-- Rejection reason is saved
-- Notification is created for the Admin/Manager
+Expected Response:
+```json
+{
+  "notifications": [
+    {
+      "notificationId": 1,
+      "userId": 123,
+      "type": "JOB_ASSIGNED",
+      "title": "New Job Assigned",
+      "message": "You have been assigned to Job #456",
+      "relatedId": 456,
+      "relatedType": "JOB",
+      "isRead": false,
+      "createdDate": "2026-05-24T10:30:00Z"
+    }
+  ],
+  "unreadCount": 1
+}
+```
 
-### Verify in Frontend:
-1. Logout from Clerk account
-2. Login as the **Admin/Manager** who sent the review
-3. Look at bell icon
-4. Badge should show updated count
-5. Click bell icon
-6. Dropdown should show:
-   - **Icon:** ❌
-   - **Title:** "Invoice Review Rejected"
-   - **Message:** "{ClerkName} rejected the invoice review for job {JobId}. Reason: {RejectionReason}"
-   - **Background:** Red (#fef2f2)
-   - **Left Border:** Red line
-   - **Indicator:** Blue dot on right side
-   - **Rejection Reason:** Visible in the message
+### Mark Notification as Read
+```bash
+curl -X PATCH \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  http://localhost:5000/api/notifications/1/read
+```
 
----
+### Mark All as Read
+```bash
+curl -X PATCH \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  http://localhost:5000/api/notifications/mark-all-read
+```
 
-## Test Scenario 4: Mark Notification as Read
+## Database Queries for Testing
 
-### Steps:
-1. With unread notifications visible in dropdown
-2. Click on any unread notification
-
-### Expected Result:
-- Notification background changes to white
-- Blue indicator dot disappears
-- Badge count decreases by 1
-- Notification remains in list but marked as read
-
----
-
-## Test Scenario 5: Mark All as Read
-
-### Steps:
-1. With multiple unread notifications visible
-2. Click **"Mark all as read"** button
-
-### Expected Result:
-- All notifications change to white background
-- All blue indicator dots disappear
-- Badge count becomes 0 and disappears
-- Button disappears (no unread notifications)
-
----
-
-## Test Scenario 6: Notification Persistence
-
-### Steps:
-1. Create notifications (sent, approved, rejected)
-2. Refresh the page (F5)
-3. Click bell icon
-
-### Expected Result:
-- All notifications still appear
-- Read/unread status is preserved
-- Badge count is correct
-
----
-
-## Test Scenario 7: Multiple Notifications
-
-### Steps:
-1. Send multiple invoice reviews to same clerk
-2. Approve some, reject others
-3. Login as clerk and approve/reject them
-4. Check notifications
-
-### Expected Result:
-- All notifications appear in dropdown
-- Each has correct icon, title, and message
-- Badge shows total unread count
-- Can scroll through list if more than 5 notifications
-
----
-
-## Database Verification
-
-### Check Notifications Table:
+### Check Notifications Table
 ```sql
--- View all notifications
-SELECT * FROM notifications ORDER BY createdDate DESC
-
--- View unread notifications for specific user
-SELECT * FROM notifications 
-WHERE userId = '<userId>' AND isRead = 0
-ORDER BY createdDate DESC
-
--- View notifications by type
-SELECT type, COUNT(*) as count FROM notifications GROUP BY type
-
--- Verify rejection reason is included
-SELECT notificationId, type, message FROM notifications 
-WHERE type = 'invoice_review_rejected'
+SELECT * FROM Notifications
+ORDER BY createdDate DESC;
 ```
 
----
-
-## Console Logging
-
-### Backend Logs to Check:
-```
-Creating notification for userId: <userId> type: invoice_review
-Notification created successfully: <notificationId>
-
-Creating notification for userId: <userId> type: invoice_review_approved
-Notification created successfully: <notificationId>
-
-Creating notification for userId: <userId> type: invoice_review_rejected
-Notification created successfully: <notificationId>
-
-Getting notifications for userId: <userId>
-Notifications found: 3
-
-Getting unread count for userId: <userId>
-Unread count: 2
+### Check Unread Notifications for User
+```sql
+SELECT * FROM Notifications 
+WHERE userId = 123 AND isRead = 0
+ORDER BY createdDate DESC;
 ```
 
-### Frontend Console Logs to Check:
+### Check Job Assignment Notifications
+```sql
+SELECT * FROM Notifications 
+WHERE type = 'JOB_ASSIGNED'
+ORDER BY createdDate DESC;
 ```
-Fetched notifications: [...]
-Fetched unread count: {unreadCount: 2}
-Error marking notification as read: (if any)
-Error fetching notifications: (if any)
+
+### Count Unread Notifications by User
+```sql
+SELECT userId, COUNT(*) as unreadCount
+FROM Notifications
+WHERE isRead = 0
+GROUP BY userId;
 ```
 
----
+### Mark All Notifications as Read for User
+```sql
+UPDATE Notifications
+SET isRead = 1
+WHERE userId = 123 AND isRead = 0;
+```
 
-## Troubleshooting
+## Browser Console Testing
 
-### Issue: Badge shows but no notifications in dropdown
-- Check browser console for errors
-- Check backend logs for database errors
-- Verify userId is correct
-- Refresh page and try again
+### Check Notification Service
+```javascript
+// In browser console
+import { notificationService } from './api/services/notificationService';
 
-### Issue: Rejection reason not showing
-- Verify rejection reason was entered when rejecting
-- Check database: `SELECT message FROM notifications WHERE type = 'invoice_review_rejected'`
-- Message should include "Reason: {reason}"
+// Get unread notifications
+notificationService.getUnreadNotifications()
+  .then(data => console.log('Unread:', data))
+  .catch(err => console.error('Error:', err));
 
-### Issue: Notifications not updating
-- Check if backend is running
-- Check if frontend is built (npm run build)
-- Clear browser cache (Ctrl+Shift+Delete)
-- Restart backend server
+// Mark as read
+notificationService.markAsRead(1)
+  .then(data => console.log('Marked as read:', data))
+  .catch(err => console.error('Error:', err));
+```
 
-### Issue: Badge count incorrect
-- Click "Mark all as read" to reset
-- Refresh page
-- Check database for orphaned notifications
+## Common Issues & Solutions
 
----
+### Issue: Notification bell shows no badge
+**Solution:**
+1. Check if user is logged in
+2. Verify JWT token is valid
+3. Check browser console for API errors
+4. Verify backend is running
+5. Check if Notifications table exists in database
 
-## Performance Notes
+### Issue: Notification appears but doesn't disappear after marking as read
+**Solution:**
+1. Check if API call succeeded (check network tab)
+2. Verify database was updated (run SQL query)
+3. Try refreshing the page
+4. Check browser console for errors
 
-- Notifications fetch every 30 seconds automatically
-- Also fetch when opening dropdown
-- No caching - always fresh from database
-- Unread count calculated in real-time
-- Supports up to 99+ unread notifications
+### Issue: Job assignment succeeds but no notification created
+**Solution:**
+1. Check backend logs for notification creation errors
+2. Verify Notifications table exists
+3. Verify user ID is correct
+4. Check if createNotification use case is properly injected
+5. Verify database connection is working
 
----
+### Issue: Multiple notifications appearing for same job
+**Solution:**
+1. Check if job was assigned multiple times
+2. Verify database doesn't have duplicate records
+3. Check if notification creation is being called multiple times
 
-## Notification Types Summary
+## Performance Testing
 
-| Type | Icon | Color | Recipient | Trigger |
-|------|------|-------|-----------|---------|
-| invoice_review | 📋 | Blue | Clerk | Review sent |
-| invoice_review_approved | ✅ | Green | Admin/Manager | Review approved |
-| invoice_review_rejected | ❌ | Red | Admin/Manager | Review rejected |
+### Load Test: Create 100 Notifications
+```bash
+# Run this in backend
+for i in {1..100}; do
+  curl -X POST http://localhost:5000/api/notifications \
+    -H "Authorization: Bearer TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"userId\": 123, \"type\": \"JOB_ASSIGNED\", \"title\": \"Test $i\", \"message\": \"Test message $i\"}"
+done
+```
 
----
+### Check Performance
+```sql
+-- Check notification count
+SELECT COUNT(*) FROM Notifications;
+
+-- Check average query time
+SELECT * FROM Notifications 
+WHERE userId = 123 AND isRead = 0
+ORDER BY createdDate DESC;
+```
+
+## Regression Testing
+
+After any changes, verify:
+- [ ] Job assignment still works
+- [ ] Notifications are created for each assigned user
+- [ ] Notification bell displays correctly
+- [ ] Unread count is accurate
+- [ ] Mark as read functionality works
+- [ ] Mark all as read functionality works
+- [ ] Notifications persist after page refresh
+- [ ] Notifications appear for multiple users
+- [ ] No duplicate notifications created
+- [ ] No errors in browser console
+- [ ] No errors in backend logs
 
 ## Success Criteria
 
-- ✅ All three notification types appear correctly
-- ✅ Icons display properly (📋 ✅ ❌)
-- ✅ Colors are correct (blue/green/red)
-- ✅ Rejection reason appears in message
-- ✅ Badge count updates correctly
-- ✅ Mark as read works
-- ✅ Mark all as read works
-- ✅ Notifications persist after refresh
-- ✅ No console errors
-- ✅ Database has all notifications
+✅ **Test Passed When:**
+1. Job is assigned to waff clerk
+2. Notification appears in bell dropdown within 30 seconds
+3. Unread count badge shows correct number
+4. Clicking checkmark marks notification as read
+5. Notification disappears from dropdown
+6. Database shows isRead = 1
+7. Refreshing page doesn't recreate notification
+8. Multiple users can receive notifications independently
+9. No errors in console or logs
+10. System remains responsive
+
+---
+
+**Last Updated:** May 24, 2026
+**Version:** 1.0.0
