@@ -84,6 +84,10 @@ function PettyCash() {
   const [withdrawalFilterMonth, setWithdrawalFilterMonth] = useState(new Date().getMonth() + 1);
   const [withdrawalFilterYear, setWithdrawalFilterYear] = useState(new Date().getFullYear());
 
+  // User Petty Cash Summary filter
+  const [userSummaryFilterMonth, setUserSummaryFilterMonth] = useState(new Date().getMonth() + 1);
+  const [userSummaryFilterYear, setUserSummaryFilterYear] = useState(new Date().getFullYear());
+
   useEffect(() => {
     fetchAssignments();
     fetchJobs();
@@ -113,6 +117,14 @@ function PettyCash() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
+
+  // Refetch user balances when month or year filter changes
+  useEffect(() => {
+    if (user?.role === 'Admin' || user?.role === 'Super Admin') {
+      fetchUserBalances(userSummaryFilterMonth, userSummaryFilterYear);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userSummaryFilterMonth, userSummaryFilterYear]);
 
   const fetchAssignments = async () => {
     try {
@@ -157,9 +169,9 @@ function PettyCash() {
     }
   };
 
-  const fetchUserBalances = async () => {
+  const fetchUserBalances = async (month = userSummaryFilterMonth, year = userSummaryFilterYear) => {
     try {
-      const response = await fetch(`${API_BASE}/api/petty-cash-assignments/user-balances`, {
+      const response = await fetch(`${API_BASE}/api/petty-cash-assignments/user-balances?month=${month}&year=${year}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -1605,8 +1617,26 @@ function PettyCash() {
       </div>
 
       {/* User Balances Summary for Admin/Super Admin — carousel */}
-      {(user?.role === 'Admin' || user?.role === 'Super Admin') && Object.keys(userBalances).length > 0 && (() => {
-        const balanceList = Object.entries(userBalances);
+      {(user?.role === 'Admin' || user?.role === 'Super Admin') && (() => {
+        // Get all Waff Clerks
+        const waffClerks = users.filter(u => u.role === 'Waff Clerk');
+        
+        // Merge with balance data - show all Waff Clerks with their balances or 0
+        const balanceList = waffClerks.map(clerk => {
+          const balance = userBalances[clerk.userId] || {
+            userId: clerk.userId,
+            userName: clerk.fullName || clerk.username,
+            totalAssigned: 0,
+            totalSpent: 0,
+            totalBalance: 0,
+            totalOver: 0,
+            activeAssignments: 0,
+            settledAssignments: 0,
+            assignments: [],
+          };
+          return [clerk.userId, balance];
+        });
+
         const CARDS_PER_VIEW = 4;
         const maxIndex = Math.max(0, balanceList.length - CARDS_PER_VIEW);
         const canPrev = userCarouselIndex > 0;
@@ -1618,74 +1648,133 @@ function PettyCash() {
             <div className="card-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
               <h2>User Petty Cash Summary</h2>
               <span style={{fontSize:'13px', color:'#6b7280'}}>
-                Showing {userCarouselIndex + 1}–{Math.min(userCarouselIndex + CARDS_PER_VIEW, balanceList.length)} of {balanceList.length} users
+                {balanceList.length > 0 
+                  ? `Showing ${userCarouselIndex + 1}–${Math.min(userCarouselIndex + CARDS_PER_VIEW, balanceList.length)} of ${balanceList.length} users`
+                  : 'No Waff Clerks available'}
               </span>
             </div>
 
-            <div className="ubc-wrapper">
-              <div className="ubc-grid">
-                {visible.map(([userId, balance]) => (
-                  <div key={userId} className="user-balance-card">
-                    <div className="user-balance-header">
-                      <div className="user-avatar">{balance.userName.charAt(0).toUpperCase()}</div>
-                      <div className="user-info">
-                        <h4>{balance.userName}</h4>
-                        <p className="user-id">{userId}</p>
-                      </div>
-                    </div>
-                    <div className="user-balance-stats">
-                      <div className="stat-row">
-                        <span className="stat-label">Total Assigned:</span>
-                        <span className="stat-value">LKR {formatAmount(balance.totalAssigned)}</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Total Spent:</span>
-                        <span className="stat-value">LKR {formatAmount(balance.totalSpent)}</span>
-                      </div>
-                      <div className="stat-row stat-row-divider">
-                        <span className="stat-label">Active Assignments:</span>
-                        <span className="stat-value stat-badge">{balance.activeAssignments}</span>
-                      </div>
-                      <div className="stat-row">
-                        <span className="stat-label">Settled Assignments:</span>
-                        <span className="stat-value stat-badge">{balance.settledAssignments}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            {/* Month and Year Filter */}
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center', padding: '15px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Month</label>
+                <select 
+                  value={userSummaryFilterMonth} 
+                  onChange={(e) => setUserSummaryFilterMonth(parseInt(e.target.value))}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value={1}>January</option>
+                  <option value={2}>February</option>
+                  <option value={3}>March</option>
+                  <option value={4}>April</option>
+                  <option value={5}>May</option>
+                  <option value={6}>June</option>
+                  <option value={7}>July</option>
+                  <option value={8}>August</option>
+                  <option value={9}>September</option>
+                  <option value={10}>October</option>
+                  <option value={11}>November</option>
+                  <option value={12}>December</option>
+                </select>
               </div>
-
-              {/* Carousel arrows — always visible */}
-              <div className="ubc-arrows">
-                <button
-                  className={`ubc-arrow ${canPrev ? '' : 'disabled'}`}
-                  onClick={() => canPrev && setUserCarouselIndex(i => i - 1)}
-                  title="Previous"
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Year</label>
+                <select 
+                  value={userSummaryFilterYear} 
+                  onChange={(e) => setUserSummaryFilterYear(parseInt(e.target.value))}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="15 18 9 12 15 6"/>
-                  </svg>
-                </button>
-                <div className="ubc-dots">
-                  {Array.from({length: maxIndex + 1}).map((_, i) => (
-                    <button
-                      key={i}
-                      className={`ubc-dot ${i === userCarouselIndex ? 'active' : ''}`}
-                      onClick={() => setUserCarouselIndex(i)}
-                    />
+                  {[2024, 2025, 2026].map(year => (
+                    <option key={year} value={year}>{year}</option>
                   ))}
-                </div>
-                <button
-                  className={`ubc-arrow ${canNext ? '' : 'disabled'}`}
-                  onClick={() => canNext && setUserCarouselIndex(i => i + 1)}
-                  title="Next"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
+                </select>
               </div>
             </div>
+
+            {balanceList.length > 0 ? (
+              <>
+                <div className="ubc-wrapper">
+                  <div className="ubc-grid">
+                    {visible.map(([userId, balance]) => (
+                      <div key={userId} className="user-balance-card">
+                        <div className="user-balance-header">
+                          <div className="user-avatar">{balance.userName.charAt(0).toUpperCase()}</div>
+                          <div className="user-info">
+                            <h4>{balance.userName}</h4>
+                            <p className="user-id">{userId}</p>
+                          </div>
+                        </div>
+                        <div className="user-balance-stats">
+                          <div className="stat-row">
+                            <span className="stat-label">Total Assigned:</span>
+                            <span className="stat-value">LKR {formatAmount(balance.totalAssigned)}</span>
+                          </div>
+                          <div className="stat-row">
+                            <span className="stat-label">Total Spent:</span>
+                            <span className="stat-value">LKR {formatAmount(balance.totalSpent)}</span>
+                          </div>
+                          <div className="stat-row stat-row-divider">
+                            <span className="stat-label">Active Assignments:</span>
+                            <span className="stat-value stat-badge">{balance.activeAssignments}</span>
+                          </div>
+                          <div className="stat-row">
+                            <span className="stat-label">Settled Assignments:</span>
+                            <span className="stat-value stat-badge">{balance.settledAssignments}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Carousel arrows — always visible */}
+                  <div className="ubc-arrows">
+                    <button
+                      className={`ubc-arrow ${canPrev ? '' : 'disabled'}`}
+                      onClick={() => canPrev && setUserCarouselIndex(i => i - 1)}
+                      title="Previous"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="15 18 9 12 15 6"/>
+                      </svg>
+                    </button>
+                    <div className="ubc-dots">
+                      {Array.from({length: maxIndex + 1}).map((_, i) => (
+                        <button
+                          key={i}
+                          className={`ubc-dot ${i === userCarouselIndex ? 'active' : ''}`}
+                          onClick={() => setUserCarouselIndex(i)}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      className={`ubc-arrow ${canNext ? '' : 'disabled'}`}
+                      onClick={() => canNext && setUserCarouselIndex(i => i + 1)}
+                      title="Next"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
+                <p>No Waff Clerks available</p>
+              </div>
+            )}
           </div>
         );
       })()}

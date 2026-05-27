@@ -13,8 +13,10 @@ function Dashboard() {
     totalCustomers: 0,
     totalJobs: 0,
     openJobs: 0,
+    closedJobs: 0,
     totalBills: 0,
     unpaidBills: 0,
+    paidBills: 0,
     pettyCashBalance: 0,
     userPettyCash: 0
   });
@@ -50,8 +52,10 @@ function Dashboard() {
         totalCustomers: customers.length,
         totalJobs: jobs.length,
         openJobs: jobs.filter(j => j.status === 'Open').length,
+        closedJobs: jobs.filter(j => j.status === 'Completed').length,
         totalBills: bills.length,
         unpaidBills: bills.filter(b => b.paymentStatus === 'Unpaid').length,
+        paidBills: bills.filter(b => b.paymentStatus === 'Paid').length,
         pettyCashBalance: pettyCashData.balance,
         userPettyCash: pettyCashData.balance
       });
@@ -152,46 +156,85 @@ function Dashboard() {
       {/* Regular Dashboard Stats */}
       <h2 className="section-title">{user?.role === 'Super Admin' ? 'Operations Overview' : 'Dashboard Overview'}</h2>
       <div className="stats-grid">
-        {(user?.role !== 'Waff Clerk') && (
-          <div className="stat-card">
-            <h3>Total Customers</h3>
-            <div className="value">{stats.totalCustomers}</div>
-            <div className="label">Registered</div>
-          </div>
-        )}
-        <div className="stat-card">
-          <h3>Total Jobs</h3>
-          <div className="value">{stats.totalJobs}</div>
-          <div className="label">{user?.role === 'Waff Clerk' ? 'Assigned to you' : 'All jobs'}</div>
-        </div>
-        <div className="stat-card">
-          <h3>Open Jobs</h3>
-          <div className="value">{stats.openJobs}</div>
-          <div className="label">Pending</div>
-        </div>
-        {(user?.role !== 'Waff Clerk') && (
+        {user?.role === 'Waff Clerk' ? (
           <>
             <div className="stat-card">
-              <h3>Total Invoices</h3>
-              <div className="value">{stats.totalBills}</div>
-              <div className="label">Generated</div>
+              <h3>Open Jobs</h3>
+              <div className="value">{stats.openJobs}</div>
+              <div className="label">Pending</div>
             </div>
             <div className="stat-card">
-              <h3>Unpaid Invoices</h3>
-              <div className="value">{stats.unpaidBills}</div>
-              <div className="label">Outstanding</div>
+              <h3>Closed Jobs</h3>
+              <div className="value">{stats.closedJobs}</div>
+              <div className="label">Completed</div>
+            </div>
+            <div className="stat-card">
+              <h3>Paid Invoices</h3>
+              <div className="value">{stats.paidBills}</div>
+              <div className="label">Total Paid</div>
+            </div>
+            <div className="stat-card">
+              <h3>Petty Cash</h3>
+              <div className="value">
+                LKR {stats.userPettyCash.toFixed(2)}
+              </div>
+              <div className="label">Assigned to you</div>
+            </div>
+          </>
+        ) : (
+          <>
+            {(user?.role !== 'Waff Clerk') && (
+              <div className="stat-card">
+                <h3>Total Customers</h3>
+                <div className="value">{stats.totalCustomers}</div>
+                <div className="label">Registered</div>
+              </div>
+            )}
+            <div className="stat-card">
+              <h3>Total Jobs</h3>
+              <div className="value">{stats.totalJobs}</div>
+              <div className="label">{user?.role === 'Waff Clerk' ? 'Assigned to you' : 'All jobs'}</div>
+            </div>
+            <div className="stat-card">
+              <h3>Open Jobs</h3>
+              <div className="value">{stats.openJobs}</div>
+              <div className="label">Pending</div>
+            </div>
+            <div className="stat-card">
+              <h3>Closed Jobs</h3>
+              <div className="value">{stats.closedJobs}</div>
+              <div className="label">Completed</div>
+            </div>
+            {(user?.role !== 'Waff Clerk') && (
+              <>
+                <div className="stat-card">
+                  <h3>Total Invoices</h3>
+                  <div className="value">{stats.totalBills}</div>
+                  <div className="label">Generated</div>
+                </div>
+                <div className="stat-card">
+                  <h3>Unpaid Invoices</h3>
+                  <div className="value">{stats.unpaidBills}</div>
+                  <div className="label">Outstanding</div>
+                </div>
+                <div className="stat-card">
+                  <h3>Paid Invoices</h3>
+                  <div className="value">{stats.paidBills}</div>
+                  <div className="label">Total Paid</div>
+                </div>
+              </>
+            )}
+            <div className="stat-card">
+              <h3>Petty Cash</h3>
+              <div className="value">
+                LKR {(user?.role === 'Waff Clerk' ? stats.userPettyCash : stats.pettyCashBalance).toFixed(2)}
+              </div>
+              <div className="label">
+                {user?.role === 'Waff Clerk' ? 'Assigned to you' : 'Current Balance'}
+              </div>
             </div>
           </>
         )}
-        <div className="stat-card">
-          <h3>Petty Cash</h3>
-          <div className="value">
-            LKR {(user?.role === 'Waff Clerk' ? stats.userPettyCash : stats.pettyCashBalance).toFixed(2)}
-          </div>
-          <div className="label">
-            {user?.role === 'Waff Clerk' ? 'Assigned to you' : 'Current Balance'}
-          </div>
-        </div>
       </div>
     </div>
   );
