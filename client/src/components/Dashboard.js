@@ -8,8 +8,10 @@ function Dashboard() {
     totalCustomers: 0,
     totalJobs: 0,
     openJobs: 0,
+    closedJobs: 0,
     totalBills: 0,
     unpaidBills: 0,
+    paidBills: 0,
     pettyCashBalance: 0
   });
 
@@ -30,8 +32,10 @@ function Dashboard() {
         totalCustomers: customers.data.length,
         totalJobs: jobs.data.length,
         openJobs: jobs.data.filter(j => j.status === 'Open').length,
+        closedJobs: jobs.data.filter(j => j.status === 'Completed').length,
         totalBills: bills.data.length,
         unpaidBills: bills.data.filter(b => b.paymentStatus === 'Unpaid').length,
+        paidBills: bills.data.filter(b => b.paymentStatus === 'Paid').length,
         pettyCashBalance: pettyCash.data.balance
       });
     } catch (error) {
@@ -47,42 +51,74 @@ function Dashboard() {
       </div>
 
       <div className="stats-grid">
-        {user?.role !== 'User' && (
-          <div className="stat-card">
-            <h3>Total Customers</h3>
-            <div className="value">{stats.totalCustomers}</div>
-            <div className="label">Registered</div>
-          </div>
-        )}
-        <div className="stat-card">
-          <h3>Total Jobs</h3>
-          <div className="value">{stats.totalJobs}</div>
-          <div className="label">{user?.role === 'User' ? 'Assigned to you' : 'All jobs'}</div>
-        </div>
-        <div className="stat-card">
-          <h3>Open Jobs</h3>
-          <div className="value">{stats.openJobs}</div>
-          <div className="label">Pending</div>
-        </div>
-        {user?.role !== 'User' && (
+        {user?.role === 'Waff Clerk' ? (
           <>
             <div className="stat-card">
-              <h3>Total Bills</h3>
-              <div className="value">{stats.totalBills}</div>
-              <div className="label">Generated</div>
+              <h3>Open Jobs</h3>
+              <div className="value">{stats.openJobs}</div>
+              <div className="label">Pending</div>
             </div>
             <div className="stat-card">
-              <h3>Unpaid Bills</h3>
-              <div className="value">{stats.unpaidBills}</div>
-              <div className="label">Outstanding</div>
+              <h3>Closed Jobs</h3>
+              <div className="value">{stats.closedJobs}</div>
+              <div className="label">Completed</div>
+            </div>
+            <div className="stat-card">
+              <h3>Paid Invoices</h3>
+              <div className="value">{stats.paidBills}</div>
+              <div className="label">Total Paid</div>
+            </div>
+          </>
+        ) : (
+          <>
+            {user?.role !== 'User' && (
+              <div className="stat-card">
+                <h3>Total Customers</h3>
+                <div className="value">{stats.totalCustomers}</div>
+                <div className="label">Registered</div>
+              </div>
+            )}
+            <div className="stat-card">
+              <h3>Total Jobs</h3>
+              <div className="value">{stats.totalJobs}</div>
+              <div className="label">{user?.role === 'User' ? 'Assigned to you' : 'All jobs'}</div>
+            </div>
+            <div className="stat-card">
+              <h3>Open Jobs</h3>
+              <div className="value">{stats.openJobs}</div>
+              <div className="label">Pending</div>
+            </div>
+            <div className="stat-card">
+              <h3>Closed Jobs</h3>
+              <div className="value">{stats.closedJobs}</div>
+              <div className="label">Completed</div>
+            </div>
+            {user?.role !== 'User' && (
+              <>
+                <div className="stat-card">
+                  <h3>Total Bills</h3>
+                  <div className="value">{stats.totalBills}</div>
+                  <div className="label">Generated</div>
+                </div>
+                <div className="stat-card">
+                  <h3>Unpaid Bills</h3>
+                  <div className="value">{stats.unpaidBills}</div>
+                  <div className="label">Outstanding</div>
+                </div>
+                <div className="stat-card">
+                  <h3>Paid Invoices</h3>
+                  <div className="value">{stats.paidBills}</div>
+                  <div className="label">Total Paid</div>
+                </div>
+              </>
+            )}
+            <div className="stat-card">
+              <h3>Petty Cash</h3>
+              <div className="value">LKR {stats.pettyCashBalance.toFixed(2)}</div>
+              <div className="label">Current Balance</div>
             </div>
           </>
         )}
-        <div className="stat-card">
-          <h3>Petty Cash</h3>
-          <div className="value">LKR {stats.pettyCashBalance.toFixed(2)}</div>
-          <div className="label">Current Balance</div>
-        </div>
       </div>
     </div>
   );
