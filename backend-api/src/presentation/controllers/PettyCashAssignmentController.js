@@ -137,8 +137,12 @@ class PettyCashAssignmentController {
 
   async getUserBalancesSummary(req, res) {
     try {
+      const { month, year } = req.query;
       const getUserBalancesSummary = this.container.resolve('getUserBalancesSummary');
-      const balances = await getUserBalancesSummary.execute();
+      const balances = await getUserBalancesSummary.execute(
+        month ? parseInt(month) : null,
+        year ? parseInt(year) : null
+      );
       res.json(balances);
     } catch (error) {
       console.error('Error in getUserBalancesSummary:', error);

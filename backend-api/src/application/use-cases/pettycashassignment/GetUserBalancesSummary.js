@@ -3,7 +3,7 @@ class GetUserBalancesSummary {
     this.pettyCashAssignmentRepository = pettyCashAssignmentRepository;
   }
 
-  async execute() {
+  async execute(month, year) {
     const allAssignments = await this.pettyCashAssignmentRepository.getAll();
 
     // All statuses that mean the assignment has been settled/finalised
@@ -28,6 +28,14 @@ class GetUserBalancesSummary {
     const userBalances = {};
 
     allAssignments.forEach(assignment => {
+      // Filter by month and year if provided
+      if (month && year) {
+        const assignmentDate = new Date(assignment.createdDate || assignment.assignedDate);
+        if (assignmentDate.getMonth() + 1 !== month || assignmentDate.getFullYear() !== year) {
+          return; // Skip this assignment if it doesn't match the month/year
+        }
+      }
+
       const userId = assignment.assignedTo;
 
       if (!userBalances[userId]) {
