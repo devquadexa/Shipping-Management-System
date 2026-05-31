@@ -28,6 +28,35 @@
   color: #6b7280;
 }
 
+/* Petty Cash Page Header Button Styling */
+.petty-cash-page .page-header .btn-primary {
+  background: #101036 !important;
+  color: white !important;
+  padding: 12px 24px !important;
+  border-radius: 6px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+
+.petty-cash-page .page-header .btn-primary:hover {
+  background: #1a1a4d !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(16, 16, 54, 0.25) !important;
+  color: white !important;
+}
+
+.petty-cash-page .page-header .btn-primary:focus,
+.petty-cash-page .page-header .btn-primary:focus-visible {
+  outline: none !important;
+  background: #1a1a4d !important;
+}
+
 .assignments-table-wrapper {
   overflow-x: auto;
   padding: 2rem;
@@ -4186,3 +4215,82 @@ input[type="number"] {
 .collapse-arrow.collapsed {
   transform: rotate(-90deg);
 }
+
+/* Cash Withdrawals Section */
+.withdrawals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.withdrawal-box {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.withdrawal-box:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.withdrawal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #4CAF50;
+}
+
+.withdrawal-id {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.withdrawal-amount {
+  font-weight: 700;
+  color: #4CAF50;
+  font-size: 18px;
+}
+
+.withdrawal-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.withdrawal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.withdrawal-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.withdrawal-value {
+  color: #333;
+  font-weight: 400;
+}
+
+.withdrawal-notes {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #ddd;
+}
+
+.withdrawal-notes p {
+  margin: 4px 0 0 0;
+  color: #555;
+  font-size: 13px;
+  line-height: 1.4;
+}
+

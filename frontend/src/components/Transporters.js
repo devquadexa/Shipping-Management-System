@@ -531,7 +531,8 @@ function Transporters() {
     const payItems = Array.isArray(job.payItems) ? job.payItems : [];
     const transporterCostItems = payItems.filter((item) => {
       const label = (item?.description || item?.name || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
 
     if (!transporterCostItems.length) return 0;
@@ -549,7 +550,8 @@ function Transporters() {
     const payItems = Array.isArray(job?.payItems) ? job.payItems : [];
     return payItems.filter((item) => {
       const label = (item?.description || item?.name || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
   };
 
@@ -795,12 +797,30 @@ function Transporters() {
     }
 
     try {
-      // Get the latest job data from the jobs array to ensure we have all existing payment records
+      // Record payment using dedicated transporter payment endpoint
+      const paymentData = {
+        amount: paymentAmount,
+        paymentMethod,
+        ...(paymentMethod === 'Cheque' && { 
+          chequeNumber, 
+          chequeDate, 
+          chequeAmount: parseFloat(chequeAmount) 
+        }),
+        ...(paymentMethod === 'Bank Transfer' && { bankName }),
+      };
+
+      const paymentResponse = await transporterService.recordPayment(
+        selectedJobForPayment.jobId,
+        paymentData
+      );
+
+      // Also update the job pay items for UI consistency
       const latestJob = jobs.find(j => j.jobId === selectedJobForPayment.jobId) || selectedJobForPayment;
       
       const updatedPayItems = (Array.isArray(latestJob.payItems) ? latestJob.payItems : []).map((item) => {
         const label = (item?.description || item?.name || '').toLowerCase().trim();
-        if (label !== 'transporter cost') return item;
+        // Match both old format "transporter cost" and new format "transporter cost (from ...)"
+        if (label !== 'transporter cost' && !label.startsWith('transporter cost (from')) return item;
 
         const itemAmount = parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0;
         const currentPaidAmount = parseFloat(item.paidAmount || 0) || 0;
@@ -1396,8 +1416,8 @@ function Transporters() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal modal-large" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large">
             <div className="modal-header">
               <h2>{editingTransporter ? 'Edit Transporter' : 'New Transporter'}</h2>
               <button className="btn-close" onClick={() => setShowModal(false)}>×</button>

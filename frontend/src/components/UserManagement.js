@@ -198,8 +198,8 @@ function UserManagement() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-large">
             <div className="modal-header">
               <h2>Create New User</h2>
               <button className="btn-close" onClick={() => setShowModal(false)}>×</button>

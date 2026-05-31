@@ -4,9 +4,11 @@ import { billingService } from '../api/services/billingService';
 import { jobService } from '../api/services/jobService';
 import { customerService } from '../api/services/customerService';
 import { transporterService } from '../api/services/transporterService';
+import { invoiceReviewService } from '../api/services/invoiceReviewService';
 import API_BASE from '../api/config';
 import apiClient from '../api/client';
 import Pagination from './Pagination';
+import ReviewInvoiceModal from './ReviewInvoiceModal';
 import { formatDate, formatDateWithMonth, formatDateWithFullMonth } from '../utils/dateFormatter';
 import '../styles/Billing.css';
 
@@ -25,13 +27,35 @@ function Billing() {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
   };
 
-  const getTransporterCostItem = () => ({
-    name: 'transporter cost',
-    actualCost: '',
-    billingAmount: '',
-    sameAmount: false,
-    hasBill: false
-  });
+  const getTransporterCostItem = () => {
+    // Always build transporter cost description with place names
+    const fromPlace = selectedJob?.exporter || 'placename';
+    const toPlace = selectedJob?.exporter || 'placename';
+    const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
+    
+    return {
+      name: description,
+      actualCost: '',
+      billingAmount: '',
+      sameAmount: false,
+      hasBill: false
+    };
+  };
+
+  // Transform pay item description to add prefix if it's a transporter cost
+  const getDisplayDescription = (item, job = selectedJob) => {
+    const description = item.description || item.name || '';
+    const normalized = description.toLowerCase().trim();
+    
+    // If it's the old format transporter cost, add the prefix
+    if (normalized === 'transporter cost' && job) {
+      const fromPlace = job.exporter || 'placename';
+      const toPlace = job.transporter || 'placename';
+      return `transporter cost (from ${fromPlace} to ${toPlace})`;
+    }
+    
+    return description;
+  };
 
   const getBlankPayItem = () => ({
     name: '',
@@ -44,12 +68,15 @@ function Billing() {
   const hasTransporterCostItem = (items) => {
     return Array.isArray(items) && items.some(item => {
       const label = (item?.name || item?.description || '').toLowerCase().trim();
-      return label === 'transporter cost';
+      // Only check for new format with place names
+      return label.startsWith('transporter cost (from');
     });
   };
 
   const isTransporterCostLabel = (value) => {
-    return String(value || '').toLowerCase().trim() === 'transporter cost';
+    const normalized = String(value || '').toLowerCase().trim();
+    // Only check for new format with place names
+    return normalized.startsWith('transporter cost (from');
   };
 
   const mergeTransporterCostItems = (items) => {
@@ -70,7 +97,7 @@ function Billing() {
       if (!transporterAccumulator) {
         transporterAccumulator = {
           ...item,
-          description: 'transporter cost',
+          description: description, // Keep the full description with place names
           amount: parseFloat(item.amount || item.actualCost || 0) || 0,
           actualCost: parseFloat(item.actualCost || item.amount || 0) || 0,
           billingAmount: parseFloat(item.billingAmount || item.amount || item.actualCost || 0) || 0
@@ -109,6 +136,13 @@ function Billing() {
 
   const getDefaultPayItemsForCategory = (shipmentCategory) => {
     return ensureFclTransporterCost([], shipmentCategory);
+  };
+
+  const getAssignedClerks = () => {
+    if (!selectedJob || !selectedJob.assignedUsers) {
+      return [];
+    }
+    return selectedJob.assignedUsers;
   };
 
   const formatCusdecNumberForDisplay = (value) => {
@@ -164,12 +198,49 @@ function Billing() {
   const [recordsPerPage, setRecordsPerPage] = useState(20);
   const [statusFilter, setStatusFilter] = useState('All');
   const [customerFilter, setCustomerFilter] = useState('All');
+  const [showGeneratedInvoices, setShowGeneratedInvoices] = useState(true);
+  const [showOldInvoices, setShowOldInvoices] = useState(false);
+  
+  // Old Invoices states
+  const [oldInvoices, setOldInvoices] = useState([]);
+  const [showOldInvoiceModal, setShowOldInvoiceModal] = useState(false);
+  const [showOldPaymentModal, setShowOldPaymentModal] = useState(false);
+  const [editingOldInvoice, setEditingOldInvoice] = useState(null);
+  const [selectedOldInvoice, setSelectedOldInvoice] = useState(null);
+  const [expandedOldInvoiceRow, setExpandedOldInvoiceRow] = useState(null);
+  const [oldInvoiceFormData, setOldInvoiceFormData] = useState({
+    customerId: '',
+    cusdecNumber: '',
+    cusdecDate: '',
+    invoiceDate: '',
+    invoiceNumberSuffix: '',
+    totalAmount: '',
+    settleDate: ''
+  });
+  const [oldInvoicePaymentData, setOldInvoicePaymentData] = useState({
+    paymentAmount: '',
+    paymentMethod: 'Cash',
+    receivedDate: new Date().toISOString().split('T')[0],
+    notes: '',
+    chequeNumber: '',
+    chequeDate: '',
+    chequeAmount: '',
+    bankName: ''
+  });
+  const [oldInvoiceFormErrors, setOldInvoiceFormErrors] = useState({});
+  const [oldInvoiceSearchTerm, setOldInvoiceSearchTerm] = useState('');
+  const [oldInvoiceFilterStatus, setOldInvoiceFilterStatus] = useState('All');
+  
+  // Review Invoice states
+  const [showReviewInvoiceModal, setShowReviewInvoiceModal] = useState(false);
+  const [reviewInvoiceLoading, setReviewInvoiceLoading] = useState(false);
 
   useEffect(() => {
     fetchBills();
     fetchJobs();
     fetchCustomers();
     fetchTransporters();
+    fetchOldInvoices();
   }, []);
 
   const fetchBills = async () => {
@@ -228,6 +299,26 @@ function Billing() {
       setTransporters(data);
     } catch (error) {
       console.error('Error fetching transporters:', error);
+    }
+  };
+
+  const fetchOldInvoices = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/old-invoices`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch old invoices');
+      }
+      
+      const data = await response.json();
+      setOldInvoices(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching old invoices:', error);
+      setOldInvoices([]);
     }
   };
 
@@ -493,11 +584,23 @@ function Billing() {
   };
 
   const addTransporterCostRow = () => {
+    // Check if transporter cost already exists
+    if (hasTransporterCostItem(payItems)) {
+      setMessage('Transporter cost is already added. Use the existing row or remove it first.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
     setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
     setShowPayItemsRow(true);
   };
 
   const addTransporterCostFromHeader = () => {
+    // Check if transporter cost already exists
+    if (hasTransporterCostItem(payItems)) {
+      setMessage('Transporter cost is already added. Use the existing row or remove it first.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
     setShowPayItemsRow(true);
     setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
   };
@@ -994,6 +1097,7 @@ function Billing() {
         console.warn('Could not close petty cash assignments from frontend:', err.message);
       }
 
+      const customerName = customers.find(c => c.customerId === selectedJob.customerId)?.name || selectedJob.customerId;
       setMessage('Invoice generated successfully!');
       setSelectedJob(null);
       fetchBills();
@@ -1003,6 +1107,26 @@ function Billing() {
       console.error('Error generating invoice:', error);
       setMessage('Error generating invoice');
       setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const handleReviewInvoiceSubmit = async (reviewData) => {
+    setReviewInvoiceLoading(true);
+    try {
+      console.log('Sending review data:', reviewData);
+      const response = await invoiceReviewService.sendReview(reviewData);
+      console.log('Review sent successfully:', response);
+      setMessage('Invoice review sent successfully');
+      setTimeout(() => setMessage(''), 3000);
+      setShowReviewInvoiceModal(false);
+    } catch (error) {
+      console.error('Error sending invoice review:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      const errorMessage = error.response?.data?.message || error.message || 'Error sending invoice review';
+      setMessage(errorMessage);
+      setTimeout(() => setMessage(''), 5000);
+    } finally {
+      setReviewInvoiceLoading(false);
     }
   };
 
@@ -1328,7 +1452,16 @@ function Billing() {
     }
 
     const printablePayItems = payItemsArray.map((item, index) => {
-      const description = item.description || item.name || 'Service Charge';
+      let description = item.description || item.name || 'Service Charge';
+      
+      // Always transform to new format with place names
+      const normalized = description.toLowerCase().trim();
+      if (normalized.startsWith('transporter cost')) {
+        const fromPlace = job.exporter || 'placename';
+        const toPlace = job.transporter || 'placename';
+        description = `transporter cost (from ${fromPlace} to ${toPlace})`;
+      }
+      
       const amount = parseFloat(item.billingAmount || item.amount || 0) || 0;
       const payItemId = item.id || item.payItemId || item.officePayItemId || `PI${String(index + 1).padStart(3, '0')}`;
 
@@ -1375,13 +1508,19 @@ function Billing() {
 
     // Add transporter cost for FCL shipments
     if (job.shipmentCategory === 'FCL') {
-      const hasTransporterCost = payItemsArray.some(item => 
-        (item.name || item.description)?.toLowerCase() === 'transporter cost'
-      );
+      const hasTransporterCost = payItemsArray.some(item => {
+        const label = (item?.name || item?.description || '').toLowerCase().trim();
+        // Check if any transporter cost exists (old or new format)
+        return label.startsWith('transporter cost');
+      });
       if (!hasTransporterCost) {
+        // Always use new format with place names
+        const fromPlace = job.exporter || 'placename';
+        const toPlace = job.transporter || 'placename';
+        const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
         payItemsArray.push({
-          name: 'Transporter Cost',
-          description: 'Transporter Cost',
+          name: description,
+          description: description,
           billingAmount: 0,
           amount: 0
         });
@@ -1690,6 +1829,9 @@ function Billing() {
         <div class="invoice-page">
         <div style="font-size: 10pt; font-weight: bold; margin-bottom: 6px; margin-top: 0;">
           INV No: ${invoiceNumber}
+          <div style="font-size: 9pt; font-weight: normal; margin-top: 2px;">
+            Date: ${formatDate(bill.invoiceDate || bill.billDate || bill.createdDate)}
+          </div>
         </div>
 
         <div class="recipient">
@@ -2206,9 +2348,21 @@ function Billing() {
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedJob.payItems.map((item, idx) => (
+                        {selectedJob.payItems.map((item, idx) => {
+                          const itemDescription = item.description || item.name || '';
+                          let displayDescription = itemDescription;
+                          
+                          // Always transform to new format with place names
+                          const normalized = itemDescription.toLowerCase().trim();
+                          if (normalized.startsWith('transporter cost')) {
+                            const fromPlace = selectedJob.exporter || 'placename';
+                            const toPlace = selectedJob.transporter || 'placename';
+                            displayDescription = `transporter cost (from ${fromPlace} to ${toPlace})`;
+                          }
+                          
+                          return (
                           <tr key={idx} className="pay-item-row">
-                            <td className="col-description">{item.description}</td>
+                            <td className="col-description">{displayDescription}</td>
                             <td className="col-amount">
                               {formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}
                             </td>
@@ -2249,7 +2403,8 @@ function Billing() {
                               </td>
                             )}
                           </tr>
-                        ))}
+                        );
+                        })}
                       </tbody>
                       <tfoot>
                         {/* Total Row */}
@@ -2303,12 +2458,19 @@ function Billing() {
                     </table>
 
                     <div className="generate-bill-section">
+                      <button 
+                        onClick={() => setShowReviewInvoiceModal(true)} 
+                        className="btn btn-secondary btn-small"
+                        disabled={!selectedJob || !selectedJob.payItems || selectedJob.payItems.length === 0 || !getAssignedClerks().length}
+                      >
+                        📋 Review Invoice
+                      </button>
                       <button onClick={generateBill} className="btn btn-primary btn-small">
                         ✓ Generate Invoice
                       </button>
                       {showValidationModal && (
-                        <div className="validation-modal-overlay" onClick={() => setShowValidationModal(false)}>
-                          <div className="validation-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="validation-modal-overlay">
+                          <div className="validation-modal">
                             <div className="validation-modal-header">
                               <h3>⚠️ Cannot Generate Invoice</h3>
                               <button className="modal-close-btn" onClick={() => setShowValidationModal(false)}>×</button>
@@ -2340,6 +2502,22 @@ function Billing() {
       <div className="card">
         <div className="card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => setShowGeneratedInvoices(!showGeneratedInvoices)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '18px',
+                color: '#374151'
+              }}
+              title={showGeneratedInvoices ? 'Collapse' : 'Expand'}
+            >
+              {showGeneratedInvoices ? '▼' : '▶'}
+            </button>
             <h2>Generated Invoices ({filteredBills.length})</h2>
             {(statusFilter !== 'All' || customerFilter !== 'All') && (
               <button
@@ -2415,11 +2593,13 @@ function Billing() {
             </div>
           </div>
         </div>
-        {filteredBills.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">📄</div>
-            <p>{bills.length === 0 ? 'No invoices generated yet' : 'No invoices match the selected filters'}</p>
-          </div>
+        {showGeneratedInvoices && (
+          <>
+            {filteredBills.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">📄</div>
+                <p>{bills.length === 0 ? 'No invoices generated yet' : 'No invoices match the selected filters'}</p>
+              </div>
         ) : (
           <div className="billing-table-wrapper">
             <table className="billing-table">
@@ -2754,6 +2934,8 @@ function Billing() {
             onPageChange={handlePageChange}
             onRecordsPerPageChange={handleRecordsPerPageChange}
           />
+        )}
+          </>
         )}
       </div>
 
@@ -3098,6 +3280,817 @@ function Billing() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Review Invoice Modal */}
+      <ReviewInvoiceModal
+        show={showReviewInvoiceModal}
+        onClose={() => setShowReviewInvoiceModal(false)}
+        job={selectedJob}
+        assignedClerks={getAssignedClerks()}
+        onSubmit={handleReviewInvoiceSubmit}
+        loading={reviewInvoiceLoading}
+      />
+
+      {/* OLD INVOICES SECTION */}
+      <div className="card">
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => setShowOldInvoices(!showOldInvoices)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '18px',
+                color: '#374151'
+              }}
+              title={showOldInvoices ? 'Collapse' : 'Expand'}
+            >
+              {showOldInvoices ? '▼' : '▶'}
+            </button>
+            <h2>Old Invoice Management ({oldInvoices.length})</h2>
+            {user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive') && (
+              <button 
+                className="btn btn-primary" 
+                onClick={() => {
+                  setEditingOldInvoice(null);
+                  setOldInvoiceFormData({
+                    customerId: '',
+                    cusdecNumber: '',
+                    cusdecDate: '',
+                    invoiceDate: '',
+                    invoiceNumberSuffix: '',
+                    totalAmount: '',
+                    settleDate: ''
+                  });
+                  setOldInvoiceFormErrors({});
+                  setShowOldInvoiceModal(true);
+                }}
+                style={{ marginLeft: 'auto' }}
+              >
+                + Add Old Invoice
+              </button>
+            )}
+          </div>
+          {showOldInvoices && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Status</span>
+                <select
+                  value={oldInvoiceFilterStatus}
+                  onChange={(e) => setOldInvoiceFilterStatus(e.target.value)}
+                  className="form-control"
+                  style={{ minWidth: '150px', padding: '6px 10px' }}
+                >
+                  <option value="All">All</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Partially Paid">Partially Paid</option>
+                  <option value="Fully Settled">Fully Settled</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                <input
+                  type="text"
+                  placeholder="Search by invoice number, customer, or cusdec..."
+                  value={oldInvoiceSearchTerm}
+                  onChange={(e) => setOldInvoiceSearchTerm(e.target.value)}
+                  className="form-control"
+                  style={{ padding: '6px 10px' }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {showOldInvoices && (
+          <>
+            {oldInvoices.filter(invoice => {
+              const matchesSearch = 
+                invoice.invoiceNumber.toLowerCase().includes(oldInvoiceSearchTerm.toLowerCase()) ||
+                invoice.customerName.toLowerCase().includes(oldInvoiceSearchTerm.toLowerCase()) ||
+                (invoice.cusdecNumber && invoice.cusdecNumber.toLowerCase().includes(oldInvoiceSearchTerm.toLowerCase()));
+              
+              const matchesStatus = oldInvoiceFilterStatus === 'All' || invoice.status === oldInvoiceFilterStatus;
+              
+              return matchesSearch && matchesStatus;
+            }).length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">📄</div>
+                <p>{oldInvoices.length === 0 ? 'No old invoices found' : 'No old invoices match the selected filters'}</p>
+              </div>
+            ) : (
+              <div className="billing-table-wrapper">
+                <table className="billing-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice Number</th>
+                      <th>Customer</th>
+                      <th>Cusdec Number</th>
+                      <th>Invoice Date</th>
+                      <th>Total Amount</th>
+                      <th>Amount Received</th>
+                      <th>Balance</th>
+                      <th>Status</th>
+                      <th className="expand-header"></th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {oldInvoices.filter(invoice => {
+                      const matchesSearch = 
+                        invoice.invoiceNumber.toLowerCase().includes(oldInvoiceSearchTerm.toLowerCase()) ||
+                        invoice.customerName.toLowerCase().includes(oldInvoiceSearchTerm.toLowerCase()) ||
+                        (invoice.cusdecNumber && invoice.cusdecNumber.toLowerCase().includes(oldInvoiceSearchTerm.toLowerCase()));
+                      
+                      const matchesStatus = oldInvoiceFilterStatus === 'All' || invoice.status === oldInvoiceFilterStatus;
+                      
+                      return matchesSearch && matchesStatus;
+                    }).map(invoice => (
+                      <React.Fragment key={invoice.oldInvoiceId}>
+                        <tr className={expandedOldInvoiceRow === invoice.oldInvoiceId ? 'expanded' : ''}>
+                          <td data-label="Invoice Number"><strong>{invoice.invoiceNumber}</strong></td>
+                          <td data-label="Customer">{invoice.customerName}</td>
+                          <td data-label="Cusdec Number">{invoice.cusdecNumber || '-'}</td>
+                          <td data-label="Invoice Date">{new Date(invoice.invoiceDate).toLocaleDateString('en-GB')}</td>
+                          <td data-label="Total Amount" className="amount">LKR {formatAmount(invoice.totalAmount)}</td>
+                          <td data-label="Amount Received" className="amount">LKR {formatAmount(invoice.amountReceived)}</td>
+                          <td data-label="Balance" className="amount">LKR {formatAmount(invoice.balance)}</td>
+                          <td data-label="Status">
+                            <span className={`status-badge status-${invoice.status.toLowerCase().replace(' ', '-')}`}>
+                              {invoice.status}
+                            </span>
+                          </td>
+                          <td className="expand-column">
+                            <button
+                              className="expand-btn-middle"
+                              onClick={() => setExpandedOldInvoiceRow(expandedOldInvoiceRow === invoice.oldInvoiceId ? null : invoice.oldInvoiceId)}
+                              title={expandedOldInvoiceRow === invoice.oldInvoiceId ? "Hide details" : "View details"}
+                            >
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points={expandedOldInvoiceRow === invoice.oldInvoiceId ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+                              </svg>
+                            </button>
+                          </td>
+                          <td data-label="Actions">
+                            <div className="action-buttons">
+                              {invoice.balance > 0 && user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive') && (
+                                <button 
+                                  className="btn btn-primary btn-small"
+                                  onClick={() => {
+                                    setSelectedOldInvoice(invoice);
+                                    setOldInvoicePaymentData({
+                                      paymentAmount: '',
+                                      paymentMethod: 'Cash',
+                                      receivedDate: new Date().toISOString().split('T')[0],
+                                      notes: '',
+                                      chequeNumber: '',
+                                      chequeDate: '',
+                                      chequeAmount: '',
+                                      bankName: ''
+                                    });
+                                    setShowOldPaymentModal(true);
+                                  }}
+                                  title="Add Payment"
+                                >
+                                  + Payment
+                                </button>
+                              )}
+                              {user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive') && (
+                                <>
+                                  <button 
+                                    className="btn btn-secondary btn-small"
+                                    onClick={() => {
+                                      const invoiceParts = invoice.invoiceNumber.split(' - INV');
+                                      const suffix = invoiceParts[1] || '';
+                                      
+                                      setEditingOldInvoice(invoice);
+                                      setOldInvoiceFormData({
+                                        customerId: invoice.customerId,
+                                        cusdecNumber: invoice.cusdecNumber || '',
+                                        cusdecDate: invoice.cusdecDate ? invoice.cusdecDate.split('T')[0] : '',
+                                        invoiceDate: invoice.invoiceDate.split('T')[0],
+                                        invoiceNumberSuffix: suffix,
+                                        totalAmount: invoice.totalAmount,
+                                        settleDate: invoice.settleDate ? invoice.settleDate.split('T')[0] : ''
+                                      });
+                                      setShowOldInvoiceModal(true);
+                                    }}
+                                    title="Edit"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button 
+                                    className="btn btn-danger btn-small"
+                                    onClick={async () => {
+                                      if (!window.confirm('Are you sure you want to delete this invoice?')) return;
+                                      try {
+                                        const response = await fetch(`${API_BASE}/api/old-invoices/${invoice.oldInvoiceId}`, {
+                                          method: 'DELETE',
+                                          headers: {
+                                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                          }
+                                        });
+                                        if (response.ok) {
+                                          setMessage('Invoice deleted successfully');
+                                          fetchOldInvoices();
+                                        } else {
+                                          setMessage('Failed to delete invoice');
+                                        }
+                                      } catch (error) {
+                                        console.error('Error deleting invoice:', error);
+                                        setMessage('Failed to delete invoice');
+                                      }
+                                    }}
+                                    title="Delete"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedOldInvoiceRow === invoice.oldInvoiceId && (
+                          <tr className="details-row">
+                            <td colSpan="10">
+                              <div className="bill-details-expanded">
+                                <div className="details-grid">
+                                  <div className="detail-card">
+                                    <div className="detail-label">Customer ID</div>
+                                    <div className="detail-value">{invoice.customerId}</div>
+                                  </div>
+                                  <div className="detail-card">
+                                    <div className="detail-label">Cusdec Date</div>
+                                    <div className="detail-value">{invoice.cusdecDate ? new Date(invoice.cusdecDate).toLocaleDateString('en-GB') : '-'}</div>
+                                  </div>
+                                  <div className="detail-card">
+                                    <div className="detail-label">Settle Date</div>
+                                    <div className="detail-value">{invoice.settleDate ? new Date(invoice.settleDate).toLocaleDateString('en-GB') : '-'}</div>
+                                  </div>
+                                  <div className="detail-card">
+                                    <div className="detail-label">Created</div>
+                                    <div className="detail-value">{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-GB') : '-'}</div>
+                                  </div>
+                                </div>
+
+                                {invoice.payments && invoice.payments.length > 0 && (
+                                  <div className="payment-tracking-section">
+                                    <div className="payment-tracking-header">
+                                      <span className="payment-tracking-title">Payment History</span>
+                                      <span className="payment-tracking-count">{invoice.payments.length} payment record{invoice.payments.length !== 1 ? 's' : ''}</span>
+                                    </div>
+                                    
+                                    <div className="payment-tracking-table">
+                                      <div className="payment-table-header">
+                                        <div className="payment-header-cell payment-date-col">#</div>
+                                        <div className="payment-header-cell payment-date-col">Payment Date</div>
+                                        <div className="payment-header-cell payment-method-col">Method</div>
+                                        <div className="payment-header-cell payment-reference-col">Reference</div>
+                                        <div className="payment-header-cell payment-amount-col">Amount Paid</div>
+                                        {user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive') && (
+                                          <div className="payment-header-cell payment-amount-col">Actions</div>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="payment-table-body">
+                                        {invoice.payments.map((payment, idx) => (
+                                          <div key={idx} className="payment-table-row">
+                                            <div className="payment-table-cell payment-date-col">
+                                              <span className="payment-num">{idx + 1}</span>
+                                            </div>
+                                            <div className="payment-table-cell payment-date-col">
+                                              {new Date(payment.receivedDate).toLocaleDateString('en-GB')}
+                                            </div>
+                                            <div className="payment-table-cell payment-method-col">
+                                              <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
+                                                {payment.paymentMethod === 'Cash' && '💵'}
+                                                {payment.paymentMethod === 'Cheque' && '📝'}
+                                                {payment.paymentMethod === 'Bank Transfer' && '🏦'}
+                                                {' '}{payment.paymentMethod || '-'}
+                                              </span>
+                                            </div>
+                                            <div className="payment-table-cell payment-reference-col">
+                                              {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? (
+                                                <span className="reference-text">CHQ: {payment.chequeNumber}</span>
+                                              ) : payment.paymentMethod === 'Bank Transfer' && payment.bankName ? (
+                                                <span className="reference-text">{payment.bankName}</span>
+                                              ) : payment.paymentMethod === 'Cash' ? (
+                                                <span className="reference-text">Cash</span>
+                                              ) : (
+                                                <span className="reference-empty">-</span>
+                                              )}
+                                            </div>
+                                            <div className="payment-table-cell payment-amount-col">
+                                              <span className="payment-amount-value">LKR {formatAmount(payment.paymentAmount || 0)}</span>
+                                            </div>
+                                            {user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive') && (
+                                              <div className="payment-table-cell payment-amount-col">
+                                                <button 
+                                                  className="btn btn-danger btn-small"
+                                                  onClick={async () => {
+                                                    if (!window.confirm('Are you sure you want to delete this payment?')) return;
+                                                    try {
+                                                      const response = await fetch(`${API_BASE}/api/old-invoices/payments/${payment.paymentId}`, {
+                                                        method: 'DELETE',
+                                                        headers: {
+                                                          'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                                        }
+                                                      });
+                                                      if (response.ok) {
+                                                        setMessage('Payment deleted successfully');
+                                                        fetchOldInvoices();
+                                                      } else {
+                                                        setMessage('Failed to delete payment');
+                                                      }
+                                                    } catch (error) {
+                                                      console.error('Error deleting payment:', error);
+                                                      setMessage('Failed to delete payment');
+                                                    }
+                                                  }}
+                                                >
+                                                  Delete
+                                                </button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Old Invoice Add/Edit Modal */}
+      {showOldInvoiceModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>{editingOldInvoice ? 'Edit Old Invoice' : 'Add Old Invoice'}</h2>
+              <button 
+                className="modal-close" 
+                onClick={() => {
+                  setShowOldInvoiceModal(false);
+                  setEditingOldInvoice(null);
+                  setOldInvoiceFormData({
+                    customerId: '',
+                    cusdecNumber: '',
+                    cusdecDate: '',
+                    invoiceDate: '',
+                    invoiceNumberSuffix: '',
+                    totalAmount: '',
+                    settleDate: ''
+                  });
+                  setOldInvoiceFormErrors({});
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              
+              const errors = {};
+              if (!oldInvoiceFormData.customerId) errors.customerId = 'Customer is required';
+              if (!oldInvoiceFormData.invoiceDate) errors.invoiceDate = 'Invoice date is required';
+              if (!oldInvoiceFormData.invoiceNumberSuffix) errors.invoiceNumberSuffix = 'Invoice number suffix is required';
+              if (!oldInvoiceFormData.totalAmount || parseFloat(oldInvoiceFormData.totalAmount) <= 0) {
+                errors.totalAmount = 'Total amount must be greater than 0';
+              }
+              
+              if (Object.keys(errors).length > 0) {
+                setOldInvoiceFormErrors(errors);
+                setMessage('Please fix the errors in the form');
+                return;
+              }
+
+              try {
+                const invoiceNumber = `${new Date(oldInvoiceFormData.invoiceDate).getFullYear()}/${String(new Date(oldInvoiceFormData.invoiceDate).getMonth() + 1).padStart(2, '0')} - INV${oldInvoiceFormData.invoiceNumberSuffix}`;
+                const totalAmount = parseFloat(oldInvoiceFormData.totalAmount);
+                const balance = totalAmount;
+                
+                const payload = {
+                  customerId: oldInvoiceFormData.customerId,
+                  cusdecNumber: oldInvoiceFormData.cusdecNumber || null,
+                  cusdecDate: oldInvoiceFormData.cusdecDate || null,
+                  invoiceDate: oldInvoiceFormData.invoiceDate,
+                  invoiceNumber: invoiceNumber,
+                  totalAmount: totalAmount,
+                  amountReceived: 0,
+                  balance: balance,
+                  status: 'Pending',
+                  settleDate: oldInvoiceFormData.settleDate || null,
+                  daysAfterInvoice: null
+                };
+
+                const url = editingOldInvoice
+                  ? `${API_BASE}/api/old-invoices/${editingOldInvoice.oldInvoiceId}`
+                  : `${API_BASE}/api/old-invoices`;
+                
+                const method = editingOldInvoice ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                  method: method,
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                  setMessage(editingOldInvoice ? 'Invoice updated successfully' : 'Invoice created successfully');
+                  fetchOldInvoices();
+                  setShowOldInvoiceModal(false);
+                  setEditingOldInvoice(null);
+                  setOldInvoiceFormData({
+                    customerId: '',
+                    cusdecNumber: '',
+                    cusdecDate: '',
+                    invoiceDate: '',
+                    invoiceNumberSuffix: '',
+                    totalAmount: '',
+                    settleDate: ''
+                  });
+                  setOldInvoiceFormErrors({});
+                } else {
+                  const error = await response.json();
+                  setMessage(error.message || 'Failed to save invoice');
+                }
+              } catch (error) {
+                console.error('Error saving invoice:', error);
+                setMessage('Failed to save invoice');
+              }
+            }} className="modal-form">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Customer *</label>
+                  <select
+                    value={oldInvoiceFormData.customerId}
+                    onChange={(e) => setOldInvoiceFormData({...oldInvoiceFormData, customerId: e.target.value})}
+                    className={oldInvoiceFormErrors.customerId ? 'error' : ''}
+                    required
+                  >
+                    <option value="">Select Customer</option>
+                    {customers.map(customer => (
+                      <option key={customer.customerId} value={customer.customerId}>
+                        {customer.name}
+                      </option>
+                    ))}
+                  </select>
+                  {oldInvoiceFormErrors.customerId && <span className="error-text">{oldInvoiceFormErrors.customerId}</span>}
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Cusdec Number</label>
+                  <input
+                    type="text"
+                    value={oldInvoiceFormData.cusdecNumber}
+                    onChange={(e) => setOldInvoiceFormData({...oldInvoiceFormData, cusdecNumber: e.target.value})}
+                    placeholder="Enter cusdec number"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Cusdec Date</label>
+                  <input
+                    type="date"
+                    value={oldInvoiceFormData.cusdecDate}
+                    onChange={(e) => setOldInvoiceFormData({...oldInvoiceFormData, cusdecDate: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Invoice Date *</label>
+                  <input
+                    type="date"
+                    value={oldInvoiceFormData.invoiceDate}
+                    onChange={(e) => setOldInvoiceFormData({...oldInvoiceFormData, invoiceDate: e.target.value})}
+                    className={oldInvoiceFormErrors.invoiceDate ? 'error' : ''}
+                    required
+                  />
+                  {oldInvoiceFormErrors.invoiceDate && <span className="error-text">{oldInvoiceFormErrors.invoiceDate}</span>}
+                </div>
+                <div className="form-group">
+                  <label>Invoice Number Suffix *</label>
+                  <input
+                    type="text"
+                    value={oldInvoiceFormData.invoiceNumberSuffix}
+                    onChange={(e) => setOldInvoiceFormData({...oldInvoiceFormData, invoiceNumberSuffix: e.target.value})}
+                    placeholder="e.g., 11959"
+                    className={oldInvoiceFormErrors.invoiceNumberSuffix ? 'error' : ''}
+                    required
+                  />
+                  {oldInvoiceFormErrors.invoiceNumberSuffix && <span className="error-text">{oldInvoiceFormErrors.invoiceNumberSuffix}</span>}
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Total Amount (LKR) *</label>
+                  <input
+                    type="text"
+                    value={oldInvoiceFormData.totalAmount}
+                    onChange={(e) => setOldInvoiceFormData({...oldInvoiceFormData, totalAmount: e.target.value.replace(/,/g, '')})}
+                    placeholder="0.00"
+                    className={oldInvoiceFormErrors.totalAmount ? 'error' : ''}
+                    required
+                  />
+                  {oldInvoiceFormErrors.totalAmount && <span className="error-text">{oldInvoiceFormErrors.totalAmount}</span>}
+                </div>
+                <div className="form-group">
+                  <label>Settle Date (if fully settled)</label>
+                  <input
+                    type="date"
+                    value={oldInvoiceFormData.settleDate}
+                    onChange={(e) => setOldInvoiceFormData({...oldInvoiceFormData, settleDate: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => {
+                  setShowOldInvoiceModal(false);
+                  setEditingOldInvoice(null);
+                  setOldInvoiceFormData({
+                    customerId: '',
+                    cusdecNumber: '',
+                    cusdecDate: '',
+                    invoiceDate: '',
+                    invoiceNumberSuffix: '',
+                    totalAmount: '',
+                    settleDate: ''
+                  });
+                  setOldInvoiceFormErrors({});
+                }}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  {editingOldInvoice ? 'Update Invoice' : 'Create Invoice'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Old Invoice Payment Modal */}
+      {showOldPaymentModal && selectedOldInvoice && (
+        <div className="modal-overlay">
+          <div className="modal-content modal-small">
+            <div className="modal-header">
+              <h2>Add Payment</h2>
+              <button 
+                className="modal-close" 
+                onClick={() => {
+                  setShowOldPaymentModal(false);
+                  setSelectedOldInvoice(null);
+                  setOldInvoicePaymentData({
+                    paymentAmount: '',
+                    paymentMethod: 'Cash',
+                    receivedDate: new Date().toISOString().split('T')[0],
+                    notes: '',
+                    chequeNumber: '',
+                    chequeDate: '',
+                    chequeAmount: '',
+                    bankName: ''
+                  });
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="payment-info">
+              <p><strong>Invoice:</strong> {selectedOldInvoice.invoiceNumber}</p>
+              <p><strong>Customer:</strong> {selectedOldInvoice.customerName}</p>
+              <p><strong>Balance:</strong> LKR {formatAmount(selectedOldInvoice.balance)}</p>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              
+              if (!oldInvoicePaymentData.paymentAmount || parseFloat(oldInvoicePaymentData.paymentAmount) <= 0) {
+                setMessage('Payment amount must be greater than 0');
+                return;
+              }
+
+              if (oldInvoicePaymentData.paymentMethod === 'Cheque') {
+                if (!oldInvoicePaymentData.chequeNumber) {
+                  setMessage('Cheque number is required for cheque payments');
+                  return;
+                }
+                if (!oldInvoicePaymentData.chequeDate) {
+                  setMessage('Cheque date is required for cheque payments');
+                  return;
+                }
+                if (!oldInvoicePaymentData.chequeAmount || parseFloat(oldInvoicePaymentData.chequeAmount) <= 0) {
+                  setMessage('Cheque amount must be greater than 0');
+                  return;
+                }
+              }
+
+              if (oldInvoicePaymentData.paymentMethod === 'Bank Transfer') {
+                if (!oldInvoicePaymentData.bankName) {
+                  setMessage('Bank name is required for bank transfer payments');
+                  return;
+                }
+              }
+
+              try {
+                const payload = {
+                  paymentAmount: parseFloat(oldInvoicePaymentData.paymentAmount),
+                  paymentMethod: oldInvoicePaymentData.paymentMethod,
+                  receivedDate: oldInvoicePaymentData.receivedDate,
+                  notes: oldInvoicePaymentData.notes
+                };
+
+                if (oldInvoicePaymentData.paymentMethod === 'Cheque') {
+                  payload.chequeNumber = oldInvoicePaymentData.chequeNumber;
+                  payload.chequeDate = oldInvoicePaymentData.chequeDate;
+                  payload.chequeAmount = parseFloat(oldInvoicePaymentData.chequeAmount);
+                }
+
+                if (oldInvoicePaymentData.paymentMethod === 'Bank Transfer') {
+                  payload.bankName = oldInvoicePaymentData.bankName;
+                }
+
+                const response = await fetch(`${API_BASE}/api/old-invoices/${selectedOldInvoice.oldInvoiceId}/payments`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                  setMessage('Payment added successfully');
+                  fetchOldInvoices();
+                  setShowOldPaymentModal(false);
+                  setSelectedOldInvoice(null);
+                  setOldInvoicePaymentData({
+                    paymentAmount: '',
+                    paymentMethod: 'Cash',
+                    receivedDate: new Date().toISOString().split('T')[0],
+                    notes: '',
+                    chequeNumber: '',
+                    chequeDate: '',
+                    chequeAmount: '',
+                    bankName: ''
+                  });
+                } else {
+                  const error = await response.json();
+                  setMessage(error.message || 'Failed to add payment');
+                }
+              } catch (error) {
+                console.error('Error adding payment:', error);
+                setMessage('Failed to add payment');
+              }
+            }} className="modal-form">
+              <div className="form-group">
+                <label>Payment Amount (LKR) *</label>
+                <input
+                  type="text"
+                  value={oldInvoicePaymentData.paymentAmount}
+                  onChange={(e) => setOldInvoicePaymentData({...oldInvoicePaymentData, paymentAmount: e.target.value.replace(/,/g, '')})}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Payment Method *</label>
+                <select
+                  value={oldInvoicePaymentData.paymentMethod}
+                  onChange={(e) => setOldInvoicePaymentData({...oldInvoicePaymentData, paymentMethod: e.target.value})}
+                  required
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+              </div>
+
+              {oldInvoicePaymentData.paymentMethod === 'Cheque' && (
+                <>
+                  <div className="form-group">
+                    <label>Cheque Number *</label>
+                    <input
+                      type="text"
+                      value={oldInvoicePaymentData.chequeNumber}
+                      onChange={(e) => setOldInvoicePaymentData({...oldInvoicePaymentData, chequeNumber: e.target.value})}
+                      placeholder="Enter cheque number"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Cheque Date *</label>
+                    <input
+                      type="date"
+                      value={oldInvoicePaymentData.chequeDate}
+                      onChange={(e) => setOldInvoicePaymentData({...oldInvoicePaymentData, chequeDate: e.target.value})}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Cheque Amount (LKR) *</label>
+                    <input
+                      type="text"
+                      value={oldInvoicePaymentData.chequeAmount}
+                      onChange={(e) => setOldInvoicePaymentData({...oldInvoicePaymentData, chequeAmount: e.target.value.replace(/,/g, '')})}
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              {oldInvoicePaymentData.paymentMethod === 'Bank Transfer' && (
+                <div className="form-group">
+                  <label>Bank Name *</label>
+                  <select
+                    value={oldInvoicePaymentData.bankName}
+                    onChange={(e) => setOldInvoicePaymentData({...oldInvoicePaymentData, bankName: e.target.value})}
+                    required
+                  >
+                    <option value="">Select Bank</option>
+                    <option value="Commercial Bank">Commercial Bank</option>
+                    <option value="Peoples Bank">Peoples Bank</option>
+                    <option value="Bank of Ceylon">Bank of Ceylon</option>
+                    <option value="Hatton National Bank">Hatton National Bank</option>
+                    <option value="Sampath Bank">Sampath Bank</option>
+                    <option value="Nations Trust Bank">Nations Trust Bank</option>
+                    <option value="DFCC Bank">DFCC Bank</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Received Date *</label>
+                <input
+                  type="date"
+                  value={oldInvoicePaymentData.receivedDate}
+                  onChange={(e) => setOldInvoicePaymentData({...oldInvoicePaymentData, receivedDate: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Notes</label>
+                <textarea
+                  value={oldInvoicePaymentData.notes}
+                  onChange={(e) => setOldInvoicePaymentData({...oldInvoicePaymentData, notes: e.target.value})}
+                  placeholder="Optional notes"
+                  rows="3"
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => {
+                  setShowOldPaymentModal(false);
+                  setSelectedOldInvoice(null);
+                  setOldInvoicePaymentData({
+                    paymentAmount: '',
+                    paymentMethod: 'Cash',
+                    receivedDate: new Date().toISOString().split('T')[0],
+                    notes: '',
+                    chequeNumber: '',
+                    chequeDate: '',
+                    chequeAmount: '',
+                    bankName: ''
+                  });
+                }}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Add Payment
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

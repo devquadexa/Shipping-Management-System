@@ -17,13 +17,41 @@
 .transporters-page .page-header h1 {
   margin: 0;
   color: #101036;
-  font-size: 1.75rem;
   font-weight: 700;
 }
 
 .transporters-page .page-header p {
   margin: 0.35rem 0 0;
   color: #6b7280;
+}
+
+/* New Transporter Button Styling */
+.transporters-page .page-header .btn-primary {
+  background: #101036 !important;
+  color: white !important;
+  padding: 12px 24px !important;
+  border-radius: 6px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+
+.transporters-page .page-header .btn-primary:hover {
+  background: #1a1a4d !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(16, 16, 54, 0.25) !important;
+  color: white !important;
+}
+
+.transporters-page .page-header .btn-primary:focus,
+.transporters-page .page-header .btn-primary:focus-visible {
+  outline: none !important;
+  background: #1a1a4d !important;
 }
 
 .transporters-page .card {
@@ -146,14 +174,12 @@
 }
 
 .transporters-page .btn-edit {
-  background: #101036;
-  color: white;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .transporters-page .btn-edit:hover {
-  background: #1a1a4d;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  background: #bfdbfe;
 }
 
 .transporters-page .btn-view {
@@ -1596,7 +1622,6 @@
   background: #f9fafb;
   border-bottom: 2px solid #e5e7eb;
   min-height: auto;
-  padding: 1.5rem;
   margin-top: 0.5rem;
 }
 

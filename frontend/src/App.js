@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
@@ -19,7 +19,13 @@ import Transporters from './components/Transporters';
 import OldInvoices from './components/OldInvoices';
 import OtherExpenses from './components/OtherExpenses';
 import OtherExpensesReport from './components/OtherExpensesReport';
+import InvoiceReviewPage from './components/InvoiceReviewPage';
+import CashSummaryReport from './components/CashSummaryReport';
 import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
+import ResetPassword from './components/ResetPassword';
+import ForgotPassword from './components/ForgotPassword';
+import PasswordResetRequests from './components/PasswordResetRequests';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -43,64 +49,118 @@ function AdminRoute({ children }) {
 }
 
 function AppContent() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarHidden, setIsSidebarHidden] = useState(false);
+
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const closeSidebar = () => setIsSidebarOpen(false);
+
+  // Listen for sidebar visibility toggle events
+  React.useEffect(() => {
+    const handleToggleSidebarVisibility = (event) => {
+      setIsSidebarHidden(event.detail.hidden);
+    };
+
+    window.addEventListener('toggleSidebarVisibility', handleToggleSidebarVisibility);
+    return () => window.removeEventListener('toggleSidebarVisibility', handleToggleSidebarVisibility);
+  }, []);
+
+  // Show loading state while auth is being checked
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <Router>
       <div className="App">
-        {user && <Navbar />}
+        {user && (
+          <>
+            {!isSidebarHidden && <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />}
+            <Navbar onMenuClick={toggleSidebar} />
+          </>
+        )}
 
-        <Routes>
-          <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+        {!user ? (
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="*" element={<Navigate to="/login" />} />
+          </Routes>
+        ) : (
+          <div className={`main-content ${!isSidebarHidden ? 'with-sidebar' : ''}`}>
+            <Routes>
+              <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+              <Route path="/reset-password" element={<PrivateRoute><ResetPassword /></PrivateRoute>} />
+              <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
+              <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
+              <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+              <Route path="/invoice-reviews" element={<PrivateRoute><InvoiceReviewPage /></PrivateRoute>} />
+              <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
+              <Route path="/old-invoices" element={<PrivateRoute><OldInvoices /></PrivateRoute>} />
+              <Route path="/other-expenses" element={<PrivateRoute><OtherExpenses /></PrivateRoute>} />
+              <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
+              <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
+              <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+              
+              {/* Password Reset Requests - Super Admin only */}
+              <Route 
+                path="/password-reset-requests" 
+                element={
+                  <PrivateRoute>
+                    {user?.role === 'Super Admin' ? <PasswordResetRequests /> : <Navigate to="/" />}
+                  </PrivateRoute>
+                } 
+              />
 
-          <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
-          <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
-          <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
-          <Route path="/transporters" element={<PrivateRoute><Transporters /></PrivateRoute>} />
-          <Route path="/old-invoices" element={<PrivateRoute><OldInvoices /></PrivateRoute>} />
-          <Route path="/other-expenses" element={<PrivateRoute><OtherExpenses /></PrivateRoute>} />
-          <Route path="/accounting" element={<PrivateRoute><Accounting /></PrivateRoute>} />
-          <Route path="/users" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
-          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+              <Route
+                path="/petty-cash"
+                element={
+                  <PrivateRoute>
+                    {user?.role === 'Office Executive' ? <Navigate to="/" /> : <PettyCash />}
+                  </PrivateRoute>
+                }
+              />
 
-          <Route
-            path="/petty-cash"
-            element={
-              <PrivateRoute>
-                {user?.role === 'Office Executive' ? <Navigate to="/" /> : <PettyCash />}
-              </PrivateRoute>
-            }
-          />
+              {/* Reports hub */}
+              <Route
+                path="/reports"
+                element={<PrivateRoute><AdminRoute><Reports /></AdminRoute></PrivateRoute>}
+              />
 
-          {/* Reports hub */}
-          <Route
-            path="/reports"
-            element={<PrivateRoute><AdminRoute><Reports /></AdminRoute></PrivateRoute>}
-          />
+              {/* Individual report pages — all nested under /reports/ */}
+              <Route
+                path="/reports/petty-cash"
+                element={<PrivateRoute><AdminRoute><PettyCashReport /></AdminRoute></PrivateRoute>}
+              />
+              <Route
+                path="/reports/pending-payments"
+                element={<PrivateRoute><AdminRoute><PendingPaymentsReport /></AdminRoute></PrivateRoute>}
+              />
+              <Route
+                path="/reports/other-expenses"
+                element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
+              />
+              <Route
+                path="/reports/cash-summary"
+                element={<PrivateRoute><AdminRoute><CashSummaryReport /></AdminRoute></PrivateRoute>}
+              />
 
-          {/* Individual report pages — all nested under /reports/ */}
-          <Route
-            path="/reports/petty-cash"
-            element={<PrivateRoute><AdminRoute><PettyCashReport /></AdminRoute></PrivateRoute>}
-          />
-          <Route
-            path="/reports/pending-payments"
-            element={<PrivateRoute><AdminRoute><PendingPaymentsReport /></AdminRoute></PrivateRoute>}
-          />
-          <Route
-            path="/reports/other-expenses"
-            element={<PrivateRoute><AdminRoute><OtherExpensesReport /></AdminRoute></PrivateRoute>}
-          />
+              <Route
+                path="/reports/transporters"
+                element={<PrivateRoute><AdminRoute><TransportersReport /></AdminRoute></PrivateRoute>}
+              />
 
-          <Route
-            path="/reports/transporters"
-            element={<PrivateRoute><AdminRoute><TransportersReport /></AdminRoute></PrivateRoute>}
-          />
-
-          {/* Legacy redirect — keep old bookmark working */}
-          <Route path="/petty-cash-report" element={<Navigate to="/reports/petty-cash" replace />} />
-        </Routes>
+              {/* Legacy redirect — keep old bookmark working */}
+              <Route path="/petty-cash-report" element={<Navigate to="/reports/petty-cash" replace />} />
+            </Routes>
+          </div>
+        )}
       </div>
     </Router>
   );

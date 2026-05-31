@@ -1,6 +1,39 @@
 .App {
   min-height: 100vh;
   background: #f0f4f8;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.main-content.with-sidebar {
+  margin-left: 280px;
+  margin-top: 70px;
+}
+
+@media (max-width: 1023px) {
+  .main-content.with-sidebar {
+    margin-left: 0;
+    margin-top: 70px;
+  }
+}
+
+/* Main content area with sidebar */
+.main-content {
+  margin-left: 260px;
+  margin-top: 70px;
+  min-height: calc(100vh - 70px);
+  padding: 2rem;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
 }
 
 .navbar {
@@ -29,6 +62,36 @@
   cursor: pointer;
   padding: 0.5rem;
   z-index: 1001;
+}
+
+.sidebar-toggle-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-toggle-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (min-width: 1024px) {
+  .sidebar-toggle-btn {
+    display: flex;
+  }
 }
 
 .hamburger-icon {
@@ -75,6 +138,33 @@
   display: flex;
   align-items: center;
   gap: 1.5rem;
+}
+
+.navbar-icon-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.navbar-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(180deg);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Profile Dropdown */
@@ -897,7 +987,7 @@
 }
 
 .form-group {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.85rem;
 }
 
 .form-group label {
@@ -943,9 +1033,13 @@
 .btn-primary {
   background: linear-gradient(135deg, #101036 0%, #1a1a4d 100%);
   color: white;
+  background-color: #101036;
+  background-attachment: fixed;
 }
 
 .btn-primary:hover {
+  background: linear-gradient(135deg, #1a1a4d 0%, #2d3561 100%);
+  color: white;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(16, 16, 54, 0.4);
 }

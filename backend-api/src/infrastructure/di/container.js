@@ -20,6 +20,8 @@ const MSSQLTransporterRepository = require('../repositories/MSSQLTransporterRepo
 const MSSQLCashBalanceSettlementRepository = require('../repositories/MSSQLCashBalanceSettlementRepository');
 const MSSQLOldInvoiceRepository = require('../repositories/MSSQLOldInvoiceRepository');
 const MSSQLPaymentRepository = require('../repositories/MSSQLPaymentRepository');
+const MSSQLCashWithdrawalRepository = require('../repositories/MSSQLCashWithdrawalRepository');
+const MSSQLNotificationRepository = require('../repositories/MSSQLNotificationRepository');
 
 // Customer Use Cases
 const CreateCustomer = require('../../application/use-cases/customer/CreateCustomer');
@@ -64,6 +66,10 @@ const CreatePettyCashEntry = require('../../application/use-cases/pettycash/Crea
 const GetAllPettyCashEntries = require('../../application/use-cases/pettycash/GetAllPettyCashEntries');
 const GetPettyCashBalance = require('../../application/use-cases/pettycash/GetPettyCashBalance');
 const GetAvailablePettyCashBalance = require('../../application/use-cases/pettycash/GetAvailablePettyCashBalance');
+
+// Cash Withdrawal Use Cases
+const CreateCashWithdrawal = require('../../application/use-cases/cashwithdrawal/CreateCashWithdrawal');
+const GetAllCashWithdrawals = require('../../application/use-cases/cashwithdrawal/GetAllCashWithdrawals');
 
 // Pay Item Template Use Cases
 const GetAllPayItemTemplates = require('../../application/use-cases/payitemtemplate/GetAllPayItemTemplates');
@@ -112,6 +118,24 @@ const DeletePaymentFromOldInvoice = require('../../application/use-cases/oldinvo
 // Auth Use Cases
 const AuthenticateUser = require('../../application/use-cases/auth/AuthenticateUser');
 
+// Password Reset Use Cases
+const ChangePassword = require('../../application/use-cases/auth/ChangePassword');
+const ResetPasswordWithTemp = require('../../application/use-cases/auth/ResetPasswordWithTemp');
+const RequestPasswordReset = require('../../application/use-cases/auth/RequestPasswordReset');
+const GetPasswordResetRequests = require('../../application/use-cases/auth/GetPasswordResetRequests');
+const ApprovePasswordResetRequest = require('../../application/use-cases/auth/ApprovePasswordResetRequest');
+const RejectPasswordResetRequest = require('../../application/use-cases/auth/RejectPasswordResetRequest');
+
+// Notification Use Cases
+const CreateNotification = require('../../application/use-cases/notification/CreateNotification');
+const GetUserNotifications = require('../../application/use-cases/notification/GetUserNotifications');
+const GetUnreadNotifications = require('../../application/use-cases/notification/GetUnreadNotifications');
+const MarkNotificationAsRead = require('../../application/use-cases/notification/MarkNotificationAsRead');
+const MarkAllNotificationsAsRead = require('../../application/use-cases/notification/MarkAllNotificationsAsRead');
+
+// Repositories
+const MSSQLPasswordResetRepository = require('../repositories/MSSQLPasswordResetRepository');
+
 // Controllers
 const CashBalanceSettlementController = require('../../presentation/controllers/CashBalanceSettlementController');
 
@@ -135,6 +159,7 @@ class Container {
     this.dependencies.jobRepository = new MSSQLJobRepository(getConnection, sql);
     this.dependencies.jobAssignmentRepository = new MSSQLJobAssignmentRepository(getConnection, sql);
     this.dependencies.userRepository = new MSSQLUserRepository(getConnection, sql);
+    this.dependencies.passwordResetRepository = new MSSQLPasswordResetRepository(getConnection, sql);
     this.dependencies.billRepository = new MSSQLBillRepository(getConnection, sql);
     this.dependencies.pettyCashRepository = new MSSQLPettyCashRepository(getConnection, sql);
     this.dependencies.payItemTemplateRepository = new MSSQLPayItemTemplateRepository(getConnection, sql);
@@ -144,6 +169,8 @@ class Container {
     this.dependencies.cashBalanceSettlementRepository = new MSSQLCashBalanceSettlementRepository(getConnection, sql);
     this.dependencies.oldInvoiceRepository = new MSSQLOldInvoiceRepository(getConnection, sql);
     this.dependencies.paymentRepository = new MSSQLPaymentRepository(getConnection, sql);
+    this.dependencies.cashWithdrawalRepository = new MSSQLCashWithdrawalRepository(getConnection, sql);
+    this.dependencies.notificationRepository = new MSSQLNotificationRepository(getConnection, sql);
   }
 
   setupUseCases() {
@@ -161,6 +188,7 @@ class Container {
       cashBalanceSettlementRepository,
       oldInvoiceRepository,
       paymentRepository,
+      cashWithdrawalRepository,
     } = this.dependencies;
     
     // Customer use cases
@@ -180,7 +208,18 @@ class Container {
     this.dependencies.updateJob = new UpdateJob(jobRepository);
     this.dependencies.updateJobStatus = new UpdateJobStatus(jobRepository);
     this.dependencies.assignJob = new AssignJob(jobRepository, userRepository);
-    this.dependencies.assignMultipleUsersToJob = new AssignMultipleUsersToJob(jobRepository, userRepository, jobAssignmentRepository);
+    
+    // Notification use cases (set up early for job assignment notifications)
+    const notificationRepository = this.dependencies.notificationRepository;
+    const createNotification = new CreateNotification(notificationRepository);
+    this.dependencies.createNotification = createNotification;
+    this.dependencies.getUserNotifications = new GetUserNotifications(notificationRepository);
+    this.dependencies.getUnreadNotifications = new GetUnreadNotifications(notificationRepository);
+    this.dependencies.markNotificationAsRead = new MarkNotificationAsRead(notificationRepository);
+    this.dependencies.markAllNotificationsAsRead = new MarkAllNotificationsAsRead(notificationRepository);
+    
+    // Now create AssignMultipleUsersToJob with notification support
+    this.dependencies.assignMultipleUsersToJob = new AssignMultipleUsersToJob(jobRepository, userRepository, jobAssignmentRepository, createNotification);
     this.dependencies.removeUserFromJob = new RemoveUserFromJob(jobRepository, userRepository, jobAssignmentRepository);
     this.dependencies.getJobAssignments = new GetJobAssignments(jobRepository, jobAssignmentRepository);
     this.dependencies.getUserJobs = new GetUserJobs(userRepository, jobAssignmentRepository);
@@ -204,6 +243,10 @@ class Container {
     this.dependencies.getPettyCashBalance = new GetPettyCashBalance(pettyCashRepository);
     this.dependencies.getAvailablePettyCashBalance = new GetAvailablePettyCashBalance(pettyCashRepository, pettyCashAssignmentRepository);
     
+    // Cash Withdrawal use cases
+    this.dependencies.createCashWithdrawal = new CreateCashWithdrawal(cashWithdrawalRepository, pettyCashRepository);
+    this.dependencies.getAllCashWithdrawals = new GetAllCashWithdrawals(cashWithdrawalRepository);
+    
     // Pay Item Template use cases
     this.dependencies.getAllPayItemTemplates = new GetAllPayItemTemplates(payItemTemplateRepository);
     this.dependencies.getPayItemTemplatesByCategory = new GetPayItemTemplatesByCategory(payItemTemplateRepository);
@@ -212,7 +255,7 @@ class Container {
     this.dependencies.deletePayItemTemplate = new DeletePayItemTemplate(payItemTemplateRepository);
     
     // Petty Cash Assignment use cases
-    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository, billRepository, jobRepository);
+    this.dependencies.createPettyCashAssignment = new CreatePettyCashAssignment(pettyCashAssignmentRepository, billRepository, jobRepository, createNotification);
     this.dependencies.getAllPettyCashAssignments = new GetAllPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getUserPettyCashAssignments = new GetUserPettyCashAssignments(pettyCashAssignmentRepository);
     this.dependencies.getPettyCashAssignmentByJob = new GetPettyCashAssignmentByJob(pettyCashAssignmentRepository);
@@ -220,7 +263,7 @@ class Container {
     this.dependencies.getUserBalancesSummary = new GetUserBalancesSummary(pettyCashAssignmentRepository);
     this.dependencies.getGroupedAssignments = new GetGroupedAssignments(pettyCashAssignmentRepository);
     this.dependencies.settleGroupedAssignments = new SettleGroupedAssignments(pettyCashAssignmentRepository);
-    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository, jobRepository);
+    this.dependencies.createSubAssignment = new CreateSubAssignment(pettyCashAssignmentRepository, jobRepository, createNotification);
     this.dependencies.getAssignmentsWithChildren = new GetAssignmentsWithChildren(pettyCashAssignmentRepository);
     this.dependencies.getAggregatedAssignments = new GetAggregatedAssignments(pettyCashAssignmentRepository);
     
@@ -246,6 +289,15 @@ class Container {
     // Auth use cases
     const jwtSecret = process.env.JWT_SECRET || 'default_secret';
     this.dependencies.authenticateUser = new AuthenticateUser(userRepository, jwtSecret);
+    
+    // Password Reset use cases
+    const passwordResetRepository = this.dependencies.passwordResetRepository;
+    this.dependencies.changePassword = new ChangePassword(userRepository);
+    this.dependencies.resetPasswordWithTemp = new ResetPasswordWithTemp(userRepository);
+    this.dependencies.requestPasswordReset = new RequestPasswordReset(userRepository, passwordResetRepository);
+    this.dependencies.getPasswordResetRequests = new GetPasswordResetRequests(passwordResetRepository);
+    this.dependencies.approvePasswordResetRequest = new ApprovePasswordResetRequest(passwordResetRepository, userRepository);
+    this.dependencies.rejectPasswordResetRequest = new RejectPasswordResetRequest(passwordResetRepository);
     
     // Cash Balance Settlement use cases
     this.dependencies.CreateCashBalanceSettlement = new CreateCashBalanceSettlement(cashBalanceSettlementRepository, pettyCashAssignmentRepository);
@@ -273,6 +325,10 @@ class Container {
     const ExportOtherExpensesReportPDF = require('../../application/use-cases/otherexpense/ExportOtherExpensesReportPDF');
     const ExportOtherExpensesReportExcel = require('../../application/use-cases/otherexpense/ExportOtherExpensesReportExcel');
     
+    // Cash Summary Report Use Cases
+    const ExportCashSummaryReportPDF = require('../../application/use-cases/cashsummary/ExportCashSummaryReportPDF');
+    const ExportCashSummaryReportExcel = require('../../application/use-cases/cashsummary/ExportCashSummaryReportExcel');
+    
     const otherExpenseRepository = new MSSQLOtherExpenseRepository(getConnection, sql);
     this.dependencies.createOtherExpense = new CreateOtherExpense(otherExpenseRepository);
     this.dependencies.getAllOtherExpenses = new GetAllOtherExpenses(otherExpenseRepository);
@@ -281,6 +337,18 @@ class Container {
     this.dependencies.getOtherExpensesReport = new GetOtherExpensesReport(otherExpenseRepository);
     this.dependencies.exportOtherExpensesReportPDF = new ExportOtherExpensesReportPDF(otherExpenseRepository);
     this.dependencies.exportOtherExpensesReportExcel = new ExportOtherExpensesReportExcel(otherExpenseRepository);
+    
+    // Cash Summary Report use cases
+    this.dependencies.exportCashSummaryReportPDF = new ExportCashSummaryReportPDF(
+      cashWithdrawalRepository,
+      pettyCashAssignmentRepository,
+      otherExpenseRepository
+    );
+    this.dependencies.exportCashSummaryReportExcel = new ExportCashSummaryReportExcel(
+      cashWithdrawalRepository,
+      pettyCashAssignmentRepository,
+      otherExpenseRepository
+    );
     
     // Controllers
     this.dependencies.CashBalanceSettlementController = new CashBalanceSettlementController(this);

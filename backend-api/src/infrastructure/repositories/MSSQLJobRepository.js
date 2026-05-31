@@ -162,7 +162,7 @@ class MSSQLJobRepository extends IJobRepository {
     }
     
     let query = `
-      SELECT 
+      SELECT DISTINCT
         j.*,
         b.netTotal as billTotalAmount,
         b.paidAmount as billPaidAmount
@@ -851,6 +851,7 @@ class MSSQLJobRepository extends IJobRepository {
     let assignedUsersFromJson = [];
     let officePayItemsFromJson = [];
     let metadataFromJson = {};
+    let assignedUsers = [];
     
     try {
       const pool = await this.db();
@@ -883,7 +884,7 @@ class MSSQLJobRepository extends IJobRepository {
         }));
       }
     } catch (error) {
-      console.log('Could not parse assignedUsers JSON:', error.message);
+      console.log('Could not fetch assigned users:', error.message);
     }
     
     try {
@@ -904,43 +905,6 @@ class MSSQLJobRepository extends IJobRepository {
       }
     } catch (error) {
       console.log('Could not parse metadata JSON:', error.message);
-    }
-    
-    // Get assigned users for this job (new feature) - prefer JSON data, fallback to table
-    let assignedUsers = assignedUsersFromJson;
-    if (assignedUsers.length === 0) {
-      try {
-        const pool = await this.db();
-        
-        // Check if JobAssignments table exists first
-        const tableCheck = await pool.request()
-          .query(`
-            SELECT COUNT(*) as tableExists
-            FROM sys.tables 
-            WHERE name = 'JobAssignments'
-          `);
-        
-        const hasJobAssignments = tableCheck.recordset[0].tableExists > 0;
-        
-        if (hasJobAssignments) {
-          // Try to get from JobAssignments table directly
-          const assignmentResult = await pool.request()
-            .input('jobId', this.sql.VarChar, row.jobId || row.JobId)
-            .query(`
-              SELECT ja.userId, u.fullName as userName 
-              FROM JobAssignments ja
-              INNER JOIN Users u ON ja.userId = u.userId
-              WHERE ja.jobId = @jobId
-            `);
-          
-          assignedUsers = assignmentResult.recordset.map(a => ({
-            userId: a.userId,
-            userName: a.userName
-          }));
-        }
-      } catch (error) {
-        console.log('Could not fetch assigned users:', error.message);
-      }
     }
     
     // Merge office pay items from JSON and table (prefer table data)

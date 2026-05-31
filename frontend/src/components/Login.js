@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import '../styles/Login.css';
 
 function Login() {
@@ -15,8 +15,14 @@ function Login() {
     e.preventDefault();
     setError('');
     try {
-      await login(username, password);
-      navigate('/');
+      const userData = await login(username, password);
+      
+      // Check if user needs to reset password (temporary password or password reset required)
+      if (userData.isTemporaryPassword || userData.passwordResetRequired) {
+        navigate('/reset-password');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       console.error('Login error:', err);
       if (err.response) {
@@ -89,6 +95,20 @@ function Login() {
           <button type="submit" className="btn btn-primary btn-block">
             Sign In
           </button>
+          
+          <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+            <Link 
+              to="/forgot-password" 
+              style={{ 
+                color: '#667eea', 
+                textDecoration: 'none', 
+                fontSize: '0.9rem',
+                fontWeight: '500'
+              }}
+            >
+              Forgot Password?
+            </Link>
+          </div>
         </form>
       </div>
     </div>

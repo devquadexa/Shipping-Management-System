@@ -251,6 +251,21 @@ class MSSQLTransporterRepository extends ITransporterRepository {
     return this.mapToEntity(result.recordset[0]);
   }
 
+  async findByName(name) {
+    await this.ensureTableExists();
+    const pool = await this.db();
+
+    const result = await pool.request()
+      .input('name', this.sql.NVarChar, name)
+      .query('SELECT * FROM Transporters WHERE name = @name AND isActive = 1');
+
+    if (result.recordset.length === 0) {
+      return null;
+    }
+
+    return this.mapToEntity(result.recordset[0]);
+  }
+
   async generateNextId() {
     await this.ensureTableExists();
     const pool = await this.db();

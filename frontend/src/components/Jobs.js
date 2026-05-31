@@ -176,6 +176,7 @@ function Jobs() {
         }
       }
       
+      const customerName = customers.find(c => c.customerId === formData.customerId)?.name || formData.customerId;
       setMessage(`Job created successfully${assignmentMessage}!`);
       setFormData({ 
         customerId: '', 
@@ -482,46 +483,46 @@ function Jobs() {
       <div className="card">
         <div className="card-header">
           <h2>All Jobs ({filteredJobs.length})</h2>
-          <div className="filters-container">
-            <div className="filter-group">
-              <label htmlFor="statusFilter">Filter by Status:</label>
-              <select
-                id="statusFilter"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="status-filter-select"
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Search by Job ID, Customer, Category, Assigned User, or Date..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        </div>
+        <div className="filters-bar">
+          <div className="filter-group">
+            <label htmlFor="statusFilter">Filter by Status:</label>
+            <select
+              id="statusFilter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="status-filter-select"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Open">Open</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Pending Payment">Pending Payment</option>
+              <option value="Payment Collected">Payment Collected</option>
+              <option value="Overdue">Overdue</option>
+              <option value="Completed">Completed</option>
+              <option value="Canceled">Canceled</option>
+            </select>
+            {(statusFilter !== 'All' || searchTerm) && (
+              <button
+                onClick={() => {
+                  setStatusFilter('All');
+                  setSearchTerm('');
+                }}
+                className="btn-clear-filters"
+                title="Clear all filters"
               >
-                <option value="All">All Statuses</option>
-                <option value="Open">Open</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Pending Payment">Pending Payment</option>
-                <option value="Payment Collected">Payment Collected</option>
-                <option value="Overdue">Overdue</option>
-                <option value="Completed">Completed</option>
-                <option value="Canceled">Canceled</option>
-              </select>
-              {(statusFilter !== 'All' || searchTerm) && (
-                <button
-                  onClick={() => {
-                    setStatusFilter('All');
-                    setSearchTerm('');
-                  }}
-                  className="btn-clear-filters"
-                  title="Clear all filters"
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
-            <div className="search-box">
-              <input
-                type="text"
-                placeholder="Search by Job ID, Customer, Category, Assigned User, or Date..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
-              />
-            </div>
+                Clear Filters
+              </button>
+            )}
           </div>
         </div>
         {filteredJobs.length === 0 ? (
@@ -765,8 +766,8 @@ function Jobs() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal">
             <div className="modal-header">
               <h2>{isEditing ? 'Edit Job' : 'Create New Job'}</h2>
               <button className="btn-close" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }}>×</button>

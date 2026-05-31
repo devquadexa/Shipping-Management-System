@@ -1,0 +1,49 @@
+========================================
+URGENT: FIX NOTIFICATION REDIRECT
+========================================
+
+The code is correct. You just need to RESTART THE FRONTEND.
+
+STEP 1: Stop Frontend
+----------------------
+1. Go to the terminal where "npm start" is running
+2. Press Ctrl+C
+3. Wait for it to stop
+
+STEP 2: Restart Frontend
+-------------------------
+1. In the same terminal, type:
+   npm start
+
+2. Wait for "Compiled successfully!"
+
+STEP 3: Refresh Browser
+------------------------
+1. In your browser, press: Ctrl + Shift + R
+   (This is a HARD refresh - clears cache)
+
+STEP 4: Test
+------------
+1. Press F12 to open console
+2. Click bell icon
+3. Click a notification
+4. Check console - you should see:
+   "Notification clicked: ..."
+   "Navigating to /petty-cash"
+5. Page should redirect
+
+========================================
+
+WHY THIS IS NEEDED:
+- React needs to rebuild with the new code
+- Browser needs to clear old cached JavaScript
+- Without restart, old code is still running
+
+========================================
+
+IF STILL NOT WORKING:
+1. Check console (F12) for error messages
+2. Make sure you see "Notification clicked:" in console
+3. If you don't see console messages, the frontend didn't restart properly
+
+========================================

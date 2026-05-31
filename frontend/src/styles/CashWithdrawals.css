@@ -1,0 +1,109 @@
+/* Cash Withdrawals Section Styles */
+.withdrawals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.withdrawal-box {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.withdrawal-box:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  border-color: #4CAF50;
+}
+
+.withdrawal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #4CAF50;
+}
+
+.withdrawal-id {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  background: #e8f5e9;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.withdrawal-amount {
+  font-weight: 700;
+  color: #4CAF50;
+  font-size: 20px;
+}
+
+.withdrawal-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.withdrawal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+.withdrawal-label {
+  color: #666;
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.withdrawal-value {
+  color: #333;
+  font-weight: 400;
+  text-align: right;
+  flex: 1;
+}
+
+.withdrawal-notes {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.withdrawal-notes .withdrawal-label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.withdrawal-notes p {
+  margin: 0;
+  color: #555;
+  font-size: 13px;
+  line-height: 1.5;
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .withdrawals-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .withdrawal-box {
+    padding: 16px;
+  }
+  
+  .withdrawal-amount {
+    font-size: 18px;
+  }
+}

@@ -469,13 +469,13 @@ function OldInvoices() {
   return (
     <div className="old-invoices-container">
       <div className="page-header">
-        <div className="header-left">
+        <div>
           <h1>Old Invoice Management</h1>
-          <p className="subtitle">Historical invoice data entry (Since 2026/1/1)</p>
+          <p>Historical invoice data entry (Since 2026/1/1)</p>
         </div>
         {isAdminOrManager() && (
           <button className="btn btn-primary" onClick={handleAddNew}>
-            <span className="icon">+</span> Add Old Invoice
+            + Add Old Invoice
           </button>
         )}
       </div>
@@ -487,29 +487,44 @@ function OldInvoices() {
         </div>
       )}
 
-      <div className="filters-section">
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Search by invoice number, customer, or cusdec..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
-        <div className="filter-group">
-          <label>Status:</label>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
-            <option value="All">All</option>
-            <option value="Pending">Pending</option>
-            <option value="Partially Paid">Partially Paid</option>
-            <option value="Fully Settled">Fully Settled</option>
-          </select>
-        </div>
-      </div>
+      <div className="card">
+        <div className="card-header">
+          <h2>All Invoices ({filteredInvoices.length})</h2>
+          <div className="filters-section">
+              <div className="filter-group">
+              <select 
+                id="statusFilter"
+                value={filterStatus} 
+                onChange={(e) => setFilterStatus(e.target.value)} 
+                className="filter-select"
+              >
+                <option value="All">All</option>
+                <option value="Pending">Pending</option>
+                <option value="Partially Paid">Partially Paid</option>
+                <option value="Fully Settled">Fully Settled</option>
+              </select>
+            </div>
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search by invoice number, customer, or cusdec..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+            </div>
 
-      <div className="table-container">
-        <table className="data-table">
+          </div>
+        </div>
+
+        {filteredInvoices.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">📄</div>
+            <p>{searchTerm ? 'No invoices found matching your search' : 'No invoices found'}</p>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table className="data-table">
           <thead>
             <tr>
               <th>Invoice Number</th>
@@ -525,12 +540,7 @@ function OldInvoices() {
             </tr>
           </thead>
           <tbody>
-            {filteredInvoices.length === 0 ? (
-              <tr>
-                <td colSpan="10" className="no-data">No invoices found</td>
-              </tr>
-            ) : (
-              filteredInvoices.map(invoice => (
+            {filteredInvoices.map(invoice => (
                 <React.Fragment key={invoice.oldInvoiceId}>
                   <tr className={expandedRow === invoice.oldInvoiceId ? 'expanded' : ''}>
                     <td>
@@ -657,16 +667,17 @@ function OldInvoices() {
                     </tr>
                   )}
                 </React.Fragment>
-              ))
-            )}
+              ))}
           </tbody>
-        </table>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Add/Edit Invoice Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content">
             <div className="modal-header">
               <h2>{editingInvoice ? 'Edit Old Invoice' : 'Add Old Invoice'}</h2>
               <button className="modal-close" onClick={handleCloseModal}>×</button>
@@ -799,8 +810,8 @@ function OldInvoices() {
 
       {/* Add Payment Modal */}
       {showPaymentModal && selectedInvoice && (
-        <div className="modal-overlay" onClick={handleClosePaymentModal}>
-          <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal-content modal-small">
             <div className="modal-header">
               <h2>Add Payment</h2>
               <button className="modal-close" onClick={handleClosePaymentModal}>×</button>
