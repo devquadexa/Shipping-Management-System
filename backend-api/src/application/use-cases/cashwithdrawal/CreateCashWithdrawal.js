@@ -17,6 +17,7 @@ class CreateCashWithdrawal {
       bankName: withdrawalData.bankName,
       withdrawalDate: withdrawalData.withdrawalDate || new Date(),
       notes: withdrawalData.notes,
+      transactionType: withdrawalData.transactionType || 'withdrawal',
       createdBy: userId
     });
     

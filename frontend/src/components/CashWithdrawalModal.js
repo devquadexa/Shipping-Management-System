@@ -5,7 +5,8 @@ function CashWithdrawalModal({ show, onClose, onSubmit }) {
     amount: '',
     bankName: '',
     withdrawalDate: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    transactionType: 'withdrawal'
   });
 
   const handleChange = (e) => {
@@ -23,7 +24,8 @@ function CashWithdrawalModal({ show, onClose, onSubmit }) {
       amount: '',
       bankName: '',
       withdrawalDate: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      transactionType: 'withdrawal'
     });
   };
 
@@ -33,11 +35,37 @@ function CashWithdrawalModal({ show, onClose, onSubmit }) {
     <div className="modal-overlay">
       <div className="modal modal-medium">
         <div className="modal-header">
-          <h2>Record Cash Withdrawal</h2>
+          <h2>Record Cash Withdrawal / Deposit</h2>
           <button className="btn-close" onClick={onClose}>&times;</button>
         </div>
         
         <form onSubmit={handleSubmit} className="expense-form">
+          <div className="form-group">
+            <label>Transaction Type <span className="required">*</span></label>
+            <div className="radio-group">
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="transactionType"
+                  value="withdrawal"
+                  checked={formData.transactionType === 'withdrawal'}
+                  onChange={handleChange}
+                />
+                <span>Withdrawal</span>
+              </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  name="transactionType"
+                  value="deposit"
+                  checked={formData.transactionType === 'deposit'}
+                  onChange={handleChange}
+                />
+                <span>Deposit</span>
+              </label>
+            </div>
+          </div>
+
           <div className="form-group">
             <label>Amount <span className="required">*</span></label>
             <input
@@ -68,7 +96,7 @@ function CashWithdrawalModal({ show, onClose, onSubmit }) {
           </div>
 
           <div className="form-group">
-            <label>Withdrawal Date <span className="required">*</span></label>
+            <label>Transaction Date <span className="required">*</span></label>
             <input
               type="date"
               name="withdrawalDate"
@@ -94,7 +122,7 @@ function CashWithdrawalModal({ show, onClose, onSubmit }) {
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">
-              Record Withdrawal
+              Record {formData.transactionType === 'withdrawal' ? 'Withdrawal' : 'Deposit'}
             </button>
           </div>
         </form>

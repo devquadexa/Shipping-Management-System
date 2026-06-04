@@ -56,30 +56,52 @@ class MSSQLCashBalanceSettlementRepository {
 
   async findAll(filters = {}) {
     const pool = await this.db();
-    let query = 'SELECT * FROM CashBalanceSettlements WHERE 1=1';
+    let query = `
+      SELECT cbs.*,
+        (
+          SELECT TOP 1 pa.jobId 
+          FROM PettyCashAssignments pa 
+          WHERE pa.assignmentId = (
+            SELECT TOP 1 value 
+            FROM OPENJSON(cbs.relatedAssignments) 
+            ORDER BY [key]
+          )
+        ) as jobId,
+        (
+          SELECT TOP 1 j.CUSDECNumber
+          FROM PettyCashAssignments pa
+          JOIN Jobs j ON pa.jobId = j.JobId
+          WHERE pa.assignmentId = (
+            SELECT TOP 1 value 
+            FROM OPENJSON(cbs.relatedAssignments) 
+            ORDER BY [key]
+          )
+        ) as cusdecNumber
+      FROM CashBalanceSettlements cbs
+      WHERE 1=1`;
     const request = pool.request();
     
     if (filters.userId) {
-      query += ' AND userId = @userId';
+      query += ' AND cbs.userId = @userId';
       request.input('userId', this.sql.VarChar, filters.userId);
     }
     
     if (filters.managerId) {
-      query += ' AND managerId = @managerId';
+      query += ' AND cbs.managerId = @managerId';
       request.input('managerId', this.sql.VarChar, filters.managerId);
     }
     
     if (filters.status) {
-      query += ' AND status = @status';
+      query += ' AND cbs.status = @status';
       request.input('status', this.sql.NVarChar, filters.status);
     }
     
     if (filters.settlementType) {
-      query += ' AND settlementType = @settlementType';
+      query += ' AND cbs.settlementType = @settlementType';
       request.input('settlementType', this.sql.NVarChar, filters.settlementType);
     }
     
-    query += ' ORDER BY requestDate DESC';
+    query += ' ORDER BY cbs.requestDate DESC';
     
     const result = await request.query(query);
     return result.recordset.map(row => this.mapToEntity(row));
@@ -249,7 +271,7 @@ class MSSQLCashBalanceSettlementRepository {
       }
     }
 
-    return new CashBalanceSettlement({
+    const entity = new CashBalanceSettlement({
       settlementId: row.settlementId,
       userId: row.userId,
       userName: row.userName,
@@ -269,6 +291,9 @@ class MSSQLCashBalanceSettlementRepository {
       updatedBy: row.updatedBy,
       updatedDate: row.updatedDate
     });
+    entity.jobId = row.jobId || null;
+    entity.cusdecNumber = row.cusdecNumber || null;
+    return entity;
   }
 }
 
