@@ -13,7 +13,8 @@ class CashWithdrawalController {
         amount: req.body.amount,
         bankName: req.body.bankName,
         withdrawalDate: req.body.withdrawalDate,
-        notes: req.body.notes
+        notes: req.body.notes,
+        transactionType: req.body.transactionType || 'withdrawal'
       };
       
       const withdrawal = await this.createCashWithdrawal.execute(withdrawalData, req.user.userId);

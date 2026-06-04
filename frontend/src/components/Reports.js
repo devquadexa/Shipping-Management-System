@@ -57,7 +57,7 @@ const REPORT_CARDS = [
     path: '/reports/cash-summary',
     category: 'Financial',
     title: 'Cash Summary Report',
-    description: 'Comprehensive cash flow overview showing withdrawals from bank, petty cash issued amounts and other expenses with date range filtering.',
+    description: 'Comprehensive cash flow overview showing withdrawals and deposits, petty cash issued amounts and other expenses with date range filtering.',
     available: true,
     icon: (
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

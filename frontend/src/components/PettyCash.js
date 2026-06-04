@@ -1790,7 +1790,7 @@ function PettyCash() {
       {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
         <div className="card">
           <div className="card-header collapsible-header" onClick={() => setWithdrawalsCollapsed(c => !c)}>
-            <h2>Cash Withdrawals from Bank ({getFilteredCashWithdrawals().length})</h2>
+            <h2>Cash Withdrawals / Deposits ({getFilteredCashWithdrawals().length})</h2>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <button 
                 onClick={(e) => {
@@ -1799,7 +1799,7 @@ function PettyCash() {
                 }} 
                 className="btn btn-primary"
               >
-                + Record Withdrawal
+                + Record Withdrawal / Deposit
               </button>
               <svg
                 className={`collapse-arrow ${withdrawalsCollapsed ? 'collapsed' : ''}`}
@@ -1872,6 +1872,7 @@ function PettyCash() {
                     <thead>
                       <tr>
                         <th style={{ width: '160px' }}>Withdrawal ID</th>
+                        <th style={{ width: '100px' }}>Type</th>
                         <th style={{ width: '140px' }}>Date</th>
                         <th style={{ width: '220px' }}>Bank Name</th>
                         <th style={{ width: '180px' }}>Amount</th>
@@ -1884,6 +1885,11 @@ function PettyCash() {
                         <tr key={withdrawal.withdrawalId} className="assignment-row">
                           <td>
                             <span className="assignment-id">{withdrawal.withdrawalId}</span>
+                          </td>
+                          <td>
+                            <span className={`status-badge ${withdrawal.transactionType === 'withdrawal' ? 'status-unpaid' : 'status-completed'}`}>
+                              {withdrawal.transactionType === 'withdrawal' ? 'Withdrawal' : 'Deposit'}
+                            </span>
                           </td>
                           <td>{new Date(withdrawal.withdrawalDate).toLocaleDateString()}</td>
                           <td>{withdrawal.bankName}</td>
@@ -2005,6 +2011,7 @@ function PettyCash() {
                   <th>Assigned To</th>
                   <th>Status</th>
                   <th>Total Assigned</th>
+                  <th>Total Settled</th>
                   <th>Assigned Date</th>
                   <th>Actions</th>
                 </tr>
@@ -2251,6 +2258,7 @@ function PettyCash() {
                             </span>
                           </td>
                           <td data-label="Total Assigned"><strong>LKR {formatAmount(totalAssigned)}</strong></td>
+                          <td data-label="Total Settled"><strong>LKR {formatAmount(totalSpent)}</strong></td>
                           <td data-label="Assigned Date">{new Date(first.assignedDate).toLocaleDateString()}</td>
                           <td data-label="Actions">
                             <div className="actions-cell-hybrid">
@@ -3343,6 +3351,8 @@ const ManagementSettlementSection = ({ user }) => {
   const [message, setMessage] = useState('');
   const [actionLoading, setActionLoading] = useState({});
   const [collapsed, setCollapsed] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(20);
 
   useEffect(() => {
     fetchSettlements();
@@ -3385,6 +3395,22 @@ const ManagementSettlementSection = ({ user }) => {
     if (activeTab === 'rejected') return settlement.status === 'REJECTED';
     return true;
   });
+
+  // Pagination logic
+  const totalRecords = filteredSettlements.length;
+  const totalPages = Math.ceil(totalRecords / recordsPerPage);
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const paginatedSettlements = filteredSettlements.slice(startIndex, endIndex);
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleRecordsPerPageChange = (newRecordsPerPage) => {
+    setRecordsPerPage(newRecordsPerPage);
+    setCurrentPage(1);
+  };
 
   const handleApprove = async (settlementId, managerNotes = '') => {
     setActionLoading(prev => ({ ...prev, [settlementId]: 'approving' }));
@@ -3487,7 +3513,7 @@ const ManagementSettlementSection = ({ user }) => {
       <div className="settlement-tabs">
         <button 
           className={`tab-button ${activeTab === 'pending' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pending')}
+          onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
           title="View pending settlements"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3498,7 +3524,7 @@ const ManagementSettlementSection = ({ user }) => {
         </button>
         <button 
           className={`tab-button ${activeTab === 'approved' ? 'active' : ''}`}
-          onClick={() => setActiveTab('approved')}
+          onClick={() => { setActiveTab('approved'); setCurrentPage(1); }}
           title="View approved settlements"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3508,7 +3534,7 @@ const ManagementSettlementSection = ({ user }) => {
         </button>
         <button 
           className={`tab-button ${activeTab === 'rejected' ? 'active' : ''}`}
-          onClick={() => setActiveTab('rejected')}
+          onClick={() => { setActiveTab('rejected'); setCurrentPage(1); }}
           title="View rejected settlements"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3520,7 +3546,7 @@ const ManagementSettlementSection = ({ user }) => {
         </button>
         <button 
           className={`tab-button ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => setActiveTab('all')}
+          onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
           title="View all settlements"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3541,72 +3567,89 @@ const ManagementSettlementSection = ({ user }) => {
         )}
 
         {!loading && filteredSettlements.length > 0 && (
-          <div className="settlements-table-wrapper">
-            <table className="settlements-table">
-              <thead>
-                <tr>
-                  <th>Settlement ID</th>
-                  <th>Waff Clerk</th>
-                  <th>Type</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Request Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSettlements.map(settlement => (
-                  <tr key={settlement.settlementId}>
-                    <td data-label="Settlement ID">
-                      <strong>{settlement.settlementId}</strong>
-                    </td>
-                    <td data-label="Waff Clerk">{settlement.userName}</td>
-                    <td data-label="Type">
-                      <span className={`type-badge ${settlement.settlementType === 'BALANCE_RETURN' ? 'type-return' : 'type-collect'}`}>
-                        {settlement.settlementType === 'BALANCE_RETURN' ? 'Balance Return' : 'Overdue Collection'}
-                      </span>
-                    </td>
-                    <td data-label="Amount">
-                      <strong>LKR {settlement.amount.toLocaleString()}</strong>
-                    </td>
-                    <td data-label="Status">
-                      <span className={`status-badge ${getStatusBadgeClass(settlement.status)}`}>
-                        {settlement.statusDisplay}
-                      </span>
-                    </td>
-                    <td data-label="Request Date">
-                      {new Date(settlement.requestDate).toLocaleDateString()}
-                    </td>
-                    <td data-label="Actions">
-                      <div className="settlement-actions">
-                        {settlement.status === 'PENDING' && (
-                          <>
-                            <button
-                              className="btn-action btn-approve"
-                              onClick={() => handleApprove(settlement.settlementId)}
-                              disabled={actionLoading[settlement.settlementId]}
-                            >
-                              {actionLoading[settlement.settlementId] === 'approving' ? 'Approving...' : 'Approve'}
-                            </button>
-                            <button
-                              className="btn-action btn-reject"
-                              onClick={() => {
-                                const notes = prompt('Please provide a reason for rejection:');
-                                if (notes) handleReject(settlement.settlementId, notes);
-                              }}
-                              disabled={actionLoading[settlement.settlementId]}
-                            >
-                              {actionLoading[settlement.settlementId] === 'rejecting' ? 'Rejecting...' : 'Reject'}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+          <>
+            <div className="settlements-table-wrapper">
+              <table className="settlements-table">
+                <thead>
+                  <tr>
+                    <th>Settlement ID</th>
+                    <th>Waff Clerk</th>
+                    <th>Job ID / Cusdec ID</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Request Date</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginatedSettlements.map(settlement => (
+                    <tr key={settlement.settlementId}>
+                      <td data-label="Settlement ID">
+                        <strong>{settlement.settlementId}</strong>
+                      </td>
+                      <td data-label="Waff Clerk">{settlement.userName}</td>
+                      <td data-label="Job ID / Cusdec ID">
+                        {settlement.jobId
+                          ? `${settlement.jobId}${settlement.cusdecNumber ? ' / ' + settlement.cusdecNumber : ''}`
+                          : '-'}
+                      </td>
+                      <td data-label="Type">
+                        <span className={`type-badge ${settlement.settlementType === 'BALANCE_RETURN' ? 'type-return' : 'type-collect'}`}>
+                          {settlement.settlementType === 'BALANCE_RETURN' ? 'Balance Return' : 'Overdue Collection'}
+                        </span>
+                      </td>
+                      <td data-label="Amount">
+                        <strong>LKR {settlement.amount.toLocaleString()}</strong>
+                      </td>
+                      <td data-label="Status">
+                        <span className={`status-badge ${getStatusBadgeClass(settlement.status)}`}>
+                          {settlement.statusDisplay}
+                        </span>
+                      </td>
+                      <td data-label="Request Date">
+                        {new Date(settlement.requestDate).toLocaleDateString()}
+                      </td>
+                      <td data-label="Actions">
+                        <div className="settlement-actions">
+                          {settlement.status === 'PENDING' && (
+                            <>
+                              <button
+                                className="btn-action btn-approve"
+                                onClick={() => handleApprove(settlement.settlementId)}
+                                disabled={actionLoading[settlement.settlementId]}
+                              >
+                                {actionLoading[settlement.settlementId] === 'approving' ? 'Approving...' : 'Approve'}
+                              </button>
+                              <button
+                                className="btn-action btn-reject"
+                                onClick={() => {
+                                  const notes = prompt('Please provide a reason for rejection:');
+                                  if (notes) handleReject(settlement.settlementId, notes);
+                                }}
+                                disabled={actionLoading[settlement.settlementId]}
+                              >
+                                {actionLoading[settlement.settlementId] === 'rejecting' ? 'Rejecting...' : 'Reject'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalRecords={totalRecords}
+              recordsPerPage={recordsPerPage}
+              onPageChange={handlePageChange}
+              onRecordsPerPageChange={handleRecordsPerPageChange}
+              recordsPerPageOptions={[20, 50, 100]}
+            />
+          </>
         )}
       </div>
       </>)}
