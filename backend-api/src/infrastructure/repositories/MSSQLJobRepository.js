@@ -161,13 +161,14 @@ class MSSQLJobRepository extends IJobRepository {
       return await this.findByAssignedUser(filters.assignedTo);
     }
     
+    // Fix: Use a subquery to get only ONE bill per job (the first/latest bill)
+    // This prevents duplicate job rows when a job has multiple bills
     let query = `
       SELECT DISTINCT
         j.*,
-        b.netTotal as billTotalAmount,
-        b.paidAmount as billPaidAmount
+        (SELECT TOP 1 b.netTotal FROM Bills b WHERE b.jobId = j.jobId ORDER BY b.CreatedDate DESC) as billTotalAmount,
+        (SELECT TOP 1 b.paidAmount FROM Bills b WHERE b.jobId = j.jobId ORDER BY b.CreatedDate DESC) as billPaidAmount
       FROM Jobs j
-      LEFT JOIN Bills b ON j.jobId = b.jobId
       WHERE 1=1
     `;
     
@@ -194,18 +195,18 @@ class MSSQLJobRepository extends IJobRepository {
     try {
       console.log('findByAssignedUser called with userId:', userId);
       
-      // Get jobs assigned to this user from JobAssignments table with bill data
+      // Fix: Use subqueries to get only ONE bill per job to prevent duplicates
+      // Also filter by isActive = 1 to only get active assignments
       const assignmentResult = await pool.request()
         .input('userId', this.sql.VarChar, userId)
         .query(`
           SELECT DISTINCT 
             j.*,
-            b.netTotal as billTotalAmount,
-            b.paidAmount as billPaidAmount
+            (SELECT TOP 1 b.netTotal FROM Bills b WHERE b.jobId = j.jobId ORDER BY b.CreatedDate DESC) as billTotalAmount,
+            (SELECT TOP 1 b.paidAmount FROM Bills b WHERE b.jobId = j.jobId ORDER BY b.CreatedDate DESC) as billPaidAmount
           FROM Jobs j
           INNER JOIN JobAssignments ja ON j.jobId = ja.jobId
-          LEFT JOIN Bills b ON j.jobId = b.jobId
-          WHERE ja.userId = @userId
+          WHERE ja.userId = @userId AND ja.isActive = 1
           ORDER BY j.openDate DESC
         `);
       

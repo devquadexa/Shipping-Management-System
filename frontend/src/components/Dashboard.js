@@ -68,18 +68,55 @@ function Dashboard() {
     }
   }, [timePeriod, customDateRange]);
 
-  const filterByDate = useCallback((items, field) => {
+  const filterByDate = useCallback((items, primaryField, fallbackFields = []) => {
     const range = getDateRange();
     if (!range || !items) return items;
-    return items.filter(item => {
-      if (!item) return false;
-      // Try the requested field first, then common fallbacks
-      const raw = item[field] || item.billDate || item.createdDate || item.createdAt || item.openDate || item.openedDate;
-      if (!raw) return false;
-      const d = new Date(raw);
-      if (Number.isNaN(d.getTime())) return false;
-      return d >= range.startDate && d <= range.endDate;
+    
+    console.log('🔍 filterByDate called:', { 
+      primaryField,
+      itemCount: items.length, 
+      startDate: range.startDate.toISOString(), 
+      endDate: range.endDate.toISOString() 
     });
+    
+    const filtered = items.filter(item => {
+      if (!item) return false;
+      
+      // Try primary field first, then fallbacks
+      let dateValue = item[primaryField];
+      if (!dateValue) {
+        for (const fallback of fallbackFields) {
+          if (item[fallback]) {
+            dateValue = item[fallback];
+            break;
+          }
+        }
+      }
+      
+      if (!dateValue) {
+        console.log('⚠️ No date field found for item:', { 
+          itemId: item.jobId || item.billId || item.customerId, 
+          tried: [primaryField, ...fallbackFields]
+        });
+        return false;
+      }
+      
+      const d = new Date(dateValue);
+      if (Number.isNaN(d.getTime())) {
+        console.log('❌ Invalid date:', dateValue);
+        return false;
+      }
+      
+      const isInRange = d >= range.startDate && d <= range.endDate;
+      if (!isInRange) {
+        console.log(`❌ Out of range: ${d.toISOString()} (field: ${primaryField})`);
+      }
+      
+      return isInRange;
+    });
+    
+    console.log(`✅ Filtered ${filtered.length} of ${items.length} items`);
+    return filtered;
   }, [getDateRange]);
 
   const fetchStats = useCallback(async () => {
@@ -97,25 +134,27 @@ function Dashboard() {
         user?.role !== 'Waff Clerk' ? billingService.getBills() : Promise.resolve([])
       ]);
 
-      const fCustomers = timePeriod === 'all' ? customers : filterByDate(customers, 'registrationDate');
-      const fJobs      = timePeriod === 'all' ? jobs      : filterByDate(jobs, 'createdDate');
-      const fBills     = timePeriod === 'all' ? bills     : filterByDate(bills, 'billDate');
+      console.log('📊 fetchStats - timePeriod:', timePeriod);
+      console.log('📊 Raw data counts:', { customers: customers.length, jobs: jobs.length, bills: bills.length });
+      
+      // Filter data by date - use openDate for jobs (when job started), billDate for bills, registrationDate for customers
+      const fCustomers = timePeriod === 'all' ? customers : filterByDate(customers, 'registrationDate', ['createdDate']);
+      const fJobs      = timePeriod === 'all' ? jobs      : filterByDate(jobs, 'openDate', ['createdDate']);
+      const fBills     = timePeriod === 'all' ? bills     : filterByDate(bills, 'billDate', ['invoiceDate', 'createdDate']);
+      
+      console.log('📊 Filtered data counts:', { customers: fCustomers.length, jobs: fJobs.length, bills: fBills.length });
 
       const paidBills    = fBills.filter(b => b.paymentStatus === 'Paid' || b.paymentStatus === 'Partially Paid');
       const unpaidBills  = fBills.filter(b => b.paymentStatus === 'Unpaid' || b.paymentStatus === 'Partially Paid');
-
-      // Use server-side Bill fields where available. Prefer paidAmount/remainingAmount, then netTotal, then total/billingAmount.
-      const billValue = (b) => {
-        const val = parseFloat(b.paidAmount ?? b.remainingAmount ?? b.netTotal ?? b.total ?? b.billingAmount ?? 0);
-        return Number.isNaN(val) ? 0 : val;
-      };
 
       const totalRevenue   = paidBills.reduce((s, b) => s + (parseFloat(b.paidAmount) || parseFloat(b.netTotal) || parseFloat(b.total) || parseFloat(b.billingAmount) || 0), 0);
       const pendingRevenue = unpaidBills.reduce((s, b) => s + (parseFloat(b.remainingAmount) || parseFloat(b.netTotal) || parseFloat(b.total) || parseFloat(b.billingAmount) || 0), 0);
       const conversionRate = fBills.length > 0 ? Math.round((paidBills.length / fBills.length) * 100) : 0;
 
-      // Calculate petty cash issued from jobs in the filtered period
-      const pettyCashIssuedFiltered = fJobs.reduce((s, j) => s + parseFloat(j.pettyCashAmount || 0), 0);
+      // Note: Petty cash issued calculation requires petty cash assignments data
+      // For now, when filtering by date, we cannot accurately calculate this without additional API support
+      // TODO: Add API endpoint to get petty cash assignments filtered by date
+      const pettyCashIssuedFiltered = 0; // Placeholder - requires petty cash assignments API
 
       setStats({
         totalCustomers:   fCustomers.length,
