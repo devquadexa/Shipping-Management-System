@@ -1,124 +1,517 @@
-/* Dashboard Specific Styles */
+/* ═══════════════════════════════════════════════════════════
+   Dashboard — matches reference screenshot layout
+   Uses existing App.css color theme (#101036 navy)
+   ═══════════════════════════════════════════════════════════ */
 
-.section-title {
-  font-size: 1.5rem;
+/* Full-page wrapper — overrides .container max-width */
+.db-page {
+  padding: 1.5rem 2rem;
+  max-width: 100%;
+  min-height: calc(100vh - 70px);
+  background: #f0f4f8;
+}
+
+/* ── Header ── */
+.db-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0e6ed;
+}
+
+.db-title {
+  font-size: 2rem;
   font-weight: 700;
   color: #101036;
-  margin: 2rem 0 1.5rem 0;
+  margin: 0;
+}
+
+.db-welcome {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+/* ── Filter Card ── */
+.db-filter-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 1px 4px rgba(16,16,54,0.08);
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.db-filter-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+.db-filter-pills {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.db-pill {
+  padding: 0.3rem 0.9rem;
+  border-radius: 20px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1.5;
+}
+
+.db-pill:hover {
+  border-color: #101036;
+  color: #101036;
+}
+
+.db-pill--active {
+  background: #101036;
+  border-color: #101036;
+  color: white;
+}
+
+.db-pill--active:hover {
+  background: #1a1a4d;
+  border-color: #1a1a4d;
+  color: white;
+}
+
+.db-custom-dates {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 0.5rem;
+}
+
+.db-custom-dates label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.db-custom-dates input {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  color: #374151;
+}
+
+/* ── Main Two-Column Grid ── */
+.db-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Shared Card ── */
+.db-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(16,16,54,0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.db-card-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #101036;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin: 0 0 1.25rem 0;
   padding-bottom: 0.75rem;
   border-bottom: 2px solid #e5e7eb;
 }
 
-/* Accounting Summary Section */
-.accounting-summary-section {
-  margin-bottom: 2rem;
-}
-
-.accounting-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.accounting-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.accounting-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.accounting-card .card-icon {
-  font-size: 0.75rem;
-  font-weight: 700;
-  width: 60px;
-  height: 60px;
-  display: flex;
+/* ── Badges ── */
+.db-badge {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
   flex-shrink: 0;
-  letter-spacing: 0.5px;
 }
 
-.accounting-card.card-primary .card-icon {
-  background: #e0e7ff;
-  color: #4338ca;
+.db-badge--blue   { background: #dbeafe; color: #1d4ed8; }
+.db-badge--green  { background: #d1fae5; color: #059669; }
+.db-badge--red    { background: #fee2e2; color: #dc2626; }
+.db-badge--yellow { background: #fef3c7; color: #d97706; }
+.db-badge--purple { background: #ede9fe; color: #7c3aed; }
+
+/* ══════════════════════════════════════
+   LEFT PANEL — Revenue Performance
+   ══════════════════════════════════════ */
+
+/* Top 3 revenue tiles */
+.db-rev-top,
+.db-rev-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
-.accounting-card.card-success .card-icon {
-  background: #d1fae5;
-  color: #059669;
+.db-rev-tile {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.85rem;
 }
 
-.accounting-card.card-warning .card-icon {
-  background: #fef3c7;
-  color: #d97706;
+.db-rev-tile-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
 }
 
-.accounting-card.card-danger .card-icon {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.accounting-card.card-info .card-icon {
-  background: #dbeafe;
-  color: #2563eb;
-}
-
-.accounting-card.card-profit .card-icon {
-  background: #d1fae5;
-  color: #059669;
-}
-
-.accounting-card .card-content {
-  flex: 1;
-}
-
-.accounting-card .card-content h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.875rem;
-  font-weight: 600;
+.db-rev-tile-label {
+  font-size: 0.72rem;
   color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-weight: 500;
+  line-height: 1.3;
 }
 
-.accounting-card .card-value {
-  margin: 0;
-  font-size: 1.75rem;
+.db-rev-tile-value {
+  font-size: 1.15rem;
   font-weight: 700;
   color: #101036;
-  line-height: 1.2;
+  margin-bottom: 0.2rem;
 }
 
-.accounting-card .card-subtitle {
-  font-size: 0.875rem;
+.db-rev-tile-sub {
+  font-size: 0.72rem;
   color: #9ca3af;
 }
 
-/* Responsive Design */
+/* Revenue Contribution block */
+.db-rev-contribution {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.db-rev-contrib-label {
+  font-size: 0.78rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 0.3rem;
+}
+
+.db-rev-contrib-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #101036;
+  margin-bottom: 0.85rem;
+}
+
+.db-bar-row {
+  margin-bottom: 0.6rem;
+}
+
+.db-bar-label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.db-bar-track {
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.db-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.6s ease;
+}
+
+.db-bar--blue   { background: #3b82f6; }
+.db-bar--orange { background: #f59e0b; }
+.db-bar--green  { background: #10b981; }
+
+.db-rev-contrib-note {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+/* ══════════════════════════════════════
+   RIGHT PANEL — Operational Overview
+   ══════════════════════════════════════ */
+
+/* Total workload block */
+.db-ops-total {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.db-ops-total-label {
+  font-size: 0.78rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.db-ops-total-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #101036;
+  line-height: 1.1;
+}
+
+.db-ops-total-sub {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.2rem;
+}
+
+/* Job status row */
+.db-ops-status-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.db-ops-status-tile {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.85rem;
+  text-align: center;
+}
+
+.db-ops-status-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.db-ops-status-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #101036;
+}
+
+.db-ops--orange { color: #f59e0b; }
+.db-ops--blue   { color: #3b82f6; }
+.db-ops--green  { color: #10b981; }
+
+/* Invoice row */
+.db-ops-invoice-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.db-ops-invoice-tile {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.85rem;
+}
+
+.db-ops-invoice-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  line-height: 1.3;
+}
+
+.db-ops-invoice-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #101036;
+  line-height: 1.1;
+}
+
+.db-ops-invoice-sub {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  margin-top: 0.2rem;
+}
+
+/* Donut chart */
+.db-ops-invoice-tile--donut { }
+
+.db-donut-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.db-donut-wrap {
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.db-donut-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.db-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.db-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: #374151;
+}
+
+.db-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.db-legend--green { background: #10b981; }
+.db-legend--red   { background: #ef4444; }
+.db-legend--yellow{ background: #f59e0b; }
+
+/* Bottom row: customers + conversion */
+.db-ops-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.db-ops-bottom-tile {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.85rem;
+}
+
+.db-ops-bottom-tile--conversion {
+  border-left: 3px solid #10b981;
+}
+
+.db-conversion-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #10b981;
+  margin: 0.25rem 0;
+}
+
+/* ══════════════════════════════════════
+   CASH FLOW TRACKING
+   ══════════════════════════════════════ */
+
+.db-cashflow-card {
+  margin-bottom: 0;
+}
+
+.db-cashflow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.db-cashflow-tile {
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  border-left: 4px solid transparent;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.db-cashflow-tile--blue   { border-left: 4px solid #3b82f6; }
+.db-cashflow-tile--teal   { border-left: 4px solid #14b8a6; }
+.db-cashflow-tile--purple { border-left: 4px solid #8b5cf6; }
+.db-cashflow-tile--red    { border-left: 4px solid #ef4444; }
+
+.db-cashflow-label {
+  font-size: 0.78rem;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.db-cashflow-tile-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.db-cashflow-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #101036;
+  margin-bottom: 0.25rem;
+}
+
+.db-cashflow-sub {
+  font-size: 0.72rem;
+  color: #9ca3af;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .db-main-grid       { grid-template-columns: 1fr; }
+  .db-cashflow-grid   { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 768px) {
-  .accounting-cards {
-    grid-template-columns: 1fr;
-  }
-  
-  .section-title {
-    font-size: 1.25rem;
-    margin: 1.5rem 0 1rem 0;
-  }
-  
-  .accounting-card .card-value {
-    font-size: 1.5rem;
-  }
+  .db-page            { padding: 1rem; }
+  .db-header          { flex-direction: column; gap: 0.25rem; }
+  .db-rev-top,
+  .db-rev-bottom      { grid-template-columns: 1fr; }
+  .db-ops-status-row  { grid-template-columns: repeat(3, 1fr); }
+  .db-ops-invoice-row,
+  .db-ops-bottom-row  { grid-template-columns: 1fr; }
+  .db-cashflow-grid   { grid-template-columns: 1fr; }
+  .db-filter-card     { flex-direction: column; align-items: flex-start; }
 }
