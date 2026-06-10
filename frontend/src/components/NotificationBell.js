@@ -60,7 +60,9 @@ function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="notification-dropdown">
+        <>
+          <div className="notification-overlay" onClick={() => setIsOpen(false)} />
+          <div className="notification-dropdown">
           <div className="notification-header">
             <h3>Notifications</h3>
             {unreadCount > 0 && (
@@ -93,6 +95,7 @@ function NotificationBell() {
             )}
           </div>
         </div>
+        </>
       )}
     </div>
   );

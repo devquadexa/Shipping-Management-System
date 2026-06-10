@@ -628,6 +628,161 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.payment-slots-modal {
+  background: white;
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease-out;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.payment-slots-modal .modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f1f3 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.payment-slots-modal .modal-header h3 {
+  margin: 0;
+  color: #1a1a2e;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.payment-slots-modal .btn-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.payment-slots-modal .btn-close:hover {
+  background: #e5e7eb;
+  color: #1a1a2e;
+}
+
+.payment-slots-modal .office-pay-item-form,
+.payment-slots-modal .advance-payment-form {
+  padding: 1.5rem;
+}
+
+.form-slot {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.5rem;
+}
+
+.form-slot label {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: #1a1a2e;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.form-slot input,
+.form-slot select,
+.form-slot textarea {
+  width: 100%;
+  padding: 0.875rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  transition: all 0.2s;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.form-slot input:focus,
+.form-slot select:focus,
+.form-slot textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-slot select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.5rem;
+}
+
+.form-slot textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f8f9fa;
+  position: sticky;
+  bottom: 0;
+}
+
+.modal-actions .btn {
+  flex: 1;
+}
+
+.modal-actions .btn-primary {
+  flex: 2;
+}
+
+/* Desktop - Hide Modal */
+@media (min-width: 769px) {
+  .payment-slots-modal {
+    display: none;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .billing-table th.col-description { width: 16.66%; }
@@ -663,20 +818,32 @@ input[type="number"] {
     justify-content: center;
   }
 
-  .billing-table-wrapper {
-    overflow-x: auto;
+  .office-pay-items-section .billing-table-wrapper {
+    overflow-x: hidden;
+    max-width: 100%;
   }
 
-  .billing-table {
-    min-width: 600px;
+  .office-pay-items-section .billing-table {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 100%;
   }
 
-  .billing-table thead {
+  .office-pay-items-section .billing-table thead {
     display: none;
   }
 
-  .billing-table tbody tr {
+  .office-pay-items-section .billing-table tbody {
     display: block;
+    width: 100%;
+  }
+
+  .office-pay-items-section .billing-table tbody tr {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     margin-bottom: 1rem;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
@@ -684,39 +851,56 @@ input[type="number"] {
     background: white;
   }
 
-  .billing-table td {
+  .office-pay-items-section .billing-table td {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
+    border-right: none;
     text-align: right;
   }
 
-  .billing-table td:last-child {
+  .office-pay-items-section .billing-table td:last-child {
     border-bottom: none;
   }
 
-  .billing-table td::before {
+  .office-pay-items-section .billing-table td::before {
     content: attr(data-label);
     font-weight: 600;
     color: #1a1a2e;
     text-align: left;
-    flex: 1;
+    flex: 0 0 38%;
+    max-width: 38%;
+    flex-shrink: 0;
   }
 
-  .billing-table td.col-actual::before,
-  .billing-table td.col-billing::before {
+  .office-pay-items-section .billing-table td.col-actual::before,
+  .office-pay-items-section .billing-table td.col-billing::before {
     content: attr(data-label);
   }
 
-  .billing-table td[data-label="Actions"] {
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  .office-pay-items-section .billing-table .cell-content {
+    white-space: normal;
+    word-break: break-word;
+    overflow: visible;
+    text-overflow: unset;
+    flex: 1;
+    min-width: 0;
+    text-align: right;
   }
 
-  .billing-table td[data-label="Actions"]::before {
+  .office-pay-items-section .billing-table td[data-label="Actions"] {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .office-pay-items-section .billing-table td[data-label="Actions"]::before {
     display: none;
   }
 

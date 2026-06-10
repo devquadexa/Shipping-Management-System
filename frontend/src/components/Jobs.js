@@ -767,7 +767,7 @@ function Jobs() {
 
       {showModal && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal modal-large">
             <div className="modal-header">
               <h2>{isEditing ? 'Edit Job' : 'Create New Job'}</h2>
               <button className="btn-close" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }}>×</button>
@@ -935,7 +935,7 @@ function Jobs() {
                 </div>
               </div>
 
-              <div className="action-buttons modal-action-buttons">
+              <div className="form-actions">
                 <button type="button" onClick={() => { setShowModal(false); setIsEditing(false); setSelectedJob(null); setSelectedUsers([]); setShowUserDropdown(false); }} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn btn-primary">{isEditing ? 'Update Job' : 'Create Job'}</button>
               </div>

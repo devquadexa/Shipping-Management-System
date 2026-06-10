@@ -192,7 +192,7 @@ function PendingPaymentsReport() {
       {/* ── Date Range Filter Panel ── */}
       <div className="pcr-filter-panel">
         <div className="pcr-filter-row">
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', flex: 1 }}>
+          <div className="pcr-filter-main">
             <div className="pcr-filter-field">
               <label htmlFor="from-date" className="pcr-filter-label">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -235,13 +235,12 @@ function PendingPaymentsReport() {
               />
             </div>
 
-            <div className="pcr-filter-field" style={{ marginLeft: '8px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: '#374151' }}>
+            <div className="pcr-filter-field pcr-filter-checkbox">
+              <label className="pcr-filter-checkbox-label">
                 <input
                   type="checkbox"
                   checked={showOverdueOnly}
                   onChange={e => setShowOverdueOnly(e.target.checked)}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
                 Show Overdue Only
               </label>
@@ -269,7 +268,7 @@ function PendingPaymentsReport() {
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+          <div className="pcr-export-buttons">
             <button
               className="pcr-btn pcr-btn-pdf"
               onClick={exportToPDF}

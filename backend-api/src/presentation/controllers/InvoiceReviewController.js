@@ -1,6 +1,6 @@
 const { getConnection, sql } = require('../../config/database');
 const { v4: uuidv4 } = require('uuid');
-const NotificationController = require('./NotificationController');
+const container = require('../../infrastructure/di/container');
 
 class InvoiceReviewController {
   static async sendReview(req, res) {
@@ -56,13 +56,16 @@ class InvoiceReviewController {
 
       // Create notification for the clerk
       try {
-        await NotificationController.createNotification(
-          clerkId,
-          'invoice_review',
-          'New Invoice Review',
-          `${sender?.FullName || 'Admin'} sent you a new invoice review for job ${jobId}`,
-          reviewId
-        );
+        const createNotification = container.get('createNotification');
+        await createNotification.execute({
+          userId: clerkId,
+          type: 'invoice_review',
+          title: 'New Invoice Review',
+          message: `${sender?.FullName || 'Admin'} sent you a new invoice review for job ${jobId}`,
+          relatedId: reviewId,
+          relatedType: 'INVOICE_REVIEW',
+          createdBy: userId
+        });
       } catch (notificationError) {
         console.error('Error creating notification:', notificationError);
         // Don't fail the request if notification creation fails
@@ -263,13 +266,16 @@ class InvoiceReviewController {
 
       // Create notification for the person who sent the review
       try {
-        await NotificationController.createNotification(
-          review.sentBy,
-          'invoice_review_approved',
-          'Invoice Review Approved',
-          `${review.clerkName || 'Clerk'} approved the invoice review for job ${review.jobId}`,
-          reviewId
-        );
+        const createNotification = container.get('createNotification');
+        await createNotification.execute({
+          userId: review.sentBy,
+          type: 'invoice_review_approved',
+          title: 'Invoice Review Approved',
+          message: `${review.clerkName || 'Clerk'} approved the invoice review for job ${review.jobId}`,
+          relatedId: reviewId,
+          relatedType: 'INVOICE_REVIEW',
+          createdBy: userId
+        });
       } catch (notificationError) {
         console.error('Error creating approval notification:', notificationError);
       }
@@ -333,13 +339,16 @@ class InvoiceReviewController {
 
       // Create notification for the person who sent the review
       try {
-        await NotificationController.createNotification(
-          review.sentBy,
-          'invoice_review_rejected',
-          'Invoice Review Rejected',
-          `${review.clerkName || 'Clerk'} rejected the invoice review for job ${review.jobId}. Reason: ${rejectionReason}`,
-          reviewId
-        );
+        const createNotification = container.get('createNotification');
+        await createNotification.execute({
+          userId: review.sentBy,
+          type: 'invoice_review_rejected',
+          title: 'Invoice Review Rejected',
+          message: `${review.clerkName || 'Clerk'} rejected the invoice review for job ${review.jobId}. Reason: ${rejectionReason}`,
+          relatedId: reviewId,
+          relatedType: 'INVOICE_REVIEW',
+          createdBy: userId
+        });
       } catch (notificationError) {
         console.error('Error creating rejection notification:', notificationError);
       }

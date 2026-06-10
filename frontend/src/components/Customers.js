@@ -828,7 +828,6 @@ function Customers() {
               <h2>{editingCustomer ? 'Edit Customer' : 'Register New Customer'}</h2>
               <button className="btn-close" onClick={() => { setShowModal(false); resetForm(); }}>×</button>
             </div>
-            
             <form onSubmit={handleSubmit} className="customer-form">
               {/* Basic Information */}
               <div className="form-section">
