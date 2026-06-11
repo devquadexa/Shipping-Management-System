@@ -404,29 +404,13 @@
 }
 
 /* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  overflow: hidden;
-}
-
-.modal {
-  background: white;
-  border-radius: 12px;
+/* Modal Styles - Higher specificity to override App.css */
+.modal.modal-large {
   max-width: 95vw !important;
   width: 95vw !important;
   max-height: 95vh;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -436,7 +420,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem 4rem;
+  padding: 1rem 2rem;
   border-bottom: 2px solid #e5e7eb;
   background: white;
   flex-shrink: 0;
@@ -472,17 +456,39 @@
 
 /* Form Styles */
 .job-form {
-  padding: 2rem;
+  padding: 1rem 2rem;
   overflow-y: auto;
   flex: 1;
-  -webkit-overflow-scrolling: touch;
+}
+
+.form-section {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.section-heading {
+  margin: 0 0 1.25rem 0;
+  color: #101036;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #101036;
 }
 
 .form-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .form-group {
@@ -490,60 +496,119 @@
   flex-direction: column;
 }
 
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
 .form-group label {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
   color: #333;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+}
+
+/* Red asterisk for required fields */
+.required {
+  color: #dc2626;
+  font-weight: bold;
+  margin-left: 2px;
 }
 
 .form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 12px 14px;
+.form-group textarea,
+.form-group select {
+  padding: 10px 12px;
   border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.95rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
   font-family: inherit;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   background: white;
 }
 
 .form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
   outline: none;
   border-color: #101036;
   box-shadow: 0 0 0 3px rgba(16, 16, 54, 0.08);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 55px;
 }
 
 .form-group select {
   cursor: pointer;
 }
 
-/* Action Buttons */
-.action-buttons {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  align-items: center;
-  padding-top: 1.5rem;
-  border-top: 2px solid #e0e0e0;
-  margin-top: 1.5rem;
+/* Form Actions - Force override */
+.job-form .form-actions {
+  display: flex !important;
+  gap: 1rem !important;
+  justify-content: flex-end !important;
+  padding: 1.5rem 2rem 0 2rem !important;
+  margin-top: 0.5rem !important;
+  border-top: 2px solid #e5e7eb !important;
+  position: relative !important;
+  bottom: auto !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-/* Ensure modal action buttons are properly aligned with high specificity */
-.modal .action-buttons,
-.job-form .action-buttons,
-.modal .job-form .action-buttons,
-div.modal div.job-form div.action-buttons,
-.modal-action-buttons {
-  display: flex !important;
-  justify-content: flex-end !important;
-  align-items: center !important;
-  gap: 1rem !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
+/* Action Buttons - Higher specificity to override App.css */
+.jobs-page .btn,
+.form-actions .btn {
+  padding: 12px 24px !important;
+  border: none;
+  border-radius: 8px !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  transition: all 0.2s ease !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px !important;
+  min-width: 150px;
+}
+
+.jobs-page .btn-primary,
+.form-actions .btn-primary {
+  background: #101036 !important;
+  color: white !important;
+}
+
+.jobs-page .btn-primary:hover,
+.form-actions .btn-primary:hover {
+  background: #1a1a4d !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(16, 16, 54, 0.25) !important;
+}
+
+.jobs-page .btn-secondary,
+.form-actions .btn-secondary {
+  background: #e5e7eb !important;
+  color: #374151 !important;
+}
+
+.jobs-page .btn-secondary:hover,
+.form-actions .btn-secondary:hover {
+  background: #d1d5db !important;
+}
+
+/* Error Styles */
+.form-group input.error,
+.form-group textarea.error,
+.form-group select.error {
+  border-color: #dc3545;
+  background-color: #fff5f5;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  display: block;
 }
 
 /* Override any responsive rules for modal action buttons */
@@ -1750,8 +1815,15 @@ div.modal div.job-form div.action-buttons,
   justify-content: flex-end;
 }
 /* Office Pay Items Integration */
-.expanded-details .office-pay-items-section {
+.expanded-details .office-pay-items-section,
+.expanded-details .advance-payment-section {
   margin: 24px 0 0 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.expanded-details .office-pay-items-section {
   border-radius: 0 0 12px 12px;
   border-top: 2px solid #e2e8f0;
 }

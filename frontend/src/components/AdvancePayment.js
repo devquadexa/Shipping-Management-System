@@ -6,6 +6,7 @@ import API_BASE from '../api/config';
 function AdvancePayment({ job, onUpdate }) {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [showSlotsModal, setShowSlotsModal] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState(null);
   const [advancePayments, setAdvancePayments] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
@@ -260,6 +261,21 @@ function AdvancePayment({ job, onUpdate }) {
     setIsEditing(false);
   };
 
+  const openAddPaymentModal = () => {
+    // On mobile, show modal with slots; on desktop, show inline form
+    if (window.innerWidth <= 768) {
+      setShowSlotsModal(true);
+      setIsEditing(true);
+    } else {
+      setIsEditing(true);
+    }
+  };
+
+  const closePaymentModal = () => {
+    setShowSlotsModal(false);
+    handleCancel();
+  };
+
   const openEditPaymentForm = (payment) => {
     if (!payment || payment.isLegacy || !payment.advancePaymentId) {
       setMessage('Legacy advance payment entries cannot be edited. Add a new payment instead.');
@@ -471,6 +487,113 @@ function AdvancePayment({ job, onUpdate }) {
         </div>
       )}
 
+      {showSlotsModal && (
+        <div className="modal-overlay" onClick={closePaymentModal}>
+          <div className="payment-slots-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editingPaymentId ? 'Edit Advance Payment' : 'Add Advance Payment'}</h3>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={closePaymentModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="advance-payment-form">
+              <div className="form-slot">
+                <label htmlFor="advancePayment-modal">Advance Amount (LKR) <span className="required">*</span></label>
+                <input
+                  type="text"
+                  id="advancePayment-modal"
+                  value={formData.advancePayment}
+                  onChange={handleAdvanceAmountChange}
+                  onKeyDown={handleAdvanceAmountKeyDown}
+                  onPaste={handleAdvanceAmountPaste}
+                  placeholder="0.00"
+                  inputMode="decimal"
+                  className="form-control"
+                  required
+                />
+              </div>
+
+              <div className="form-slot">
+                <label htmlFor="paymentMadeDate-modal">Payment Made Date <span className="required">*</span></label>
+                <input
+                  type="date"
+                  id="paymentMadeDate-modal"
+                  value={formData.paymentMadeDate}
+                  onChange={(e) => setFormData({ ...formData, paymentMadeDate: e.target.value })}
+                  className="form-control"
+                  required={parseFloat(formData.advancePayment) > 0}
+                />
+              </div>
+
+              <div className="form-slot">
+                <label htmlFor="paymentType-modal">Payment Type <span className="required">*</span></label>
+                <select
+                  id="paymentType-modal"
+                  value={formData.paymentType}
+                  onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
+                  className="form-control"
+                  required={parseFloat(formData.advancePayment) > 0}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="check">Check</option>
+                  <option value="bank transfer">Bank Transfer</option>
+                </select>
+              </div>
+
+              {formData.paymentType === 'check' && (
+                <div className="form-slot">
+                  <label htmlFor="checkNo-modal">Check No <span className="required">*</span></label>
+                  <input
+                    type="text"
+                    id="checkNo-modal"
+                    value={formData.checkNo}
+                    onChange={(e) => setFormData({ ...formData, checkNo: e.target.value })}
+                    placeholder="Enter check number"
+                    className="form-control"
+                    required={parseFloat(formData.advancePayment) > 0}
+                  />
+                </div>
+              )}
+
+              <div className="form-slot">
+                <label htmlFor="notes-modal">Notes (Optional)</label>
+                <textarea
+                  id="notes-modal"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Enter any notes about this advance payment..."
+                  className="form-control"
+                  rows="3"
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={loading}
+                >
+                  {loading ? 'Processing...' : (editingPaymentId ? 'Update Payment' : 'Add Payment')}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closePaymentModal}
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="advance-payment-display">
         {loadingPayments && advancePayments.length === 0 ? (
           <div className="loading-state">
@@ -485,7 +608,7 @@ function AdvancePayment({ job, onUpdate }) {
             {canEdit && (
               <button
                 className="btn btn-primary btn-empty-state"
-                onClick={() => setIsEditing(true)}
+                onClick={openAddPaymentModal}
                 disabled={loadingPayments}
               >
                 + Add Payment
@@ -499,7 +622,7 @@ function AdvancePayment({ job, onUpdate }) {
               {canEdit && (
                 <button
                   className="btn btn-primary btn-add-payment"
-                  onClick={() => setIsEditing(true)}
+                  onClick={openAddPaymentModal}
                   disabled={loadingPayments}
                   title={advancePayments.length > 0 || totalAdvanceAmount > 0 ? 'Add another advance payment' : 'Add payment'}
                 >

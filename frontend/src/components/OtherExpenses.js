@@ -418,14 +418,14 @@ function OtherExpenses() {
       {/* Modal */}
       {showModal && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal modal-large">
             <div className="modal-header">
               <h2>{isEditing ? 'Edit Expense' : 'New Expense'}</h2>
               <button className="btn-close" onClick={resetForm}>×</button>
             </div>
 
             <form onSubmit={handleSubmit} className="expense-form">
-              <div className="form-row">
+              <div className="form-section">
                 <div className="form-group">
                   <label>Category <span className="required">*</span></label>
                   <select
@@ -531,7 +531,7 @@ function OtherExpenses() {
                 />
               </div>
 
-              <div className="action-buttons modal-action-buttons">
+              <div className="form-actions">
                 <button type="button" onClick={resetForm} className="btn btn-secondary">
                   Cancel
                 </button>

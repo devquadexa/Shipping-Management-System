@@ -552,51 +552,128 @@
 @media (max-width: 768px) {
   .advance-payment-section {
     padding: 1rem;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
 
   .advance-payment-section .header-content h3 {
     font-size: 1.35rem;
   }
 
-  .table-header-bar {
+  .advance-payment-section .table-header-bar {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
-  .billing-table {
+  .advance-payment-section .btn-add-payment {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .advance-payment-section .advance-billing-wrapper,
+  .advance-payment-section .billing-table-wrapper {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .advance-payment-section .billing-table,
+  .advance-payment-section .advance-billing-table {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 100%;
     table-layout: auto;
   }
 
-  .billing-table thead {
+  .advance-payment-section .billing-table thead {
     display: none;
   }
 
-  .billing-table tbody tr {
+  .advance-payment-section .billing-table tbody {
     display: block;
-    border-bottom: 1px solid #dbe4ff;
+    width: 100%;
   }
 
-  .billing-table td {
+  .advance-payment-section .billing-table tbody tr {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 0.75rem;
+    border: 1px solid #dbe4ff;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #eef4ff;
+  }
+
+  .advance-payment-section .billing-table td {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     border-right: none;
     padding: 0.65rem 0.9rem;
   }
 
-  .billing-table td::before {
+  .advance-payment-section .billing-table td::before {
     content: attr(data-label);
     color: #64748b;
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.35px;
+    flex: 0 0 38%;
+    max-width: 38%;
+    flex-shrink: 0;
+    text-align: left;
   }
 
-  .billing-table .col-description {
+  .advance-payment-section .billing-table .col-description {
     padding-left: 0.9rem;
+  }
+
+  .advance-payment-section .cell-content {
+    white-space: normal;
+    word-break: break-word;
+    overflow: visible;
+    text-overflow: unset;
+    flex: 1;
+    min-width: 0;
+    text-align: right;
+  }
+
+  .advance-payment-section .billing-table td[data-label="Actions"] {
+    justify-content: flex-end;
+  }
+
+  .advance-payment-section .billing-table td[data-label="Actions"]::before {
+    display: none;
+  }
+
+  .advance-payment-section .totals-section {
+    padding: 1rem;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .advance-payment-section .total-row {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .advance-payment-section .total-label,
+  .advance-payment-section .total-value {
+    min-width: 0;
+    word-break: break-word;
   }
 
   .advance-payments-table {
@@ -641,6 +718,160 @@
 
   .btn {
     width: 100%;
+  }
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.payment-slots-modal {
+  background: white;
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease-out;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.payment-slots-modal .modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f1f3 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.payment-slots-modal .modal-header h3 {
+  margin: 0;
+  color: #1a1a2e;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.payment-slots-modal .btn-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.payment-slots-modal .btn-close:hover {
+  background: #e5e7eb;
+  color: #1a1a2e;
+}
+
+.payment-slots-modal .advance-payment-form {
+  padding: 1.5rem;
+}
+
+.form-slot {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.5rem;
+}
+
+.form-slot label {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: #1a1a2e;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.form-slot input,
+.form-slot select,
+.form-slot textarea {
+  width: 100%;
+  padding: 0.875rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  transition: all 0.2s;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.form-slot input:focus,
+.form-slot select:focus,
+.form-slot textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-slot select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.5rem;
+}
+
+.form-slot textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f8f9fa;
+  position: sticky;
+  bottom: 0;
+}
+
+.modal-actions .btn {
+  flex: 1;
+}
+
+.modal-actions .btn-primary {
+  flex: 2;
+}
+
+/* Desktop - Hide Modal */
+@media (min-width: 769px) {
+  .payment-slots-modal {
+    display: none;
   }
 }
 

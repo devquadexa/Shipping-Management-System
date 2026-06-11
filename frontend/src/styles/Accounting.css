@@ -183,6 +183,10 @@
 /* Tab Content */
 .tab-content {
   animation: fadeIn 0.3s;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 @keyframes fadeIn {
@@ -463,6 +467,9 @@
 @media (max-width: 768px) {
   .accounting-page {
     padding: 1rem;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
 
   .page-header {

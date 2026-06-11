@@ -58,6 +58,8 @@ function Transporters() {
   const [chequeAmount, setChequeAmount] = useState('');
   const [bankName, setBankName] = useState('Commercial Bank');
   const [expandedPaymentDetails, setExpandedPaymentDetails] = useState(null);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
+  const [breakdownJob, setBreakdownJob] = useState(null);
   const [selectedChequeId, setSelectedChequeId] = useState('');
   const [dateRangeFilter, setDateRangeFilter] = useState({
     startDate: '',
@@ -767,6 +769,15 @@ function Transporters() {
     setShowPaymentModal(true);
   };
 
+  const handleViewPaymentDetails = (job) => {
+    if (window.innerWidth <= 768) {
+      setBreakdownJob(job);
+      setShowBreakdownModal(true);
+    } else {
+      setExpandedPaymentDetails(expandedPaymentDetails === job.jobId ? null : job.jobId);
+    }
+  };
+
   const submitTransporterPayment = async () => {
     if (!selectedJobForPayment) return;
 
@@ -1273,7 +1284,7 @@ function Transporters() {
                                                 <button
                                                   type="button"
                                                   className="inline-btn-delete"
-                                                  onClick={() => setExpandedPaymentDetails(expandedPaymentDetails === job.jobId ? null : job.jobId)}
+                                                  onClick={() => handleViewPaymentDetails(job)}
                                                   title={expandedPaymentDetails === job.jobId ? "Hide details" : "View details"}
                                                 >
                                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1292,7 +1303,7 @@ function Transporters() {
                                                   <span className="payment-tracking-title">Payment Breakdown</span>
                                                 </div>
                                                 
-                                                <div className="payment-tracking-table">
+                                                <div className="payment-tracking-table payment-breakdown-table">
                                                   <div className="payment-table-header">
                                                     <div className="payment-header-cell payment-label-col">Description</div>
                                                     <div className="payment-header-cell payment-amount-col">Amount</div>
@@ -1341,10 +1352,10 @@ function Transporters() {
                                                     <div className="payment-table-body">
                                                       {getAllPaymentRecords(job).map((payment, idx) => (
                                                         <div key={idx} className="payment-table-row">
-                                                          <div className="payment-table-cell payment-date-col">
+                                                          <div className="payment-table-cell payment-date-col" data-label="Date">
                                                             {formatDateWithMonth(payment.paymentDate)}
                                                           </div>
-                                                          <div className="payment-table-cell payment-method-col">
+                                                          <div className="payment-table-cell payment-method-col" data-label="Method">
                                                             <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
                                                               {payment.paymentMethod === 'Cash' && '💵'}
                                                               {payment.paymentMethod === 'Cheque' && '📝'}
@@ -1352,7 +1363,7 @@ function Transporters() {
                                                               {' '}{payment.paymentMethod || '-'}
                                                             </span>
                                                           </div>
-                                                          <div className="payment-table-cell payment-reference-col">
+                                                          <div className="payment-table-cell payment-reference-col" data-label="Reference">
                                                             {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? (
                                                               <span className="reference-text">CHQ: {payment.chequeNumber}</span>
                                                             ) : payment.paymentMethod === 'Bank Transfer' && payment.bankName ? (
@@ -1363,10 +1374,10 @@ function Transporters() {
                                                               <span className="reference-empty">-</span>
                                                             )}
                                                           </div>
-                                                          <div className="payment-table-cell payment-amount-col">
+                                                          <div className="payment-table-cell payment-amount-col" data-label="Amount">
                                                             <span className="payment-amount-value">LKR {formatAmount(payment.amount || 0)}</span>
                                                           </div>
-                                                          <div className="payment-table-cell payment-by-col">
+                                                          <div className="payment-table-cell payment-by-col" data-label="Paid By">
                                                             <span className="payment-by-value">{payment.paidByName || '-'}</span>
                                                           </div>
                                                         </div>
@@ -2031,6 +2042,112 @@ function Transporters() {
             </button>
           </div>
 
+        </div>
+      </div>
+    )}
+
+    {showBreakdownModal && breakdownJob && (
+      <div className="pm-overlay" onClick={() => setShowBreakdownModal(false)}>
+        <div className="pm-modal" onClick={e => e.stopPropagation()}>
+          <div className="pm-titlebar">
+            <div className="pm-titlebar-left">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{flexShrink:0}}>
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+              </svg>
+              <div>
+                <span className="pm-title">Payment Breakdown</span>
+                <span className="pm-subtitle">Job #{breakdownJob.jobId}</span>
+              </div>
+            </div>
+            <button className="pm-close" onClick={() => setShowBreakdownModal(false)} aria-label="Close">×</button>
+          </div>
+
+          <div className="pm-body" style={{ padding: '1.25rem' }}>
+            <div className="payment-tracking-section" style={{ borderTop: 'none', marginTop: 0, paddingTop: 0 }}>
+              <div className="payment-tracking-table payment-breakdown-table" style={{ display: 'block' }}>
+                <div className="payment-table-header" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                  <div className="payment-header-cell payment-label-col">Description</div>
+                  <div className="payment-header-cell payment-amount-col">Amount</div>
+                </div>
+                
+                <div className="payment-table-body">
+                  <div className="payment-table-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                    <div className="payment-table-cell payment-label-col">
+                      <span className="payment-label">Total Amount</span>
+                    </div>
+                    <div className="payment-table-cell payment-amount-col">
+                      <span className="payment-amount-value">LKR {formatAmount(getTransporterCostAmount(breakdownJob))}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="payment-table-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                    <div className="payment-table-cell payment-label-col">
+                      <span className="payment-label">Paid Amount</span>
+                    </div>
+                    <div className="payment-table-cell payment-amount-col">
+                      <span className="payment-amount-value payment-amount-paid">LKR {formatAmount(getPaymentDetails(breakdownJob)?.paidAmount || 0)}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="payment-table-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                    <div className="payment-table-cell payment-label-col">
+                      <span className="payment-label">Remaining Amount</span>
+                    </div>
+                    <div className="payment-table-cell payment-amount-col">
+                      <span className="payment-amount-value payment-amount-remaining">LKR {formatAmount(getRemainingTransporterCost(breakdownJob))}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {getPaymentDetails(breakdownJob)?.paidAmount > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <p className="pm-panel-label" style={{ marginBottom: '10px', fontWeight: 'bold' }}>Payment History</p>
+                  <div className="payment-tracking-table" style={{ display: 'block' }}>
+                    <div className="payment-table-body">
+                      {getAllPaymentRecords(breakdownJob).map((payment, idx) => (
+                        <div key={idx} className="payment-table-row" style={{ display: 'block', padding: '10px', borderBottom: '1px solid #e5e7eb' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 'bold' }}>DATE</span>
+                            <span style={{ fontSize: '0.8rem', color: '#1f2937' }}>{formatDateWithMonth(payment.paymentDate)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 'bold' }}>METHOD</span>
+                            <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
+                              {payment.paymentMethod === 'Cash' && '💵'}
+                              {payment.paymentMethod === 'Cheque' && '📝'}
+                              {payment.paymentMethod === 'Bank Transfer' && '🏦'}
+                              {' '}{payment.paymentMethod || '-'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 'bold' }}>REFERENCE</span>
+                            <span className="reference-text" style={{ fontSize: '0.8rem' }}>
+                              {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? `CHQ: ${payment.chequeNumber}` :
+                               payment.paymentMethod === 'Bank Transfer' && payment.bankName ? payment.bankName :
+                               payment.paymentMethod === 'Cash' ? 'Cash' : '-'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 'bold' }}>AMOUNT</span>
+                            <span className="payment-amount-value" style={{ fontSize: '0.85rem' }}>LKR {formatAmount(payment.amount || 0)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 'bold' }}>PAID BY</span>
+                            <span style={{ fontSize: '0.8rem', color: '#1f2937' }}>{payment.paidByName || '-'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="pm-footer">
+            <button className="pm-btn pm-btn--cancel" style={{ width: '100%' }} onClick={() => setShowBreakdownModal(false)}>Close</button>
+          </div>
         </div>
       </div>
     )}

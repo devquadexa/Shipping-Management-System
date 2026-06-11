@@ -49,7 +49,10 @@ class Notification {
       'PASSWORD_RESET_APPROVED',
       'PASSWORD_RESET_REJECTED',
       'USER_CREATED',
-      'SYSTEM_ALERT'
+      'SYSTEM_ALERT',
+      'invoice_review',
+      'invoice_review_approved',
+      'invoice_review_rejected'
     ];
     
     if (!validTypes.includes(this.type)) {

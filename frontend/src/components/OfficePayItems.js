@@ -27,6 +27,7 @@ function OfficePayItems({ jobId, onUpdate }) {
   const { user } = useAuth();
   const [officePayItems, setOfficePayItems] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showSlotsModal, setShowSlotsModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -134,6 +135,20 @@ function OfficePayItems({ jobId, onUpdate }) {
       description: '',
       actualCost: ''
     });
+  };
+
+  const openAddPaymentModal = () => {
+    // On mobile, show modal with slots; on desktop, show inline form
+    if (window.innerWidth <= 768) {
+      setShowSlotsModal(true);
+    } else {
+      setShowAddForm(true);
+    }
+  };
+
+  const closePaymentModal = () => {
+    setShowSlotsModal(false);
+    handleCloseForm();
   };
 
   const sanitizeCurrencyInput = (value) => {
@@ -297,6 +312,61 @@ function OfficePayItems({ jobId, onUpdate }) {
         </div>
       )}
 
+      {showSlotsModal && (
+        <div className="modal-overlay" onClick={closePaymentModal}>
+          <div className="payment-slots-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Office Payment</h3>
+              <button className="btn-close" onClick={closePaymentModal}>×</button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="office-pay-item-form">
+              <div className="form-slot">
+                <label htmlFor="description-modal">Description <span className="required">*</span></label>
+                <input
+                  type="text"
+                  id="description-modal"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="e.g., DO Charges, Port Fees, Documentation"
+                  required
+                />
+              </div>
+              
+              <div className="form-slot">
+                <label htmlFor="actualCost-modal">Amount Paid (LKR) <span className="required">*</span></label>
+                <input
+                  type="text"
+                  id="actualCost-modal"
+                  name="actualCost"
+                  value={formData.actualCost}
+                  onChange={handleChange}
+                  onKeyDown={handleAmountKeyDown}
+                  onPaste={handleAmountPaste}
+                  placeholder="0.00"
+                  inputMode="decimal"
+                  required
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Processing...' : 'Add Payment'}
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary"
+                  onClick={closePaymentModal}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="office-pay-items-list">
         {loading && officePayItems.length === 0 ? (
           <div className="loading-state">
@@ -310,7 +380,7 @@ function OfficePayItems({ jobId, onUpdate }) {
             <p>Add upfront payments made by office staff for this job</p>
             <button 
               className="btn btn-primary btn-empty-state"
-              onClick={() => setShowAddForm(true)}
+              onClick={openAddPaymentModal}
               disabled={loading}
             >
               + Add Payment
@@ -322,7 +392,7 @@ function OfficePayItems({ jobId, onUpdate }) {
               <div className="table-title">Payment Records</div>
               <button 
                 className="btn btn-primary btn-add-payment"
-                onClick={() => setShowAddForm(true)}
+                onClick={openAddPaymentModal}
                 disabled={loading}
                 title="Add new payment"
               >
