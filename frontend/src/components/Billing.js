@@ -28,10 +28,10 @@ function Billing() {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
   };
 
-  const getTransporterCostItem = () => {
+  const getTransporterCostItem = (job = selectedJob) => {
     // Always build transporter cost description with place names
-    const fromPlace = selectedJob?.exporter || 'placename';
-    const toPlace = selectedJob?.exporter || 'placename';
+    const fromPlace = job?.exporter || 'placename';
+    const toPlace = job?.importer || 'placename';
     const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
     
     return {
@@ -51,7 +51,7 @@ function Billing() {
     // If it's the old format transporter cost, add the prefix
     if (normalized === 'transporter cost' && job) {
       const fromPlace = job.exporter || 'placename';
-      const toPlace = job.transporter || 'placename';
+      const toPlace = job.importer || 'placename';
       return `transporter cost (from ${fromPlace} to ${toPlace})`;
     }
     
@@ -118,7 +118,7 @@ function Billing() {
     return merged;
   };
 
-  const ensureFclTransporterCost = (items, shipmentCategory) => {
+  const ensureFclTransporterCost = (items, shipmentCategory, job = selectedJob) => {
     const normalizedItems = Array.isArray(items) ? [...items] : [];
     if (shipmentCategory !== 'FCL') return normalizedItems;
 
@@ -129,7 +129,7 @@ function Billing() {
     });
 
     if (!hasTransporterCostItem(fclItems)) {
-      fclItems.push(getTransporterCostItem());
+      fclItems.push(getTransporterCostItem(job));
     }
 
     return fclItems;
@@ -181,6 +181,8 @@ function Billing() {
   // New states for pay item editing
   const [editingPayItemIndex, setEditingPayItemIndex] = useState(null);
   const [editingBillingAmount, setEditingBillingAmount] = useState('');
+  const [editingDescription, setEditingDescription] = useState('');
+  
   
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -480,13 +482,13 @@ function Billing() {
             });
           }
         });
-        mergedPayItems = ensureFclTransporterCost(mergedPayItems, job.shipmentCategory);
+        mergedPayItems = ensureFclTransporterCost(mergedPayItems, job.shipmentCategory, job);
         setSelectedJob({ ...job, payItems: mergedPayItems });
         setShowPayItemsRow(false);
         setMessage(`?? Job has ${mergedPayItems.length} pay items. Use "+ Add More Items" to add additional items.`);
         setTimeout(() => setMessage(''), 5000);
       } else if (allPayItems.length > 0) {
-        const payItemsWithFclItem = ensureFclTransporterCost(allPayItems, job.shipmentCategory);
+        const payItemsWithFclItem = ensureFclTransporterCost(allPayItems, job.shipmentCategory, job);
         setPayItems(payItemsWithFclItem);
         setShowPayItemsRow(true);
         
@@ -546,7 +548,7 @@ function Billing() {
               hasBill: false
             }));
 
-            const payItemsWithFclItem = ensureFclTransporterCost(loadedPayItems, job.shipmentCategory);
+            const payItemsWithFclItem = ensureFclTransporterCost(loadedPayItems, job.shipmentCategory, job);
             
             setPayItems(payItemsWithFclItem);
             setShowPayItemsRow(true);
@@ -591,7 +593,7 @@ function Billing() {
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
+    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem(selectedJob)]);
     setShowPayItemsRow(true);
   };
 
@@ -603,7 +605,7 @@ function Billing() {
       return;
     }
     setShowPayItemsRow(true);
-    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
+    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem(selectedJob)]);
   };
 
   const removePayItemRow = (index) => {
@@ -909,6 +911,7 @@ function Billing() {
     if (editingPayItemIndex === null) return;
     
     const newBillingAmount = parseFloat(editingBillingAmount);
+
     if (isNaN(newBillingAmount) || newBillingAmount < 0) {
       setMessage('? Please enter a valid billing amount');
       setTimeout(() => setMessage(''), 3000);
@@ -1455,13 +1458,7 @@ function Billing() {
     const printablePayItems = payItemsArray.map((item, index) => {
       let description = item.description || item.name || 'Service Charge';
       
-      // Always transform to new format with place names
-      const normalized = description.toLowerCase().trim();
-      if (normalized.startsWith('transporter cost')) {
-        const fromPlace = job.exporter || 'placename';
-        const toPlace = job.transporter || 'placename';
-        description = `transporter cost (from ${fromPlace} to ${toPlace})`;
-      }
+      // Use description as-is (no transformation needed - it already has the correct prefix from UI)
       
       const amount = parseFloat(item.billingAmount || item.amount || 0) || 0;
       const payItemId = item.id || item.payItemId || item.officePayItemId || `PI${String(index + 1).padStart(3, '0')}`;
@@ -1507,26 +1504,8 @@ function Billing() {
 
     const hasMultiplePages = printablePayItemPages.length > 1;
 
-    // Add transporter cost for FCL shipments
-    if (job.shipmentCategory === 'FCL') {
-      const hasTransporterCost = payItemsArray.some(item => {
-        const label = (item?.name || item?.description || '').toLowerCase().trim();
-        // Check if any transporter cost exists (old or new format)
-        return label.startsWith('transporter cost');
-      });
-      if (!hasTransporterCost) {
-        // Always use new format with place names
-        const fromPlace = job.exporter || 'placename';
-        const toPlace = job.transporter || 'placename';
-        const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
-        payItemsArray.push({
-          name: description,
-          description: description,
-          billingAmount: 0,
-          amount: 0
-        });
-      }
-    }
+    // FCL shipments should have transporter cost added via UI
+    // No need to auto-add it here - it will be included if user added it
 
     const isCompactItemsLayout = payItemsArray.length >= 20;
     
@@ -2603,19 +2582,10 @@ function Billing() {
                       <tbody>
                         {selectedJob.payItems.map((item, idx) => {
                           const itemDescription = item.description || item.name || '';
-                          let displayDescription = itemDescription;
-                          
-                          // Always transform to new format with place names
-                          const normalized = itemDescription.toLowerCase().trim();
-                          if (normalized.startsWith('transporter cost')) {
-                            const fromPlace = selectedJob.exporter || 'placename';
-                            const toPlace = selectedJob.transporter || 'placename';
-                            displayDescription = `transporter cost (from ${fromPlace} to ${toPlace})`;
-                          }
                           
                           return (
                           <tr key={idx} className="pay-item-row">
-                            <td className="col-description" data-label="Description">{displayDescription}</td>
+                            <td className="col-description" data-label="Description">{itemDescription}</td>
                             <td className="col-amount" data-label="Actual Cost (LKR)">
                               {formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}
                             </td>
