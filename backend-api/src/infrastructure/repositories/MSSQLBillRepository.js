@@ -231,6 +231,50 @@ class MSSQLBillRepository extends IBillRepository {
     return await this.findById(billId);
   }
 
+  async replaceBill(billId, billData) {
+    const pool = await this.db();
+
+    await pool.request()
+      .input('billId', this.sql.VarChar, billId)
+      .input('customerId', this.sql.VarChar, billData.customerId)
+      .input('amount', this.sql.Decimal(10, 2), billData.amount || billData.billingAmount)
+      .input('tax', this.sql.Decimal(10, 2), billData.tax || 0)
+      .input('total', this.sql.Decimal(10, 2), billData.total)
+      .input('actualCost', this.sql.Decimal(10, 2), billData.actualCost)
+      .input('billingAmount', this.sql.Decimal(10, 2), billData.billingAmount)
+      .input('profit', this.sql.Decimal(10, 2), billData.profit)
+      .input('advancePayment', this.sql.Decimal(18, 2), billData.advancePayment || 0)
+      .input('grossTotal', this.sql.Decimal(18, 2), billData.grossTotal)
+      .input('netTotal', this.sql.Decimal(18, 2), billData.netTotal)
+      .input('paymentStatus', this.sql.VarChar, billData.paymentStatus || 'Unpaid')
+      .input('invoiceNumber', this.sql.VarChar, billData.invoiceNumber || null)
+      .input('invoiceDate', this.sql.DateTime, billData.invoiceDate || new Date())
+      .input('dueDate', this.sql.DateTime, billData.dueDate)
+      .input('isOverdue', this.sql.Bit, billData.isOverdue || false)
+      .query(`
+        UPDATE Bills SET 
+          CustomerId = @customerId,
+          Amount = @amount,
+          Tax = @tax,
+          Total = @total,
+          ActualCost = @actualCost,
+          BillingAmount = @billingAmount,
+          Profit = @profit,
+          advancePayment = @advancePayment,
+          grossTotal = @grossTotal,
+          netTotal = @netTotal,
+          PaymentStatus = @paymentStatus,
+          InvoiceNumber = @invoiceNumber,
+          invoiceDate = @invoiceDate,
+          dueDate = @dueDate,
+          isOverdue = @isOverdue,
+          BillDate = GETDATE()
+        WHERE BillId = @billId
+      `);
+
+    return await this.findById(billId);
+  }
+
   async delete(billId) {
     const pool = await this.db();
     

@@ -316,6 +316,11 @@
   background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
 }
 
+.csr-card-teal {
+  border-color: #14b8a6;
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+}
+
 .csr-summary-icon {
   font-size: 2.5rem;
   flex-shrink: 0;

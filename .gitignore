@@ -18,6 +18,8 @@ dist/
 frontend/.env
 backend-api/.env
 
+.kiro
+
 # Logs
 logs/
 *.log

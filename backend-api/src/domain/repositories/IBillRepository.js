@@ -34,6 +34,10 @@ class IBillRepository {
     throw new Error('Method not implemented');
   }
 
+  async replaceBill(billId, billData) {
+    throw new Error('Method not implemented');
+  }
+
   async generateNextId() {
     throw new Error('Method not implemented');
   }
