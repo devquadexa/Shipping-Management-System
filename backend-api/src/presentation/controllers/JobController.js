@@ -100,21 +100,21 @@ class JobController {
       console.log('JobController.update - jobId:', jobId);
       console.log('JobController.update - req.body:', JSON.stringify(req.body, null, 2));
       
-      const jobData = {
-        blNumber: req.body.blNumber || null,
-        cusdecNumber: req.body.cusdecNumber || null,
-        cusdecDate: req.body.cusdecDate || null,
-        openDate: req.body.openDate || null,
-        shipmentCategory: req.body.shipmentCategory,
-        chassisNumber: req.body.chassisNumber || null,
-        exporter: req.body.exporter || null,
-        transporter: req.body.transporter || null,
-        lcNumber: req.body.lcNumber || null,
-        containerNumber: req.body.containerNumber || null,
-        transportDeliveryDate: req.body.transportDeliveryDate || null,
-        status: req.body.status,
-        assignedTo: req.body.assignedTo || null
-      };
+      // Only include fields that are explicitly present in the request body
+      const jobData = {};
+      if (req.body.hasOwnProperty('blNumber')) jobData.blNumber = req.body.blNumber || null;
+      if (req.body.hasOwnProperty('cusdecNumber')) jobData.cusdecNumber = req.body.cusdecNumber || null;
+      if (req.body.hasOwnProperty('cusdecDate')) jobData.cusdecDate = req.body.cusdecDate || null;
+      if (req.body.hasOwnProperty('openDate')) jobData.openDate = req.body.openDate || null;
+      if (req.body.hasOwnProperty('shipmentCategory')) jobData.shipmentCategory = req.body.shipmentCategory;
+      if (req.body.hasOwnProperty('chassisNumber')) jobData.chassisNumber = req.body.chassisNumber || null;
+      if (req.body.hasOwnProperty('exporter')) jobData.exporter = req.body.exporter || null;
+      if (req.body.hasOwnProperty('transporter')) jobData.transporter = req.body.transporter || null;
+      if (req.body.hasOwnProperty('lcNumber')) jobData.lcNumber = req.body.lcNumber || null;
+      if (req.body.hasOwnProperty('containerNumber')) jobData.containerNumber = req.body.containerNumber || null;
+      if (req.body.hasOwnProperty('transportDeliveryDate')) jobData.transportDeliveryDate = req.body.transportDeliveryDate || null;
+      if (req.body.hasOwnProperty('status')) jobData.status = req.body.status;
+      if (req.body.hasOwnProperty('assignedTo')) jobData.assignedTo = req.body.assignedTo || null;
       
       console.log('JobController.update - jobData:', JSON.stringify(jobData, null, 2));
       

@@ -328,11 +328,17 @@ function Billing() {
     }
   };
 
-  const handleTransporterChange = async (newTransporterName) => {
-    if (!selectedJob || !newTransporterName) return;
+  const handleTransporterChange = async (newTransporterId) => {
+    if (!selectedJob || !newTransporterId) return;
+
+    // Find the transporter name from the ID
+    const transporter = transporters.find(t => t.transporterId === newTransporterId);
+    if (!transporter) return;
+
+    const newTransporterName = transporter.name;
 
     try {
-      // Update job with new transporter
+      // Update job with new transporter name
       await jobService.update(selectedJob.jobId, {
         transporter: newTransporterName
       });
@@ -1081,7 +1087,15 @@ function Billing() {
       };
       console.log('generateBill - sending billData:', billData);
       
-      await billingService.createBill(billData);
+      const result = await billingService.createBill(billData);
+      
+      // Check if bill generation was blocked (paid/partially paid)
+      if (result.blocked) {
+        setMessage(`Bill is ${result.paymentStatus.toLowerCase()}`);
+        setTimeout(() => setMessage(''), 5000);
+        console.log('=== GENERATE BILL BLOCKED ===', result.message);
+        return;
+      }
       
       // Update petty cash assignment status to Closed via direct API call (safety net)
       try {
@@ -2610,8 +2624,12 @@ function Billing() {
                               <td className="col-actions">
                                 {editingPayItemIndex === idx ? (
                                   <div className="action-btns">
-                                    <button className="action-btn save-btn" onClick={saveInlineEditedPayItem} title="Save">?</button>
-                                    <button className="action-btn cancel-btn" onClick={cancelEditingPayItem} title="Cancel">?</button>
+                                    <button className="action-btn save-btn" onClick={saveInlineEditedPayItem} title="Save" aria-label="Save">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                    </button>
+                                    <button className="action-btn cancel-btn" onClick={cancelEditingPayItem} title="Cancel" aria-label="Cancel">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
                                   </div>
                                 ) : (
                                   <div className="action-btns">
