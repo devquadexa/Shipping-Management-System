@@ -8,6 +8,7 @@ class CashWithdrawal {
     bankName,
     withdrawalDate,
     notes,
+    transactionType,
     createdBy,
     createdAt
   }) {
@@ -16,6 +17,7 @@ class CashWithdrawal {
     this.bankName = bankName;
     this.withdrawalDate = withdrawalDate || new Date();
     this.notes = notes || '';
+    this.transactionType = transactionType || 'withdrawal';
     this.createdBy = createdBy;
     this.createdAt = createdAt || new Date();
   }

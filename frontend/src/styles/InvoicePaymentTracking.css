@@ -1,0 +1,334 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   INVOICE PAYMENT TRACKING TABLE — Professional Design for Billing Page
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.invoice-payment-tracking-section {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 3px solid #e5e7eb;
+}
+
+.invoice-payment-tracking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.invoice-payment-tracking-title {
+  margin: 0;
+  color: #101036;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.invoice-payment-tracking-count {
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Payment Tracking Table — Grid-based layout matching Settlement Items */
+.invoice-payment-tracking-table {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.invoice-payment-table-header {
+  display: grid;
+  grid-template-columns: 0.8fr 1.5fr 1.2fr 1.2fr 1.2fr;
+  background: #f3f4f6;
+  border-bottom: 2px solid #d1d5db;
+}
+
+.invoice-payment-header-cell {
+  padding: 0.6rem 0.75rem;
+  font-weight: 700;
+  color: #374151;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-right: 1px solid #e5e7eb;
+}
+
+.invoice-payment-header-cell:last-child {
+  border-right: none;
+}
+
+.invoice-payment-table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.invoice-payment-table-row {
+  display: grid;
+  grid-template-columns: 0.8fr 1.5fr 1.2fr 1.2fr 1.2fr;
+  border-bottom: 1px solid #e5e7eb;
+  transition: background 0.15s ease;
+}
+
+.invoice-payment-table-row:last-child {
+  border-bottom: none;
+}
+
+.invoice-payment-table-row:hover {
+  background: #f9fafb;
+}
+
+.invoice-payment-table-cell {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  color: #374151;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invoice-payment-table-cell:last-child {
+  border-right: none;
+}
+
+.invoice-payment-date-col {
+  justify-content: flex-start;
+}
+
+.invoice-payment-method-col {
+  justify-content: flex-start;
+}
+
+.invoice-payment-reference-col {
+  justify-content: flex-start;
+}
+
+.invoice-payment-amount-col {
+  justify-content: flex-end;
+  font-weight: 600;
+}
+
+.invoice-payment-label-col {
+  justify-content: flex-start;
+}
+
+.invoice-payment-by-col {
+  justify-content: flex-start;
+}
+
+.invoice-payment-num {
+  color: #9ca3af;
+  font-size: 0.813rem;
+  font-weight: 500;
+}
+
+.invoice-payment-method-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.invoice-payment-method-cash {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.invoice-payment-method-cheque {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.invoice-payment-method-bank-transfer {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.invoice-reference-text {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #111827;
+  font-size: 0.9rem;
+}
+
+.invoice-reference-empty {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.invoice-payment-amount-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: #111827;
+  font-size: 0.95rem;
+}
+
+.invoice-payment-amount-paid {
+  color: #10b981;
+}
+
+.invoice-payment-amount-remaining {
+  color: #dc2626;
+}
+
+.invoice-payment-label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.invoice-payment-by-value {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+/* Total Row */
+.invoice-payment-total-row {
+  display: grid;
+  grid-template-columns: 0.8fr 1.5fr 1.2fr 1.2fr 1.2fr;
+  background: #f0f4ff;
+  border-top: 2px solid #d1d5db;
+  border-bottom: none;
+}
+
+.invoice-payment-total-row .invoice-payment-table-cell {
+  padding: 0.65rem 0.75rem;
+  font-weight: 700;
+  color: #111827;
+  font-size: 0.95rem;
+  border-right: 1px solid #e5e7eb;
+}
+
+.invoice-payment-total-row .invoice-payment-table-cell:last-child {
+  border-right: none;
+}
+
+/* Payment Details Expanded Row */
+.invoice-payment-details-expanded-row {
+  background: #f9fafb;
+}
+
+.invoice-payment-details-expanded-row .invoice-payment-table-cell {
+  padding: 1rem 1.5rem !important;
+  border-top: 1px solid #e5e7eb;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .invoice-payment-table-header,
+  .invoice-payment-table-row,
+  .invoice-payment-total-row {
+    grid-template-columns: 0.8fr 1.5fr 1.2fr 1.2fr 1.2fr;
+  }
+
+  .invoice-payment-header-cell,
+  .invoice-payment-table-cell {
+    padding: 0.7rem 0.85rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .invoice-payment-tracking-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+  }
+
+  .invoice-payment-tracking-header {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .invoice-payment-table-header {
+    display: none;
+  }
+
+  .invoice-payment-table-body {
+    display: block;
+    width: 100%;
+  }
+
+  .invoice-payment-table-row {
+    display: block;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .invoice-payment-table-row:hover {
+    background: #f9fafb;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  .invoice-payment-table-cell {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-right: none;
+    border-bottom: none;
+    gap: 0.5rem;
+  }
+
+  .invoice-payment-table-cell:last-child {
+    border-bottom: none;
+  }
+
+  .invoice-payment-table-cell::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: #6b7280;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+
+  .invoice-payment-total-row {
+    display: block;
+    background: #f0f4ff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+  }
+
+  .invoice-payment-total-row .invoice-payment-table-cell {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.6rem 0;
+    border-right: none;
+  }
+
+  .invoice-payment-total-row .invoice-payment-table-cell::before {
+    display: none;
+  }
+
+  .invoice-payment-total-row .invoice-payment-table-cell:first-child {
+    margin-bottom: 0.5rem;
+  }
+
+  .invoice-payment-method-badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.7rem;
+  }
+}

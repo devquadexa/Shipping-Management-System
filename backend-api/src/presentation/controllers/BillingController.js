@@ -26,6 +26,12 @@ class BillingController {
       console.log('BillingController.create - Extracted billData:', billData);
       
       const bill = await this.createBill.execute(billData);
+      
+      // If bill generation was blocked (paid/partially paid), return 200 with message
+      if (bill.blocked) {
+        return res.status(200).json(bill);
+      }
+      
       res.status(201).json(bill);
     } catch (error) {
       console.error('Create bill error:', error);

@@ -14,7 +14,7 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
   async create(withdrawal) {
     const pool = await this.db();
     
-    // Ensure table exists
+    // Ensure table exists with transactionType column
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CashWithdrawals')
       BEGIN
@@ -24,9 +24,14 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
           bankName NVARCHAR(200) NOT NULL,
           withdrawalDate DATETIME NOT NULL,
           notes NVARCHAR(500),
+          transactionType NVARCHAR(50) DEFAULT 'withdrawal',
           createdBy NVARCHAR(50) NOT NULL,
           createdAt DATETIME DEFAULT GETDATE()
         )
+      END
+      ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CashWithdrawals') AND name = 'transactionType')
+      BEGIN
+        ALTER TABLE CashWithdrawals ADD transactionType NVARCHAR(50) DEFAULT 'withdrawal'
       END
     `);
     
@@ -36,10 +41,11 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
       .input('bankName', this.sql.NVarChar, withdrawal.bankName)
       .input('withdrawalDate', this.sql.DateTime, withdrawal.withdrawalDate)
       .input('notes', this.sql.NVarChar, withdrawal.notes || null)
+      .input('transactionType', this.sql.NVarChar, withdrawal.transactionType || 'withdrawal')
       .input('createdBy', this.sql.VarChar, withdrawal.createdBy)
       .query(`
-        INSERT INTO CashWithdrawals (withdrawalId, amount, bankName, withdrawalDate, notes, createdBy)
-        VALUES (@withdrawalId, @amount, @bankName, @withdrawalDate, @notes, @createdBy)
+        INSERT INTO CashWithdrawals (withdrawalId, amount, bankName, withdrawalDate, notes, transactionType, createdBy)
+        VALUES (@withdrawalId, @amount, @bankName, @withdrawalDate, @notes, @transactionType, @createdBy)
       `);
     
     return withdrawal;
@@ -48,7 +54,7 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
   async findAll() {
     const pool = await this.db();
     
-    // Ensure table exists
+    // Ensure table exists with transactionType column
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CashWithdrawals')
       BEGIN
@@ -58,9 +64,14 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
           bankName NVARCHAR(200) NOT NULL,
           withdrawalDate DATETIME NOT NULL,
           notes NVARCHAR(500),
+          transactionType NVARCHAR(50) DEFAULT 'withdrawal',
           createdBy NVARCHAR(50) NOT NULL,
           createdAt DATETIME DEFAULT GETDATE()
         )
+      END
+      ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CashWithdrawals') AND name = 'transactionType')
+      BEGIN
+        ALTER TABLE CashWithdrawals ADD transactionType NVARCHAR(50) DEFAULT 'withdrawal'
       END
     `);
     
@@ -89,7 +100,7 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
   async findByDateRange(fromDate, toDate) {
     const pool = await this.db();
     
-    // Ensure table exists
+    // Ensure table exists with transactionType column
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CashWithdrawals')
       BEGIN
@@ -99,9 +110,14 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
           bankName NVARCHAR(200) NOT NULL,
           withdrawalDate DATETIME NOT NULL,
           notes NVARCHAR(500),
+          transactionType NVARCHAR(50) DEFAULT 'withdrawal',
           createdBy NVARCHAR(50) NOT NULL,
           createdAt DATETIME DEFAULT GETDATE()
         )
+      END
+      ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CashWithdrawals') AND name = 'transactionType')
+      BEGIN
+        ALTER TABLE CashWithdrawals ADD transactionType NVARCHAR(50) DEFAULT 'withdrawal'
       END
     `);
     
@@ -124,7 +140,7 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
   async generateNextId() {
     const pool = await this.db();
     
-    // Ensure table exists
+    // Ensure table exists with transactionType column
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CashWithdrawals')
       BEGIN
@@ -134,9 +150,14 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
           bankName NVARCHAR(200) NOT NULL,
           withdrawalDate DATETIME NOT NULL,
           notes NVARCHAR(500),
+          transactionType NVARCHAR(50) DEFAULT 'withdrawal',
           createdBy NVARCHAR(50) NOT NULL,
           createdAt DATETIME DEFAULT GETDATE()
         )
+      END
+      ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CashWithdrawals') AND name = 'transactionType')
+      BEGIN
+        ALTER TABLE CashWithdrawals ADD transactionType NVARCHAR(50) DEFAULT 'withdrawal'
       END
     `);
     
@@ -154,6 +175,7 @@ class MSSQLCashWithdrawalRepository extends ICashWithdrawalRepository {
       bankName: row.bankName,
       withdrawalDate: row.withdrawalDate,
       notes: row.notes,
+      transactionType: row.transactionType || 'withdrawal',
       createdBy: row.createdBy,
       createdAt: row.createdAt,
       createdByName: row.createdByName

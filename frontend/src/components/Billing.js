@@ -11,6 +11,7 @@ import Pagination from './Pagination';
 import ReviewInvoiceModal from './ReviewInvoiceModal';
 import { formatDate, formatDateWithMonth, formatDateWithFullMonth } from '../utils/dateFormatter';
 import '../styles/Billing.css';
+import '../styles/InvoicePaymentTracking.css';
 
 function Billing() {
   const { user } = useAuth();
@@ -27,10 +28,10 @@ function Billing() {
     return category === 'Vehicle - Personal' || category === 'Vehicle - Company' || category === 'Vehicle';
   };
 
-  const getTransporterCostItem = () => {
+  const getTransporterCostItem = (job = selectedJob) => {
     // Always build transporter cost description with place names
-    const fromPlace = selectedJob?.exporter || 'placename';
-    const toPlace = selectedJob?.exporter || 'placename';
+    const fromPlace = job?.exporter || 'placename';
+    const toPlace = job?.importer || 'placename';
     const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
     
     return {
@@ -50,7 +51,7 @@ function Billing() {
     // If it's the old format transporter cost, add the prefix
     if (normalized === 'transporter cost' && job) {
       const fromPlace = job.exporter || 'placename';
-      const toPlace = job.transporter || 'placename';
+      const toPlace = job.importer || 'placename';
       return `transporter cost (from ${fromPlace} to ${toPlace})`;
     }
     
@@ -117,7 +118,7 @@ function Billing() {
     return merged;
   };
 
-  const ensureFclTransporterCost = (items, shipmentCategory) => {
+  const ensureFclTransporterCost = (items, shipmentCategory, job = selectedJob) => {
     const normalizedItems = Array.isArray(items) ? [...items] : [];
     if (shipmentCategory !== 'FCL') return normalizedItems;
 
@@ -128,7 +129,7 @@ function Billing() {
     });
 
     if (!hasTransporterCostItem(fclItems)) {
-      fclItems.push(getTransporterCostItem());
+      fclItems.push(getTransporterCostItem(job));
     }
 
     return fclItems;
@@ -174,10 +175,14 @@ function Billing() {
   const [validationMessage, setValidationMessage] = useState('');
   const [expandedBillId, setExpandedBillId] = useState(null);
   const [printMode, setPrintMode] = useState('color');
+  const [showPaymentBreakdownModal, setShowPaymentBreakdownModal] = useState(false);
+  const [paymentBreakdownBill, setPaymentBreakdownBill] = useState(null);
   
   // New states for pay item editing
   const [editingPayItemIndex, setEditingPayItemIndex] = useState(null);
   const [editingBillingAmount, setEditingBillingAmount] = useState('');
+  const [editingDescription, setEditingDescription] = useState('');
+  
   
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -234,6 +239,7 @@ function Billing() {
   // Review Invoice states
   const [showReviewInvoiceModal, setShowReviewInvoiceModal] = useState(false);
   const [reviewInvoiceLoading, setReviewInvoiceLoading] = useState(false);
+  const [showJobInfoModal, setShowJobInfoModal] = useState(false);
 
   useEffect(() => {
     fetchBills();
@@ -323,21 +329,24 @@ function Billing() {
   };
 
   const handleTransporterChange = async (newTransporterId) => {
-    if (!selectedJob) return;
+    if (!selectedJob || !newTransporterId) return;
+
+    // Find the transporter name from the ID
+    const transporter = transporters.find(t => t.transporterId === newTransporterId);
+    if (!transporter) return;
+
+    const newTransporterName = transporter.name;
 
     try {
-      const transporter = transporters.find(t => t.transporterId === newTransporterId);
-      const transporterName = transporter ? transporter.name : '';
-
-      // Update job with new transporter
+      // Update job with new transporter name
       await jobService.update(selectedJob.jobId, {
-        transporter: transporterName
+        transporter: newTransporterName
       });
 
       // Update selected job state
       setSelectedJob({
         ...selectedJob,
-        transporter: transporterName
+        transporter: newTransporterName
       });
 
       setMessage('Transporter updated successfully!');
@@ -460,7 +469,7 @@ function Billing() {
       const hasExistingPayItems = job.payItems && job.payItems.length > 0;
 
       if (hasExistingPayItems) {
-        // Job has saved pay items — merge any office pay items not already saved
+        // Job has saved pay items � merge any office pay items not already saved
         let mergedPayItems = [...job.payItems];
         const officeItemsFromApi = allPayItems.filter(item => item.isOfficePayItem);
         officeItemsFromApi.forEach(opi => {
@@ -479,19 +488,19 @@ function Billing() {
             });
           }
         });
-        mergedPayItems = ensureFclTransporterCost(mergedPayItems, job.shipmentCategory);
+        mergedPayItems = ensureFclTransporterCost(mergedPayItems, job.shipmentCategory, job);
         setSelectedJob({ ...job, payItems: mergedPayItems });
         setShowPayItemsRow(false);
-        setMessage(`📋 Job has ${mergedPayItems.length} pay items. Use "+ Add More Items" to add additional items.`);
+        setMessage(`?? Job has ${mergedPayItems.length} pay items. Use "+ Add More Items" to add additional items.`);
         setTimeout(() => setMessage(''), 5000);
       } else if (allPayItems.length > 0) {
-        const payItemsWithFclItem = ensureFclTransporterCost(allPayItems, job.shipmentCategory);
+        const payItemsWithFclItem = ensureFclTransporterCost(allPayItems, job.shipmentCategory, job);
         setPayItems(payItemsWithFclItem);
         setShowPayItemsRow(true);
         
         const officeItemsCount = allPayItems.filter(item => item.isOfficePayItem).length;
         const pettyCashItemsCount = allPayItems.filter(item => item.isPettyCashItem).length;
-        let message = `✅ Loaded ${allPayItems.length} items: `;
+        let message = `? Loaded ${allPayItems.length} items: `;
         if (officeItemsCount > 0) message += `${officeItemsCount} office payments`;
         if (pettyCashItemsCount > 0) {
           if (officeItemsCount > 0) message += `, `;
@@ -501,7 +510,7 @@ function Billing() {
         setMessage(message);
         setTimeout(() => setMessage(''), 5000);
       } else {
-        // No existing pay items, no office/petty cash items — show entry form or load templates
+        // No existing pay items, no office/petty cash items � show entry form or load templates
         if (job?.pettyCashStatus !== 'Settled') {
           setMessage('Petty cash must be settled before generating invoice');
           setTimeout(() => setMessage(''), 3000);
@@ -545,7 +554,7 @@ function Billing() {
               hasBill: false
             }));
 
-            const payItemsWithFclItem = ensureFclTransporterCost(loadedPayItems, job.shipmentCategory);
+            const payItemsWithFclItem = ensureFclTransporterCost(loadedPayItems, job.shipmentCategory, job);
             
             setPayItems(payItemsWithFclItem);
             setShowPayItemsRow(true);
@@ -590,7 +599,7 @@ function Billing() {
       setTimeout(() => setMessage(''), 3000);
       return;
     }
-    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
+    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem(selectedJob)]);
     setShowPayItemsRow(true);
   };
 
@@ -602,7 +611,7 @@ function Billing() {
       return;
     }
     setShowPayItemsRow(true);
-    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem()]);
+    setPayItems((prevPayItems) => [...prevPayItems, getTransporterCostItem(selectedJob)]);
   };
 
   const removePayItemRow = (index) => {
@@ -675,9 +684,9 @@ function Billing() {
               throw new Error(`Failed to update office pay item: ${response.statusText}`);
             }
             
-            console.log(`✓ Updated billing amount for office pay item ${item.officePayItemId}`);
+            console.log(`? Updated billing amount for office pay item ${item.officePayItemId}`);
           } catch (error) {
-            console.error(`✗ Error updating office pay item ${item.officePayItemId}:`, error);
+            console.error(`? Error updating office pay item ${item.officePayItemId}:`, error);
             throw error;
           }
         }
@@ -729,16 +738,16 @@ function Billing() {
       
       // Save combined pay items to the job
       await jobService.replacePayItems(selectedJob.jobId, finalPayItemsData);
-      console.log('✓ All pay items saved successfully');
+      console.log('? All pay items saved successfully');
 
       const isAddingToExisting = existingPayItems.length > 0;
       const addedCount = newPayItemsData.length;
       const totalCount = finalPayItemsData.length;
       
       if (isAddingToExisting) {
-        setMessage(`✓ Added ${addedCount} new pay item(s) successfully! Total: ${totalCount} items. Review below and generate invoice.`);
+        setMessage(`? Added ${addedCount} new pay item(s) successfully! Total: ${totalCount} items. Review below and generate invoice.`);
       } else {
-        setMessage(`✓ ${addedCount} pay item(s) saved successfully! Review the details below and generate invoice.`);
+        setMessage(`? ${addedCount} pay item(s) saved successfully! Review the details below and generate invoice.`);
       }
       
       setShowPayItemsRow(false);
@@ -779,9 +788,9 @@ function Billing() {
           console.error('Error re-fetching office pay items after save:', err);
         }
         setSelectedJob({ ...updatedJob, payItems: mergedPayItems });
-        console.log('✓ Selected job updated with merged pay items:', mergedPayItems.length);
+        console.log('? Selected job updated with merged pay items:', mergedPayItems.length);
       } else {
-        console.error('❌ Could not find updated job');
+        console.error('? Could not find updated job');
         setSelectedJob({
           ...selectedJob,
           payItems: allPayItemsData
@@ -887,7 +896,7 @@ function Billing() {
   // Start inline editing for a pay item
   const startEditingPayItem = (index) => {
     if (!canEditPayItems()) {
-      setMessage('❌ Only Super Admin, Admin, and Manager users can edit pay items. Please contact an administrator for changes.');
+      setMessage('? Only Super Admin, Admin, and Manager users can edit pay items. Please contact an administrator for changes.');
       setTimeout(() => setMessage(''), 5000);
       return;
     }
@@ -908,8 +917,9 @@ function Billing() {
     if (editingPayItemIndex === null) return;
     
     const newBillingAmount = parseFloat(editingBillingAmount);
+
     if (isNaN(newBillingAmount) || newBillingAmount < 0) {
-      setMessage('❌ Please enter a valid billing amount');
+      setMessage('? Please enter a valid billing amount');
       setTimeout(() => setMessage(''), 3000);
       return;
     }
@@ -931,13 +941,13 @@ function Billing() {
         payItems: updatedPayItems
       });
 
-      setMessage('✅ Pay item billing amount updated successfully');
+      setMessage('? Pay item billing amount updated successfully');
       setEditingPayItemIndex(null);
       setEditingBillingAmount('');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error updating pay item:', error);
-      setMessage('❌ Error updating pay item. Please try again.');
+      setMessage('? Error updating pay item. Please try again.');
       setTimeout(() => setMessage(''), 3000);
     }
   };
@@ -945,7 +955,7 @@ function Billing() {
   // Remove a pay item
   const removePayItem = async (index) => {
     if (!canEditPayItems()) {
-      setMessage('❌ Only Super Admin, Admin, and Manager users can remove pay items. Please contact an administrator for changes.');
+      setMessage('? Only Super Admin, Admin, and Manager users can remove pay items. Please contact an administrator for changes.');
       setTimeout(() => setMessage(''), 5000);
       return;
     }
@@ -970,11 +980,11 @@ function Billing() {
         payItems: updatedPayItems
       });
 
-      setMessage('✅ Pay item removed successfully');
+      setMessage('? Pay item removed successfully');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error('Error removing pay item:', error);
-      setMessage('❌ Error removing pay item. Please try again.');
+      setMessage('? Error removing pay item. Please try again.');
       setTimeout(() => setMessage(''), 3000);
     }
   };
@@ -1029,7 +1039,7 @@ function Billing() {
     if (missingFields.length > 0) {
       const fieldsList = missingFields.join(', ');
       console.error('BLOCKING INVOICE GENERATION - Missing fields:', fieldsList);
-      setValidationMessage(`Please edit the job and complete the following required fields:\n\n${missingFields.map(f => `• ${f}`).join('\n')}`);
+      setValidationMessage(`Please edit the job and complete the following required fields:\n\n${missingFields.map(f => `� ${f}`).join('\n')}`);
       setShowValidationModal(true);
       return; // STOP HERE - Do not proceed with invoice generation
     }
@@ -1077,7 +1087,15 @@ function Billing() {
       };
       console.log('generateBill - sending billData:', billData);
       
-      await billingService.createBill(billData);
+      const result = await billingService.createBill(billData);
+      
+      // Check if bill generation was blocked (paid/partially paid)
+      if (result.blocked) {
+        setMessage(`Bill is ${result.paymentStatus.toLowerCase()}`);
+        setTimeout(() => setMessage(''), 5000);
+        console.log('=== GENERATE BILL BLOCKED ===', result.message);
+        return;
+      }
       
       // Update petty cash assignment status to Closed via direct API call (safety net)
       try {
@@ -1227,7 +1245,7 @@ function Billing() {
         setChequeAutoFillData(null);
       }
     } catch {
-      // 404 = new cheque, user fills manually — this is normal
+      // 404 = new cheque, user fills manually � this is normal
       setChequeAutoFilled(false);
       setChequeAutoFillData(null);
     }
@@ -1245,13 +1263,13 @@ function Billing() {
                        0;
       
       if (!amount || amount <= 0) {
-        setMessage('❌ Please enter a valid payment amount');
+        setMessage('? Please enter a valid payment amount');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
       
       if (amount > remaining + 0.01) { // 0.01 tolerance for floating point
-        setMessage(`❌ Payment amount (LKR ${formatAmount(amount)}) exceeds remaining balance (LKR ${formatAmount(remaining)})`);
+        setMessage(`? Payment amount (LKR ${formatAmount(amount)}) exceeds remaining balance (LKR ${formatAmount(remaining)})`);
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -1260,14 +1278,14 @@ function Billing() {
     // Validate based on payment method
     if (paymentMethod === 'Cheque') {
       if (!chequeNumber || !chequeDate || !chequeAmount) {
-        setMessage('❌ Please fill in all cheque details (Number, Date, Amount)');
+        setMessage('? Please fill in all cheque details (Number, Date, Amount)');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
       
       const amount = parseFloat(chequeAmount);
       if (isNaN(amount) || amount <= 0) {
-        setMessage('❌ Please enter a valid cheque amount');
+        setMessage('? Please enter a valid cheque amount');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -1275,7 +1293,7 @@ function Billing() {
     
     if (paymentMethod === 'Bank Transfer') {
       if (!bankName) {
-        setMessage('❌ Please select a bank');
+        setMessage('? Please select a bank');
         setTimeout(() => setMessage(''), 5000);
         return;
       }
@@ -1305,11 +1323,11 @@ function Billing() {
         const newRemaining = (parseFloat(selectedBillForPayment.remainingAmount || selectedBillForPayment.netTotal) - parseFloat(partialPaymentAmount));
         const newStatus = newRemaining <= 0.01 ? 'Paid' : 'Partially Paid';
         
-        setMessage(`✅ Partial payment of LKR ${formatAmount(partialPaymentAmount)} recorded successfully. Invoice status: ${newStatus}`);
+        setMessage(`? Partial payment of LKR ${formatAmount(partialPaymentAmount)} recorded successfully. Invoice status: ${newStatus}`);
       } else {
         // Call full payment endpoint
         await billingService.markAsPaid(selectedBillForPayment.billId, paymentDetails);
-        setMessage(`✅ Invoice ${selectedBillForPayment.invoiceNumber || selectedBillForPayment.billId} marked as paid via ${paymentMethod}`);
+        setMessage(`? Invoice ${selectedBillForPayment.invoiceNumber || selectedBillForPayment.billId} marked as paid via ${paymentMethod}`);
       }
       
       setShowPaymentModal(false);
@@ -1318,7 +1336,7 @@ function Billing() {
       setTimeout(() => setMessage(''), 5000);
     } catch (error) {
       console.error('Error marking bill as paid:', error);
-      setMessage(`❌ Error: ${error.response?.data?.message || error.message}`);
+      setMessage(`? Error: ${error.response?.data?.message || error.message}`);
       setTimeout(() => setMessage(''), 5000);
     }
   };
@@ -1454,13 +1472,7 @@ function Billing() {
     const printablePayItems = payItemsArray.map((item, index) => {
       let description = item.description || item.name || 'Service Charge';
       
-      // Always transform to new format with place names
-      const normalized = description.toLowerCase().trim();
-      if (normalized.startsWith('transporter cost')) {
-        const fromPlace = job.exporter || 'placename';
-        const toPlace = job.transporter || 'placename';
-        description = `transporter cost (from ${fromPlace} to ${toPlace})`;
-      }
+      // Use description as-is (no transformation needed - it already has the correct prefix from UI)
       
       const amount = parseFloat(item.billingAmount || item.amount || 0) || 0;
       const payItemId = item.id || item.payItemId || item.officePayItemId || `PI${String(index + 1).padStart(3, '0')}`;
@@ -1506,26 +1518,8 @@ function Billing() {
 
     const hasMultiplePages = printablePayItemPages.length > 1;
 
-    // Add transporter cost for FCL shipments
-    if (job.shipmentCategory === 'FCL') {
-      const hasTransporterCost = payItemsArray.some(item => {
-        const label = (item?.name || item?.description || '').toLowerCase().trim();
-        // Check if any transporter cost exists (old or new format)
-        return label.startsWith('transporter cost');
-      });
-      if (!hasTransporterCost) {
-        // Always use new format with place names
-        const fromPlace = job.exporter || 'placename';
-        const toPlace = job.transporter || 'placename';
-        const description = `transporter cost (from ${fromPlace} to ${toPlace})`;
-        payItemsArray.push({
-          name: description,
-          description: description,
-          billingAmount: 0,
-          amount: 0
-        });
-      }
-    }
+    // FCL shipments should have transporter cost added via UI
+    // No need to auto-add it here - it will be included if user added it
 
     const isCompactItemsLayout = payItemsArray.length >= 20;
     
@@ -1960,6 +1954,239 @@ function Billing() {
     setExpandedBillId(null);
   };
 
+  const renderGeneratedInvoiceActions = (bill) => (
+    <div className="invoice-row-actions">
+      <button
+        type="button"
+        className="expand-btn-middle invoice-expand-btn"
+        onClick={() => setExpandedBillId(expandedBillId === bill.billId ? null : bill.billId)}
+        title={expandedBillId === bill.billId ? 'Hide details' : 'View details'}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points={expandedBillId === bill.billId ? '18 15 12 9 6 15' : '6 9 12 15 18 9'}></polyline>
+        </svg>
+      </button>
+      <button
+        onClick={() => printBill(bill)}
+        className="btn btn-primary btn-small invoice-action-btn"
+        title="Print Invoice"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span className="invoice-action-label">Print</span>
+      </button>
+      {(bill.paymentStatus === 'Unpaid' || bill.paymentStatus === 'Partially Paid') && (
+        <button
+          onClick={() => markAsPaid(bill.billId)}
+          className={`btn ${bill.paymentStatus === 'Partially Paid' ? 'btn-primary' : 'btn-success'} btn-small invoice-action-btn`}
+          title={bill.paymentStatus === 'Partially Paid' ? 'Pay Remaining' : 'Pay Invoice'}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span className="invoice-action-label">{bill.paymentStatus === 'Partially Paid' ? 'Pay Remaining' : 'Pay Invoice'}</span>
+        </button>
+      )}
+      {bill.paymentStatus === 'Paid' && (
+        <span className="paid-indicator">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Paid
+        </span>
+      )}
+    </div>
+  );
+
+  const renderBillExpandedDetails = (bill) => (
+    <div className="bill-details-expanded">
+      <div className="details-grid">
+        <div className="detail-card">
+          <div className="detail-label">Actual Cost</div>
+          <div className="detail-value">LKR {formatAmount(bill.actualCost)}</div>
+        </div>
+        <div className="detail-card">
+          <div className="detail-label">Billing Amount</div>
+          <div className="detail-value">LKR {formatAmount(bill.billingAmount)}</div>
+        </div>
+        <div className="detail-card">
+          <div className="detail-label">Profit</div>
+          <div className="detail-value">LKR {formatAmount(bill.profit)}</div>
+        </div>
+        {bill.paymentStatus === 'Partially Paid' && (
+          <>
+            <div className="detail-card detail-card--paid">
+              <div className="detail-label">Amount Paid</div>
+              <div className="detail-value detail-value--paid">LKR {formatAmount(bill.paidAmount || 0)}</div>
+              <div className="detail-card-sub">
+                {Math.round((parseFloat(bill.paidAmount || 0) / parseFloat(bill.netTotal || bill.total || 1)) * 100)}% of invoice settled
+              </div>
+            </div>
+            <div className="detail-card detail-card--remaining">
+              <div className="detail-label">Total Due</div>
+              <div className="detail-value detail-value--remaining">LKR {formatAmount(bill.remainingAmount || 0)}</div>
+              <div className="detail-card-sub">
+                {Math.round((parseFloat(bill.remainingAmount || 0) / parseFloat(bill.netTotal || bill.total || 1)) * 100)}% outstanding
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {(bill.paymentStatus === 'Partially Paid' || bill.paymentStatus === 'Paid') && (
+        <div className="invoice-payment-tracking-section">
+          <div className="invoice-payment-tracking-header">
+            <span className="invoice-payment-tracking-title">Payment Tracking</span>
+            <span className="invoice-payment-tracking-count">
+              {Array.isArray(bill.paymentRecords) && bill.paymentRecords.length > 0
+                ? `${bill.paymentRecords.length} payment record${bill.paymentRecords.length !== 1 ? 's' : ''}`
+                : '1 payment record'}
+            </span>
+          </div>
+          <div className="invoice-payment-tracking-table">
+            <div className="invoice-payment-table-header">
+              <div className="invoice-payment-header-cell invoice-payment-balance-col">Remaining Balance</div>
+              <div className="invoice-payment-header-cell invoice-payment-date-col">Payment Date</div>
+              <div className="invoice-payment-header-cell invoice-payment-method-col">Method</div>
+              <div className="invoice-payment-header-cell invoice-payment-reference-col">Reference</div>
+              <div className="invoice-payment-header-cell invoice-payment-amount-col">Amount Paid</div>
+            </div>
+            <div className="invoice-payment-table-body">
+              {bill.paymentRecords && Array.isArray(bill.paymentRecords) && bill.paymentRecords.length > 0 ? (
+                bill.paymentRecords.map((payment, idx) => {
+                  const paidUpToThisPoint = bill.paymentRecords
+                    .slice(0, idx + 1)
+                    .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+                  const remainingAtThisPoint = (parseFloat(bill.netTotal || bill.total || 0)) - paidUpToThisPoint;
+
+                  return (
+                    <div key={idx} className="invoice-payment-table-row">
+                      <div className="invoice-payment-table-cell invoice-payment-date-col"><span className="payment-num">{idx + 1}</span></div>
+                      <div className="invoice-payment-table-cell invoice-payment-date-col">{formatDateWithMonth(payment.paymentDate)}</div>
+                      <div className="invoice-payment-table-cell invoice-payment-method-col">
+                        <span className={`invoice-payment-method-badge invoice-payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
+                          {payment.paymentMethod === 'Cash' && '💵'}
+                          {payment.paymentMethod === 'Cheque' && '📝'}
+                          {payment.paymentMethod === 'Bank Transfer' && '🏦'}
+                          {' '}{payment.paymentMethod || '-'}
+                        </span>
+                      </div>
+                      <div className="invoice-payment-table-cell invoice-payment-reference-col">
+                        {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? (
+                          <span className="invoice-reference-text">CHQ: {payment.chequeNumber}</span>
+                        ) : payment.paymentMethod === 'Bank Transfer' && payment.bankName ? (
+                          <span className="invoice-reference-text">{payment.bankName}</span>
+                        ) : payment.paymentMethod === 'Cash' ? (
+                          <span className="invoice-reference-text">Cash</span>
+                        ) : (
+                          <span className="invoice-reference-empty">-</span>
+                        )}
+                      </div>
+                      <div className="invoice-payment-table-cell invoice-payment-amount-col">
+                        <span className="invoice-payment-amount-value">LKR {formatAmount(payment.amount || 0)}</span>
+                      </div>
+                      <div className="invoice-payment-table-cell invoice-payment-balance-col">
+                        <span className="invoice-payment-balance-value">LKR {formatAmount(Math.max(0, remainingAtThisPoint))}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="invoice-payment-table-row">
+                  <div className="invoice-payment-table-cell invoice-payment-date-col"><span className="invoice-payment-num">1</span></div>
+                  <div className="invoice-payment-table-cell invoice-payment-date-col">{formatDateWithMonth(bill.paidDate)}</div>
+                  <div className="invoice-payment-table-cell invoice-payment-method-col">
+                    <span className={`invoice-payment-method-badge invoice-payment-method-${bill.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
+                      {bill.paymentMethod === 'Cash' && '??'}
+                      {bill.paymentMethod === 'Cheque' && '??'}
+                      {bill.paymentMethod === 'Bank Transfer' && '??'}
+                      {' '}{bill.paymentMethod || '-'}
+                    </span>
+                  </div>
+                  <div className="invoice-payment-table-cell invoice-payment-reference-col">
+                    {bill.paymentMethod === 'Cheque' && bill.chequeNumber ? (
+                      <span className="invoice-reference-text">CHQ: {bill.chequeNumber}</span>
+                    ) : bill.paymentMethod === 'Bank Transfer' && bill.bankName ? (
+                      <span className="invoice-reference-text">{bill.bankName}</span>
+                    ) : bill.paymentMethod === 'Cash' ? (
+                      <span className="invoice-reference-text">Cash</span>
+                    ) : (
+                      <span className="invoice-reference-empty">-</span>
+                    )}
+                  </div>
+                  <div className="invoice-payment-table-cell invoice-payment-amount-col">
+                    <span className="invoice-payment-amount-value">LKR {formatAmount(bill.paidAmount || 0)}</span>
+                  </div>
+                  <div className="invoice-payment-table-cell invoice-payment-balance-col">
+                    <span className="invoice-payment-balance-value">LKR {formatAmount(bill.remainingAmount || 0)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="invoice-payment-total-row">
+              <div className="invoice-payment-table-cell invoice-payment-date-col"></div>
+              <div className="invoice-payment-table-cell invoice-payment-date-col"></div>
+              <div className="invoice-payment-table-cell invoice-payment-method-col"></div>
+              <div className="invoice-payment-table-cell invoice-payment-reference-col"><strong>Total</strong></div>
+              <div className="invoice-payment-table-cell invoice-payment-amount-col"><strong>LKR {formatAmount(bill.paidAmount || 0)}</strong></div>
+              <div className="invoice-payment-table-cell invoice-payment-balance-col"><strong>LKR {formatAmount(bill.remainingAmount || 0)}</strong></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bill.paymentStatus === 'Paid' && bill.paymentMethod && (
+        <div className="payment-details-section">
+          <h4 className="payment-details-title">💳 Payment Information</h4>
+          <div className="payment-details-grid">
+            <div className="payment-detail-card">
+              <div className="payment-detail-label">Payment Method</div>
+              <div className="payment-detail-value">
+                <span className={`payment-method-badge payment-method-${bill.paymentMethod.toLowerCase().replace(' ', '-')}`}>
+                  {bill.paymentMethod === 'Cash' && '💵'}
+                  {bill.paymentMethod === 'Cheque' && '📝'}
+                  {bill.paymentMethod === 'Bank Transfer' && '🏦'}
+                  {' '}{bill.paymentMethod}
+                </span>
+              </div>
+            </div>
+            {bill.paidDate && (
+              <div className="payment-detail-card">
+                <div className="payment-detail-label">Payment Date</div>
+                <div className="payment-detail-value">{formatDateWithFullMonth(bill.paidDate)}</div>
+              </div>
+            )}
+            {bill.paymentMethod === 'Cheque' && (
+              <>
+                {bill.chequeNumber && (
+                  <div className="payment-detail-card">
+                    <div className="payment-detail-label">Cheque Number</div>
+                    <div className="payment-detail-value cheque-number">{bill.chequeNumber}</div>
+                  </div>
+                )}
+                {bill.chequeDate && (
+                  <div className="payment-detail-card">
+                    <div className="payment-detail-label">Cheque Date</div>
+                    <div className="payment-detail-value">{formatDateWithFullMonth(bill.chequeDate)}</div>
+                  </div>
+                )}
+                {bill.chequeAmount && (
+                  <div className="payment-detail-card">
+                    <div className="payment-detail-label">Cheque Amount</div>
+                    <div className="payment-detail-value amount-highlight">LKR {formatAmount(bill.chequeAmount)}</div>
+                  </div>
+                )}
+              </>
+            )}
+            {bill.paymentMethod === 'Bank Transfer' && bill.bankName && (
+              <div className="payment-detail-card">
+                <div className="payment-detail-label">Bank Name</div>
+                <div className="payment-detail-value bank-name">🏦 {bill.bankName}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="billing-page">
       <div className="page-header">
@@ -1967,7 +2194,7 @@ function Billing() {
         <p>Generate invoices and track profitability</p>
       </div>
 
-      {message && <div className={`alert ${message.includes('Error') || message.includes('Cannot') || message.includes('⚠️') ? 'alert-error' : 'alert-success'}`}>{message}</div>}
+      {message && <div className={`alert ${message.includes('Error') || message.includes('Cannot') || message.includes('??') ? 'alert-error' : 'alert-success'}`}>{message}</div>}
 
       <div className="card">
         <div className="card-header">
@@ -1976,19 +2203,31 @@ function Billing() {
         <div className="card-body">
           <div className="form-group">
             <label>Select Job *</label>
-            <select 
-              value={selectedJob?.jobId || ''} 
-              onChange={(e) => handleJobSelect(e.target.value)}
-              className="form-control"
-              disabled={loadingSettlement}
-            >
-              <option value="">-- Select a Job --</option>
-              {jobs.map(job => (
-                <option key={job.jobId} value={job.jobId}>
-                  {job.jobId} - {getCustomerName(job.customerId)} - {job.shipmentCategory}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <select 
+                value={selectedJob?.jobId || ''} 
+                onChange={(e) => handleJobSelect(e.target.value)}
+                className="form-control"
+                disabled={loadingSettlement}
+                style={{ flex: 1 }}
+              >
+                <option value="">-- Select a Job --</option>
+                {jobs.map(job => (
+                  <option key={job.jobId} value={job.jobId}>
+                    {job.jobId} - {getCustomerName(job.customerId)} - {job.shipmentCategory}
+                  </option>
+                ))}
+              </select>
+              {selectedJob && (
+                <button 
+                  onClick={() => setShowJobInfoModal(true)}
+                  className="btn-job-info-mobile"
+                  title="View Job Information"
+                >
+                  ??
+                </button>
+              )}
+            </div>
             {loadingSettlement && (
               <div style={{ marginTop: '10px', color: '#101036', fontStyle: 'italic' }}>
                 Loading petty cash settlement data...
@@ -2108,7 +2347,7 @@ function Billing() {
                     <span className={`info-value ${selectedJob.advancePayment > 0 ? 'advance-received' : 'no-advance'}`}>
                       LKR {formatAmount(selectedJob.advancePayment || 0)}
                       {selectedJob.advancePayment > 0 && (
-                        <span className="advance-indicator"> ✓ Received</span>
+                        <span className="advance-indicator"> ? Received</span>
                       )}
                     </span>
                   </div>
@@ -2116,12 +2355,16 @@ function Billing() {
                   );
                 })()}
               </div>
+            </div>
+          )}
 
+          {selectedJob && (
+            <div className="pay-items-card-container">
               <div className="pay-items-card">
                 <div className="card-header-inline">
                   <h3>Pay Items</h3>
                   {!showPayItemsRow && selectedJob.payItems && selectedJob.payItems.length > 0 && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="pay-items-header-actions">
                       <button 
                         onClick={addTransporterCostFromHeader} 
                         className="btn btn-secondary btn-small"
@@ -2137,7 +2380,7 @@ function Billing() {
                     </div>
                   )}
                   {!showPayItemsRow && (!selectedJob.payItems || selectedJob.payItems.length === 0) && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="pay-items-header-actions">
                       <button 
                         onClick={addTransporterCostFromHeader} 
                         className="btn btn-secondary btn-small"
@@ -2158,7 +2401,7 @@ function Billing() {
                   <div className="pay-items-form">
                     {selectedJob.payItems && selectedJob.payItems.length > 0 && (
                       <div className="add-more-items-notice">
-                        <div className="notice-icon">ℹ️</div>
+                        <div className="notice-icon">??</div>
                         <div className="notice-text">
                           <strong>Adding Additional Items</strong>
                           <p>You are adding new pay items to the existing {selectedJob.payItems.length} item(s). All items will be combined in the review table.</p>
@@ -2180,7 +2423,7 @@ function Billing() {
                       <tbody>
                         {payItems.map((item, index) => (
                           <tr key={index} className={item.isOfficePayItem ? 'office-pay-item-row' : item.isPettyCashItem ? 'petty-cash-item-row' : ''}>
-                            <td>
+                            <td data-label="Pay Item Name">
                               <div className="pay-item-name-container">
                                 <input
                                   type="text"
@@ -2243,14 +2486,16 @@ function Billing() {
                                 onChange={(e) => handlePayItemChange(index, 'sameAmount', e.target.checked)}
                               />
                             </td>
-                            <td>
+                            <td data-label="Action">
                               {payItems.length > 1 && !item.paidByName && !(selectedJob?.shipmentCategory === 'FCL' && isTransporterCostLabel(item.name)) && (
                                 <button
                                   type="button"
                                   onClick={() => removePayItemRow(index)}
-                                  className="btn btn-danger btn-small"
+                                  className="action-btn remove-btn"
+                                  title="Remove"
+                                  aria-label="Remove"
                                 >
-                                  Remove
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                 </button>
                               )}
                             </td>
@@ -2260,10 +2505,10 @@ function Billing() {
                       <tfoot className="pay-items-totals-footer">
                         <tr className="totals-row">
                           <td className="total-label"><strong>Total</strong></td>
-                          <td className="total-amount"><strong>{formatAmount(calculateUnsavedTotals().actualCost)}</strong></td>
+                          <td className="total-amount" data-label="Actual Cost (LKR)"><strong>{formatAmount(calculateUnsavedTotals().actualCost)}</strong></td>
                           <td></td>
                           <td></td>
-                          <td className="total-amount"><strong>{formatAmount(calculateUnsavedTotals().billingAmount)}</strong></td>
+                          <td className="total-amount" data-label="Billing Amount (LKR)"><strong>{formatAmount(calculateUnsavedTotals().billingAmount)}</strong></td>
                           <td></td>
                           <td></td>
                         </tr>
@@ -2322,6 +2567,7 @@ function Billing() {
                       </div>
                     </div>
 
+                    <div className="pay-items-review-scroll">
                     <table className="pay-items-review-table">
                       <colgroup>
                         {canEditPayItems() ? (
@@ -2350,23 +2596,14 @@ function Billing() {
                       <tbody>
                         {selectedJob.payItems.map((item, idx) => {
                           const itemDescription = item.description || item.name || '';
-                          let displayDescription = itemDescription;
-                          
-                          // Always transform to new format with place names
-                          const normalized = itemDescription.toLowerCase().trim();
-                          if (normalized.startsWith('transporter cost')) {
-                            const fromPlace = selectedJob.exporter || 'placename';
-                            const toPlace = selectedJob.transporter || 'placename';
-                            displayDescription = `transporter cost (from ${fromPlace} to ${toPlace})`;
-                          }
                           
                           return (
                           <tr key={idx} className="pay-item-row">
-                            <td className="col-description">{displayDescription}</td>
-                            <td className="col-amount">
+                            <td className="col-description" data-label="Description">{itemDescription}</td>
+                            <td className="col-amount" data-label="Actual Cost (LKR)">
                               {formatAmount(parseFloat(item.actualCost) || parseFloat(item.amount) || 0)}
                             </td>
-                            <td className="col-amount">
+                            <td className="col-amount" data-label="Billing Amount (LKR)">
                               {editingPayItemIndex === idx ? (
                                 <input
                                   type="text"
@@ -2387,16 +2624,20 @@ function Billing() {
                               <td className="col-actions">
                                 {editingPayItemIndex === idx ? (
                                   <div className="action-btns">
-                                    <button className="action-btn save-btn" onClick={saveInlineEditedPayItem} title="Save">✓</button>
-                                    <button className="action-btn cancel-btn" onClick={cancelEditingPayItem} title="Cancel">✗</button>
+                                    <button className="action-btn save-btn" onClick={saveInlineEditedPayItem} title="Save" aria-label="Save">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                    </button>
+                                    <button className="action-btn cancel-btn" onClick={cancelEditingPayItem} title="Cancel" aria-label="Cancel">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
                                   </div>
                                 ) : (
                                   <div className="action-btns">
-                                    <button className="action-btn edit-btn" onClick={() => startEditingPayItem(idx)} title="Edit billing amount">
-                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    <button className="action-btn edit-btn" onClick={() => startEditingPayItem(idx)} title="Edit billing amount" aria-label="Edit billing amount">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     </button>
-                                    <button className="action-btn remove-btn" onClick={() => removePayItem(idx)} title="Remove">
-                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                                    <button className="action-btn remove-btn" onClick={() => removePayItem(idx)} title="Remove" aria-label="Remove">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                     </button>
                                   </div>
                                 )}
@@ -2456,6 +2697,7 @@ function Billing() {
                         </tr>
                       </tfoot>
                     </table>
+                    </div>
 
                     <div className="generate-bill-section">
                       <button 
@@ -2499,9 +2741,9 @@ function Billing() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card generated-invoices-card">
         <div className="card-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="generated-invoices-header">
             <button
               onClick={() => setShowGeneratedInvoices(!showGeneratedInvoices)}
               style={{
@@ -2542,17 +2784,16 @@ function Billing() {
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Status</span>
+          <div className="generated-invoices-filters">
+            <div className="invoice-filter-group">
+              <span className="invoice-filter-label">Status</span>
               <select
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="form-control"
-                style={{ minWidth: '150px', padding: '6px 10px' }}
+                className="form-control invoice-filter-select"
               >
                 <option value="All">All Status</option>
                 <option value="Paid">Paid</option>
@@ -2560,16 +2801,15 @@ function Billing() {
                 <option value="Unpaid">Unpaid</option>
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Customer</span>
+            <div className="invoice-filter-group">
+              <span className="invoice-filter-label">Customer</span>
               <select
                 value={customerFilter}
                 onChange={(e) => {
                   setCustomerFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="form-control"
-                style={{ minWidth: '200px', padding: '6px 10px' }}
+                className="form-control invoice-filter-select"
               >
                 <option value="All">All Customers</option>
                 {customers.map(customer => (
@@ -2579,13 +2819,12 @@ function Billing() {
                 ))}
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: 600 }}>Print Mode</span>
+            <div className="invoice-filter-group">
+              <span className="invoice-filter-label">Print Mode</span>
               <select
                 value={printMode}
                 onChange={(e) => setPrintMode(e.target.value)}
-                className="form-control"
-                style={{ minWidth: '180px', padding: '6px 10px' }}
+                className="form-control invoice-filter-select"
               >
                 <option value="color">Color (Theme)</option>
                 <option value="bw">Black & White</option>
@@ -2601,7 +2840,59 @@ function Billing() {
                 <p>{bills.length === 0 ? 'No invoices generated yet' : 'No invoices match the selected filters'}</p>
               </div>
         ) : (
-          <div className="billing-table-wrapper">
+          <>
+          <div className="invoice-mobile-list">
+            {currentRecords.map(bill => (
+              <article
+                key={`mobile-${bill.billId}`}
+                className={`invoice-mobile-card${bill.isOverdue ? ' overdue' : ''}${expandedBillId === bill.billId ? ' expanded' : ''}`}
+              >
+                <div className="invoice-mobile-card-top">
+                  <strong className="invoice-mobile-card-id">{bill.invoiceNumber || bill.billId}</strong>
+                  <span className={`status-badge status-${(bill.paymentStatus || 'unpaid').toLowerCase().replace(' ', '-')}`}>
+                    {bill.paymentStatus || 'Unpaid'}
+                  </span>
+                </div>
+                <div className="invoice-mobile-card-customer">{getCustomerName(bill.customerId)}</div>
+                <div className="invoice-mobile-card-fields">
+                  <div className="invoice-mobile-field">
+                    <span className="invoice-mobile-field-label">Job ID</span>
+                    <span className="invoice-mobile-field-value">{bill.jobId}</span>
+                  </div>
+                  <div className="invoice-mobile-field">
+                    <span className="invoice-mobile-field-label">Invoice Date</span>
+                    <span className="invoice-mobile-field-value">{formatDate(bill.invoiceDate)}</span>
+                  </div>
+                  <div className="invoice-mobile-field">
+                    <span className="invoice-mobile-field-label">Due Date</span>
+                    <span className="invoice-mobile-field-value">
+                      {bill.dueDate ? formatDate(bill.dueDate) : '-'}
+                      {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
+                    </span>
+                  </div>
+                </div>
+                <div className="invoice-mobile-card-actions">
+                  {renderGeneratedInvoiceActions(bill)}
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setPaymentBreakdownBill(bill);
+                    setShowPaymentBreakdownModal(true);
+                  }}
+                  style={{ width: '100%', marginTop: '0.5rem' }}
+                >
+                  View Payment Breakdown
+                </button>
+                {expandedBillId === bill.billId && (
+                  <div className="invoice-mobile-card-details">
+                    {renderBillExpandedDetails(bill)}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+          <div className="billing-table-wrapper billing-invoices-table-wrap">
             <table className="billing-table">
               <thead>
                 <tr>
@@ -2611,27 +2902,26 @@ function Billing() {
                   <th>Invoice Date</th>
                   <th>Due Date</th>
                   <th>Status</th>
-                  <th className="expand-header"></th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {currentRecords.map(bill => (
                   <React.Fragment key={bill.billId}>
-                    <tr className={bill.isOverdue ? 'overdue-row' : ''}>
+                    <tr className={`${bill.isOverdue ? 'overdue-row' : ''}${expandedBillId === bill.billId ? ' invoice-row-expanded' : ''}`.trim()}>
                       <td data-label="Invoice No"><strong>{bill.invoiceNumber || bill.billId}</strong></td>
-                      <td data-label="Job ID">{bill.jobId}</td>
-                      <td data-label="Customer">{getCustomerName(bill.customerId)}</td>
+                      <td data-label="Job ID"><span className="billing-cell-value">{bill.jobId}</span></td>
+                      <td data-label="Customer"><span className="billing-cell-value">{getCustomerName(bill.customerId)}</span></td>
                       <td data-label="Invoice Date">
-                        {formatDate(bill.invoiceDate)}
+                        <span className="billing-cell-value">{formatDate(bill.invoiceDate)}</span>
                       </td>
                       <td data-label="Due Date">
                         {bill.dueDate ? (
                           <div className="due-date-cell">
-                            {formatDate(bill.dueDate)}
+                            <span className="billing-cell-value">{formatDate(bill.dueDate)}</span>
                             {bill.isOverdue && <span className="overdue-badge">OVERDUE</span>}
                           </div>
-                        ) : '-'}
+                        ) : <span className="billing-cell-value">-</span>}
                       </td>
                       <td data-label="Status">
                         <div className="status-cell">
@@ -2640,281 +2930,14 @@ function Billing() {
                           </span>
                         </div>
                       </td>
-                      <td className="expand-column">
-                        <button
-                          className="expand-btn-middle"
-                          onClick={() => setExpandedBillId(expandedBillId === bill.billId ? null : bill.billId)}
-                          title={expandedBillId === bill.billId ? "Hide details" : "View details"}
-                        >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points={expandedBillId === bill.billId ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
-                          </svg>
-                        </button>
-                      </td>
                       <td data-label="Actions">
-                        <div className="action-buttons">
-                          <button 
-                            onClick={() => printBill(bill)} 
-                            className="btn btn-primary btn-small"
-                            title="Print Invoice"
-                          >
-                            Print
-                          </button>
-                          {(bill.paymentStatus === 'Unpaid' || bill.paymentStatus === 'Partially Paid') && (
-                            <>
-                              <button 
-                                onClick={() => markAsPaid(bill.billId)} 
-                                className={`btn ${bill.paymentStatus === 'Partially Paid' ? 'btn-primary' : 'btn-success'} btn-small`}
-                              >
-                                {bill.paymentStatus === 'Partially Paid' ? 'Pay Remaining' : 'Pay Invoice'}
-                              </button>
-                            </>
-                          )}
-                          {bill.paymentStatus === 'Paid' && (
-                            <span className="paid-indicator">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                              </svg>
-                              Paid
-                            </span>
-                          )}
-                        </div>
+                        {renderGeneratedInvoiceActions(bill)}
                       </td>
                     </tr>
                     {expandedBillId === bill.billId && (
                       <tr className="details-row">
-                        <td colSpan="8">
-                          <div className="bill-details-expanded">
-                            <div className="details-grid">
-                              <div className="detail-card">
-                                <div className="detail-label">Actual Cost</div>
-                                <div className="detail-value">LKR {formatAmount(bill.actualCost)}</div>
-                              </div>
-                              <div className="detail-card">
-                                <div className="detail-label">Billing Amount</div>
-                                <div className="detail-value">LKR {formatAmount(bill.billingAmount)}</div>
-                              </div>
-                              <div className="detail-card">
-                                <div className="detail-label">Profit</div>
-                                <div className="detail-value">
-                                  LKR {formatAmount(bill.profit)}
-                                </div>
-                              </div>
-                              {/* Show Paid Amount + Total Due cards for Partially Paid only */}
-                              {bill.paymentStatus === 'Partially Paid' && (
-                                <>
-                                  <div className="detail-card detail-card--paid">
-                                    <div className="detail-label">Amount Paid</div>
-                                    <div className="detail-value detail-value--paid">
-                                      LKR {formatAmount(bill.paidAmount || 0)}
-                                    </div>
-                                    <div className="detail-card-sub">
-                                      {Math.round((parseFloat(bill.paidAmount || 0) / parseFloat(bill.netTotal || bill.total || 1)) * 100)}% of invoice settled
-                                    </div>
-                                  </div>
-                                  <div className="detail-card detail-card--remaining">
-                                    <div className="detail-label">Total Due</div>
-                                    <div className="detail-value detail-value--remaining">
-                                      LKR {formatAmount(bill.remainingAmount || 0)}
-                                    </div>
-                                    <div className="detail-card-sub">
-                                      {Math.round((parseFloat(bill.remainingAmount || 0) / parseFloat(bill.netTotal || bill.total || 1)) * 100)}% outstanding
-                                    </div>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-
-                            {/* Payment Tracking Table — shown for Partially Paid and Paid invoices */}
-                            {(bill.paymentStatus === 'Partially Paid' || bill.paymentStatus === 'Paid') && (
-                              <div className="payment-tracking-section">
-                                <div className="payment-tracking-header">
-                                  <span className="payment-tracking-title">Payment Tracking</span>
-                                  <span className="payment-tracking-count">
-                                    {Array.isArray(bill.paymentRecords) && bill.paymentRecords.length > 0 
-                                      ? `${bill.paymentRecords.length} payment record${bill.paymentRecords.length !== 1 ? 's' : ''}`
-                                      : '1 payment record'
-                                    }
-                                  </span>
-                                </div>
-                                
-                                <div className="payment-tracking-table">
-                                  <div className="payment-table-header">
-                                    <div className="payment-header-cell payment-date-col">#</div>
-                                    <div className="payment-header-cell payment-date-col">Payment Date</div>
-                                    <div className="payment-header-cell payment-method-col">Method</div>
-                                    <div className="payment-header-cell payment-reference-col">Reference</div>
-                                    <div className="payment-header-cell payment-amount-col">Amount Paid</div>
-                                    <div className="payment-header-cell payment-balance-col">Remaining Balance</div>
-                                  </div>
-                                  
-                                  <div className="payment-table-body">
-                                    {bill.paymentRecords && Array.isArray(bill.paymentRecords) && bill.paymentRecords.length > 0 ? (
-                                      bill.paymentRecords.map((payment, idx) => {
-                                        // Calculate running balance
-                                        const paidUpToThisPoint = bill.paymentRecords
-                                          .slice(0, idx + 1)
-                                          .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-                                        const remainingAtThisPoint = (parseFloat(bill.netTotal || bill.total || 0)) - paidUpToThisPoint;
-                                        
-                                        return (
-                                          <div key={idx} className="payment-table-row">
-                                            <div className="payment-table-cell payment-date-col">
-                                              <span className="payment-num">{idx + 1}</span>
-                                            </div>
-                                            <div className="payment-table-cell payment-date-col">
-                                              {formatDateWithMonth(payment.paymentDate)}
-                                            </div>
-                                            <div className="payment-table-cell payment-method-col">
-                                              <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
-                                                {payment.paymentMethod === 'Cash' && '💵'}
-                                                {payment.paymentMethod === 'Cheque' && '📝'}
-                                                {payment.paymentMethod === 'Bank Transfer' && '🏦'}
-                                                {' '}{payment.paymentMethod || '-'}
-                                              </span>
-                                            </div>
-                                            <div className="payment-table-cell payment-reference-col">
-                                              {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? (
-                                                <span className="reference-text">CHQ: {payment.chequeNumber}</span>
-                                              ) : payment.paymentMethod === 'Bank Transfer' && payment.bankName ? (
-                                                <span className="reference-text">{payment.bankName}</span>
-                                              ) : payment.paymentMethod === 'Cash' ? (
-                                                <span className="reference-text">Cash</span>
-                                              ) : (
-                                                <span className="reference-empty">-</span>
-                                              )}
-                                            </div>
-                                            <div className="payment-table-cell payment-amount-col">
-                                              <span className="payment-amount-value">LKR {formatAmount(payment.amount || 0)}</span>
-                                            </div>
-                                            <div className="payment-table-cell payment-balance-col">
-                                              <span className="payment-balance-value">LKR {formatAmount(Math.max(0, remainingAtThisPoint))}</span>
-                                            </div>
-                                          </div>
-                                        );
-                                      })
-                                    ) : (
-                                      <div className="payment-table-row">
-                                        <div className="payment-table-cell payment-date-col">
-                                          <span className="payment-num">1</span>
-                                        </div>
-                                        <div className="payment-table-cell payment-date-col">
-                                          {formatDateWithMonth(bill.paidDate)}
-                                        </div>
-                                        <div className="payment-table-cell payment-method-col">
-                                          <span className={`payment-method-badge payment-method-${bill.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
-                                            {bill.paymentMethod === 'Cash' && '💵'}
-                                            {bill.paymentMethod === 'Cheque' && '📝'}
-                                            {bill.paymentMethod === 'Bank Transfer' && '🏦'}
-                                            {' '}{bill.paymentMethod || '-'}
-                                          </span>
-                                        </div>
-                                        <div className="payment-table-cell payment-reference-col">
-                                          {bill.paymentMethod === 'Cheque' && bill.chequeNumber ? (
-                                            <span className="reference-text">CHQ: {bill.chequeNumber}</span>
-                                          ) : bill.paymentMethod === 'Bank Transfer' && bill.bankName ? (
-                                            <span className="reference-text">{bill.bankName}</span>
-                                          ) : bill.paymentMethod === 'Cash' ? (
-                                            <span className="reference-text">Cash</span>
-                                          ) : (
-                                            <span className="reference-empty">-</span>
-                                          )}
-                                        </div>
-                                        <div className="payment-table-cell payment-amount-col">
-                                          <span className="payment-amount-value">LKR {formatAmount(bill.paidAmount || 0)}</span>
-                                        </div>
-                                        <div className="payment-table-cell payment-balance-col">
-                                          <span className="payment-balance-value">LKR {formatAmount(bill.remainingAmount || 0)}</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                  
-                                  <div className="payment-total-row">
-                                    <div className="payment-table-cell payment-date-col"></div>
-                                    <div className="payment-table-cell payment-date-col"></div>
-                                    <div className="payment-table-cell payment-method-col"></div>
-                                    <div className="payment-table-cell payment-reference-col">
-                                      <strong>Total</strong>
-                                    </div>
-                                    <div className="payment-table-cell payment-amount-col">
-                                      <strong>LKR {formatAmount(bill.paidAmount || 0)}</strong>
-                                    </div>
-                                    <div className="payment-table-cell payment-balance-col">
-                                      <strong>LKR {formatAmount(bill.remainingAmount || 0)}</strong>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Payment Information — shown for Fully Paid invoices */}
-                            {bill.paymentStatus === 'Paid' && bill.paymentMethod && (
-                              <div className="payment-details-section">
-                                <h4 className="payment-details-title">💳 Payment Information</h4>
-                                <div className="payment-details-grid">
-                                  <div className="payment-detail-card">
-                                    <div className="payment-detail-label">Payment Method</div>
-                                    <div className="payment-detail-value">
-                                      <span className={`payment-method-badge payment-method-${bill.paymentMethod.toLowerCase().replace(' ', '-')}`}>
-                                        {bill.paymentMethod === 'Cash' && '💵'}
-                                        {bill.paymentMethod === 'Cheque' && '📝'}
-                                        {bill.paymentMethod === 'Bank Transfer' && '🏦'}
-                                        {' '}{bill.paymentMethod}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {bill.paidDate && (
-                                    <div className="payment-detail-card">
-                                      <div className="payment-detail-label">Payment Date</div>
-                                      <div className="payment-detail-value">
-                                        {formatDateWithFullMonth(bill.paidDate)}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {bill.paymentMethod === 'Cheque' && (
-                                    <>
-                                      {bill.chequeNumber && (
-                                        <div className="payment-detail-card">
-                                          <div className="payment-detail-label">Cheque Number</div>
-                                          <div className="payment-detail-value cheque-number">
-                                            {bill.chequeNumber}
-                                          </div>
-                                        </div>
-                                      )}
-                                      {bill.chequeDate && (
-                                        <div className="payment-detail-card">
-                                          <div className="payment-detail-label">Cheque Date</div>
-                                          <div className="payment-detail-value">
-                                            {formatDateWithFullMonth(bill.chequeDate)}
-                                          </div>
-                                        </div>
-                                      )}
-                                      {bill.chequeAmount && (
-                                        <div className="payment-detail-card">
-                                          <div className="payment-detail-label">Cheque Amount</div>
-                                          <div className="payment-detail-value amount-highlight">
-                                            LKR {formatAmount(bill.chequeAmount)}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-
-                                  {bill.paymentMethod === 'Bank Transfer' && bill.bankName && (
-                                    <div className="payment-detail-card">
-                                      <div className="payment-detail-label">Bank Name</div>
-                                      <div className="payment-detail-value bank-name">
-                                        🏦 {bill.bankName}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                        <td colSpan="7">
+                          {renderBillExpandedDetails(bill)}
                         </td>
                       </tr>
                     )}
@@ -2923,6 +2946,7 @@ function Billing() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {bills.length > 0 && (
@@ -2939,17 +2963,17 @@ function Billing() {
         )}
       </div>
 
-      {/* ═══════════════════════════════════════════════════════
-           RECORD PAYMENT MODAL  —  3-Row Professional Layout
+      {/* -------------------------------------------------------
+           RECORD PAYMENT MODAL  �  3-Row Professional Layout
            Row 1: Invoice details strip
            Row 2: Payment type (Full / Partial) + amount
            Row 3: Payment method + cheque / bank fields
-      ═══════════════════════════════════════════════════════ */}
+      ------------------------------------------------------- */}
       {showPaymentModal && selectedBillForPayment && (
         <div className="pm-overlay" onClick={() => setShowPaymentModal(false)}>
           <div className="pm-modal" onClick={e => e.stopPropagation()}>
 
-            {/* ── Title bar ── */}
+            {/* -- Title bar -- */}
             <div className="pm-titlebar">
               <div className="pm-titlebar-left">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{flexShrink:0}}>
@@ -2960,12 +2984,12 @@ function Billing() {
                   <span className="pm-subtitle">Invoice&nbsp;#{selectedBillForPayment.invoiceNumber || selectedBillForPayment.billId}</span>
                 </div>
               </div>
-              <button className="pm-close" onClick={() => setShowPaymentModal(false)} aria-label="Close">×</button>
+              <button className="pm-close" onClick={() => setShowPaymentModal(false)} aria-label="Close">�</button>
             </div>
 
-            {/* ══════════════════════════════════════════
-                ROW 1 — Invoice details (horizontal strip)
-            ══════════════════════════════════════════ */}
+            {/* ------------------------------------------
+                ROW 1 � Invoice details (horizontal strip)
+            ------------------------------------------ */}
             <div className="pm-body">
             <div className="pm-row pm-row-details">
               <div className="pm-detail-cell">
@@ -2998,9 +3022,9 @@ function Billing() {
               </div>
             </div>
 
-            {/* ══════════════════════════════════════════
-                ROW 2 — Payment type + amount
-            ══════════════════════════════════════════ */}
+            {/* ------------------------------------------
+                ROW 2 � Payment type + amount
+            ------------------------------------------ */}
             <div className="pm-row pm-row-type">
 
               {/* Left: radio buttons */}
@@ -3102,9 +3126,9 @@ function Billing() {
 
             </div>{/* end ROW 2 */}
 
-            {/* ══════════════════════════════════════════
-                ROW 3 — Payment method + details
-            ══════════════════════════════════════════ */}
+            {/* ------------------------------------------
+                ROW 3 � Payment method + details
+            ------------------------------------------ */}
             <div className="pm-row pm-row-method">
 
               {/* Left: method selector */}
@@ -3132,7 +3156,7 @@ function Billing() {
                   ))}
                 </div>
 
-                {/* Cash — no extra fields */}
+                {/* Cash � no extra fields */}
                 {paymentMethod === 'Cash' && (
                   <div className="pm-cash-note">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -3147,7 +3171,7 @@ function Billing() {
               {/* Right: cheque / bank fields */}
               <div className="pm-details-panel">
 
-                {/* ── Cheque ── */}
+                {/* -- Cheque -- */}
                 {paymentMethod === 'Cheque' && (
                   <>
                     <p className="pm-panel-label">Cheque Details</p>
@@ -3169,7 +3193,7 @@ function Billing() {
                       <div className="pm-field pm-field--full">
                         <label className="pm-field-label">Select Cheque <span className="pm-req">*</span></label>
                         {loadingExistingCheques ? (
-                          <span className="pm-loading">Loading cheques…</span>
+                          <span className="pm-loading">Loading cheques�</span>
                         ) : !Array.isArray(existingCheques) || existingCheques.length === 0 ? (
                           <div className="pm-info-box">No cheques with remaining balance found for this customer.</div>
                         ) : (
@@ -3236,7 +3260,7 @@ function Billing() {
                   </>
                 )}
 
-                {/* ── Bank Transfer ── */}
+                {/* -- Bank Transfer -- */}
                 {paymentMethod === 'Bank Transfer' && (
                   <>
                     <p className="pm-panel-label">Transfer Details</p>
@@ -3258,7 +3282,7 @@ function Billing() {
                   </>
                 )}
 
-                {/* ── Cash placeholder ── */}
+                {/* -- Cash placeholder -- */}
                 {paymentMethod === 'Cash' && (
                   <div className="pm-empty-panel">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
@@ -3271,7 +3295,7 @@ function Billing() {
             </div>{/* end ROW 3 */}
             </div>{/* end pm-body */}
 
-            {/* ── Footer ── */}
+            {/* -- Footer -- */}
             <div className="pm-footer">
               <button className="pm-btn pm-btn--cancel" onClick={() => setShowPaymentModal(false)}>Cancel</button>
               <button className="pm-btn pm-btn--confirm" onClick={submitPayment}>
@@ -3312,7 +3336,7 @@ function Billing() {
               }}
               title={showOldInvoices ? 'Collapse' : 'Expand'}
             >
-              {showOldInvoices ? '▼' : '▶'}
+              {showOldInvoices ? '?' : '?'}
             </button>
             <h2>Old Invoice Management ({oldInvoices.length})</h2>
             {user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive') && (
@@ -3540,19 +3564,19 @@ function Billing() {
                                 </div>
 
                                 {invoice.payments && invoice.payments.length > 0 && (
-                                  <div className="payment-tracking-section">
-                                    <div className="payment-tracking-header">
-                                      <span className="payment-tracking-title">Payment History</span>
-                                      <span className="payment-tracking-count">{invoice.payments.length} payment record{invoice.payments.length !== 1 ? 's' : ''}</span>
+                                  <div className="invoice-payment-tracking-section">
+                                    <div className="invoice-payment-tracking-header">
+                                      <span className="invoice-payment-tracking-title">Payment History</span>
+                                      <span className="invoice-payment-tracking-count">{invoice.payments.length} payment record{invoice.payments.length !== 1 ? 's' : ''}</span>
                                     </div>
                                     
-                                    <div className="payment-tracking-table">
-                                      <div className="payment-table-header">
-                                        <div className="payment-header-cell payment-date-col">#</div>
-                                        <div className="payment-header-cell payment-date-col">Payment Date</div>
-                                        <div className="payment-header-cell payment-method-col">Method</div>
-                                        <div className="payment-header-cell payment-reference-col">Reference</div>
-                                        <div className="payment-header-cell payment-amount-col">Amount Paid</div>
+                                    <div className="invoice-payment-tracking-table">
+                                      <div className="invoice-payment-table-header">
+                                        <div className="invoice-payment-header-cell invoice-payment-date-col">#</div>
+                                        <div className="invoice-payment-header-cell invoice-payment-date-col">Payment Date</div>
+                                        <div className="invoice-payment-header-cell invoice-payment-method-col">Method</div>
+                                        <div className="invoice-payment-header-cell invoice-payment-reference-col">Reference</div>
+                                        <div className="invoice-payment-header-cell invoice-payment-amount-col">Amount Paid</div>
                                         {user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive') && (
                                           <div className="payment-header-cell payment-amount-col">Actions</div>
                                         )}
@@ -3561,36 +3585,36 @@ function Billing() {
                                       <div className="payment-table-body">
                                         {invoice.payments.map((payment, idx) => (
                                           <div key={idx} className="payment-table-row">
-                                            <div className="payment-table-cell payment-date-col">
-                                              <span className="payment-num">{idx + 1}</span>
+                                            <div className="invoice-payment-table-cell payment-date-col">
+                                              <span className="invoice-payment-num">{idx + 1}</span>
                                             </div>
-                                            <div className="payment-table-cell payment-date-col">
+                                            <div className="invoice-payment-table-cell payment-date-col">
                                               {new Date(payment.receivedDate).toLocaleDateString('en-GB')}
                                             </div>
-                                            <div className="payment-table-cell payment-method-col">
+                                            <div className="invoice-payment-table-cell payment-method-col">
                                               <span className={`payment-method-badge payment-method-${payment.paymentMethod?.toLowerCase().replace(' ', '-')}`}>
-                                                {payment.paymentMethod === 'Cash' && '💵'}
-                                                {payment.paymentMethod === 'Cheque' && '📝'}
-                                                {payment.paymentMethod === 'Bank Transfer' && '🏦'}
+                                                {payment.paymentMethod === 'Cash' && '??'}
+                                                {payment.paymentMethod === 'Cheque' && '??'}
+                                                {payment.paymentMethod === 'Bank Transfer' && '??'}
                                                 {' '}{payment.paymentMethod || '-'}
                                               </span>
                                             </div>
-                                            <div className="payment-table-cell payment-reference-col">
+                                            <div className="invoice-payment-table-cell payment-reference-col">
                                               {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? (
-                                                <span className="reference-text">CHQ: {payment.chequeNumber}</span>
+                                                <span className="invoice-reference-text">CHQ: {payment.chequeNumber}</span>
                                               ) : payment.paymentMethod === 'Bank Transfer' && payment.bankName ? (
-                                                <span className="reference-text">{payment.bankName}</span>
+                                                <span className="invoice-reference-text">{payment.bankName}</span>
                                               ) : payment.paymentMethod === 'Cash' ? (
-                                                <span className="reference-text">Cash</span>
+                                                <span className="invoice-reference-text">Cash</span>
                                               ) : (
                                                 <span className="reference-empty">-</span>
                                               )}
                                             </div>
-                                            <div className="payment-table-cell payment-amount-col">
-                                              <span className="payment-amount-value">LKR {formatAmount(payment.paymentAmount || 0)}</span>
+                                            <div className="invoice-payment-table-cell payment-amount-col">
+                                              <span className="invoice-payment-amount-value">LKR {formatAmount(payment.paymentAmount || 0)}</span>
                                             </div>
                                             {user && (user.role === 'Admin' || user.role === 'Super Admin' || user.role === 'Manager' || user.role === 'Office Executive') && (
-                                              <div className="payment-table-cell payment-amount-col">
+                                              <div className="invoice-payment-table-cell payment-amount-col">
                                                 <button 
                                                   className="btn btn-danger btn-small"
                                                   onClick={async () => {
@@ -3661,7 +3685,7 @@ function Billing() {
                   setOldInvoiceFormErrors({});
                 }}
               >
-                ×
+                �
               </button>
             </div>
             
@@ -3878,7 +3902,7 @@ function Billing() {
                   });
                 }}
               >
-                ×
+                �
               </button>
             </div>
             
@@ -4091,6 +4115,172 @@ function Billing() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Job Information Modal for Mobile */}
+      {showJobInfoModal && selectedJob && (
+        <div className="modal-overlay">
+          <div className="modal modal-large">
+            <div className="modal-header">
+              <h2>Job Information</h2>
+              <button className="btn-close" onClick={() => setShowJobInfoModal(false)}>�</button>
+            </div>
+            <div className="job-info-modal-content">
+              <div className="info-grid">
+                <div className="info-section">
+                  <h4 className="section-title">Basic Information</h4>
+                  <div className="info-item">
+                    <span className="info-label">Job ID:</span>
+                    <span className="info-value">{selectedJob.jobId}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Customer:</span>
+                    <span className="info-value">{getCustomerName(selectedJob.customerId)}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Category:</span>
+                    <span className="info-value">{selectedJob.shipmentCategory}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Status:</span>
+                    <span className={`status-badge status-${(selectedJob.status || 'Open').toLowerCase().replace(/\s+/g, '-')}`}>
+                      {selectedJob.status || 'Open'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="info-section">
+                  <h4 className="section-title">Shipment Details</h4>
+                  <div className="info-item">
+                    <span className="info-label">BL Number: {(!selectedJob.blNumber || selectedJob.blNumber.trim() === '') && <span className="required-badge">*Required</span>}</span>
+                    <span className={`info-value ${!selectedJob.blNumber ? 'missing' : ''}`}>{selectedJob.blNumber || '-'}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">CUSDEC Number: {(!selectedJob.cusdecNumber || selectedJob.cusdecNumber.trim() === '') && <span className="required-badge">*Required</span>}</span>
+                    <span className={`info-value ${!selectedJob.cusdecNumber ? 'missing' : ''}`}>{formatCusdecWithDate(selectedJob.cusdecNumber, selectedJob.cusdecDate)}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">LC/TT Number: {(!selectedJob.lcNumber || selectedJob.lcNumber.trim() === '') && <span className="required-badge">*Required</span>}</span>
+                    <span className={`info-value ${!selectedJob.lcNumber ? 'missing' : ''}`}>{selectedJob.lcNumber || '-'}</span>
+                  </div>
+                  {selectedJob.shipmentCategory && (selectedJob.shipmentCategory.includes('Vehicle')) && (
+                    <div className="info-item">
+                      <span className="info-label">Chassis Number: {(!selectedJob.chassisNumber || selectedJob.chassisNumber.trim() === '') && <span className="required-badge">*Required</span>}</span>
+                      <span className={`info-value ${!selectedJob.chassisNumber ? 'missing' : ''}`}>{selectedJob.chassisNumber || '-'}</span>
+                    </div>
+                  )}
+                  {selectedJob.shipmentCategory && !selectedJob.shipmentCategory.includes('Vehicle') && (
+                    <div className="info-item">
+                      <span className="info-label">Container Number: {(!selectedJob.containerNumber || selectedJob.containerNumber.trim() === '') && <span className="required-badge">*Required</span>}</span>
+                      <span className={`info-value ${!selectedJob.containerNumber ? 'missing' : ''}`}>{selectedJob.containerNumber || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="info-section">
+                  <h4 className="section-title">Logistics</h4>
+                  <div className="info-item">
+                    <span className="info-label">Exporter:</span>
+                    <span className="info-value">{selectedJob.exporter || '-'}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Transporter:</span>
+                    <select 
+                      value={selectedJob.transporter || ''}
+                      onChange={(e) => handleTransporterChange(e.target.value)}
+                      className="transporter-select-modal"
+                    >
+                      <option value="">Select Transporter</option>
+                      {transporters.map((transporter) => (
+                        <option key={transporter.transporterId} value={transporter.name}>
+                          {transporter.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Open Date:</span>
+                    <span className="info-value">{selectedJob.openDate ? new Date(selectedJob.openDate).toLocaleDateString() : '-'}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Delivery Date:</span>
+                    <span className="info-value">{selectedJob.transportDeliveryDate ? new Date(selectedJob.transportDeliveryDate).toLocaleDateString() : '-'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPaymentBreakdownModal && paymentBreakdownBill && (
+        <div className="payment-modal-overlay" onClick={() => setShowPaymentBreakdownModal(false)}>
+          <div className="payment-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="payment-modal-header">
+              <h3>Payment Breakdown - Invoice {paymentBreakdownBill.invoiceNumber || paymentBreakdownBill.billId}</h3>
+              <button 
+                className="modal-close-btn" 
+                onClick={() => setShowPaymentBreakdownModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'block' }}>
+              <div style={{ background: '#f0f9ff', border: '1px solid #0ea5e9', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', paddingBottom: '0.6rem', borderBottom: '1px solid #bae6fd' }}>
+                  <span style={{ fontWeight: 600, color: '#6b7280', fontSize: '0.875rem' }}>Gross Total</span>
+                  <span style={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem', textAlign: 'right' }}>LKR {formatAmount(paymentBreakdownBill.grossTotal || 0)}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', paddingTop: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #bae6fd' }}>
+                  <span style={{ fontWeight: 600, color: '#6b7280', fontSize: '0.875rem' }}>Advance Payment</span>
+                  <span style={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem', textAlign: 'right' }}>LKR ({formatAmount(paymentBreakdownBill.advancePayment || 0)})</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', paddingTop: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #bae6fd' }}>
+                  <span style={{ fontWeight: 600, color: '#0369a1', fontSize: '0.875rem' }}>Net Total</span>
+                  <span style={{ fontWeight: 700, color: '#101036', fontSize: '1.2rem', textAlign: 'right' }}>LKR {formatAmount(paymentBreakdownBill.netTotal || paymentBreakdownBill.total || 0)}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', paddingTop: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid #bae6fd' }}>
+                  <span style={{ fontWeight: 600, color: '#6b7280', fontSize: '0.875rem' }}>Paid Amount</span>
+                  <span style={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem', textAlign: 'right' }}>LKR {formatAmount(paymentBreakdownBill.paidAmount || 0)}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', paddingTop: '0.75rem' }}>
+                  <span style={{ fontWeight: 700, color: '#059669', fontSize: '0.875rem' }}>Remaining Balance</span>
+                  <span style={{ fontWeight: 700, color: '#059669', fontSize: '1.2rem', textAlign: 'right' }}>LKR {formatAmount(paymentBreakdownBill.remainingAmount || 0)}</span>
+                </div>
+              </div>
+
+              {(paymentBreakdownBill.paymentStatus === 'Partially Paid' || paymentBreakdownBill.paymentStatus === 'Paid') && paymentBreakdownBill.paymentRecords && paymentBreakdownBill.paymentRecords.length > 0 && (
+                <div style={{ marginTop: '1.5rem' }}>
+                  <h4 style={{ margin: '0 0 1rem 0', color: '#101036', fontSize: '0.95rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment History</h4>
+                  <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.5fr 1.2fr 1.2fr 1.2fr', background: '#f3f4f6', borderBottom: '2px solid #d1d5db' }}>
+                      <div style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#374151', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.6px', borderRight: '1px solid #e5e7eb' }}>#</div>
+                      <div style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#374151', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.6px', borderRight: '1px solid #e5e7eb' }}>DATE</div>
+                      <div style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#374151', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.6px', borderRight: '1px solid #e5e7eb' }}>METHOD</div>
+                      <div style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#374151', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.6px', borderRight: '1px solid #e5e7eb' }}>REFERENCE</div>
+                      <div style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#374151', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>AMOUNT</div>
+                    </div>
+                    {paymentBreakdownBill.paymentRecords.map((payment, idx) => (
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.5fr 1.2fr 1.2fr 1.2fr', borderBottom: '1px solid #e5e7eb' }}>
+                        <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.9rem', color: '#374151', borderRight: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}><span style={{ color: '#9ca3af', fontSize: '0.813rem', fontWeight: 500 }}>{idx + 1}</span></div>
+                        <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.9rem', color: '#374151', borderRight: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>{formatDateWithMonth(payment.paymentDate)}</div>
+                        <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.9rem', color: '#374151', borderRight: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3px', whiteSpace: 'nowrap', background: payment.paymentMethod === 'Cheque' ? '#fef3c7' : payment.paymentMethod === 'Cash' ? '#dcfce7' : '#dbeafe', color: payment.paymentMethod === 'Cheque' ? '#92400e' : payment.paymentMethod === 'Cash' ? '#166534' : '#1e40af' }}>
+                            {payment.paymentMethod || '-'}
+                          </span>
+                        </div>
+                        <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.9rem', color: '#374151', borderRight: '1px solid #e5e7eb', display: 'flex', alignItems: 'center' }}>
+                          {payment.paymentMethod === 'Cheque' && payment.chequeNumber ? `CHQ: ${payment.chequeNumber}` : payment.paymentMethod === 'Bank Transfer' && payment.bankName ? payment.bankName : '-'}
+                        </div>
+                        <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.9rem', color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontFamily: "'Courier New', monospace", fontWeight: 700 }}>LKR {formatAmount(payment.amount || 0)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -32,6 +32,7 @@ function CashSummaryReport() {
   const [cashWithdrawals, setCashWithdrawals] = useState([]);
   const [pettyCashAssignments, setPettyCashAssignments] = useState([]);
   const [otherExpenses, setOtherExpenses] = useState([]);
+  const [cashDeposits, setCashDeposits] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
 
   const hasAccess = () => user && ['Admin', 'Super Admin'].includes(user.role);
@@ -41,18 +42,21 @@ function CashSummaryReport() {
     const totalWithdrawn = cashWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount || 0), 0);
     const totalPettyCash = pettyCashAssignments.reduce((sum, a) => sum + parseFloat(a.assignedAmount || 0), 0);
     const totalExpenses = otherExpenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+    const totalDeposited = cashDeposits.reduce((sum, d) => sum + parseFloat(d.amount || 0), 0);
     const availableBalance = totalWithdrawn - totalPettyCash - totalExpenses;
     
     return {
       totalWithdrawn,
       totalPettyCash,
       totalExpenses,
+      totalDeposited,
       availableBalance,
       withdrawalCount: cashWithdrawals.length,
       assignmentCount: pettyCashAssignments.length,
-      expenseCount: otherExpenses.length
+      expenseCount: otherExpenses.length,
+      depositCount: cashDeposits.length
     };
-  }, [cashWithdrawals, pettyCashAssignments, otherExpenses]);
+  }, [cashWithdrawals, pettyCashAssignments, otherExpenses, cashDeposits]);
 
   const fetchData = async () => {
     if (!fromDate || !toDate) {
@@ -80,10 +84,11 @@ function CashSummaryReport() {
         return dateOnly >= fromDateStr && dateOnly <= toDateStr;
       };
 
-      // Fetch cash withdrawals
+      // Fetch cash withdrawals (exclude deposits)
       const withdrawals = await cashWithdrawalService.getAll();
       console.log('All withdrawals:', withdrawals);
       const filteredWithdrawals = withdrawals.filter(w => 
+        w.transactionType !== 'deposit' &&
         isDateInRange(w.withdrawalDate, fromDate, toDate)
       );
       console.log('Filtered withdrawals:', filteredWithdrawals);
@@ -114,6 +119,31 @@ function CashSummaryReport() {
       );
       console.log('Filtered expenses:', filteredExpenses);
       setOtherExpenses(filteredExpenses);
+
+      // Fetch cash deposits (from withdrawals table with transactionType === 'deposit')
+      try {
+        const depositsResponse = await fetch(`${API_BASE}/api/cash-withdrawals`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (depositsResponse.ok) {
+          const allTransactions = await depositsResponse.json();
+          // Filter only deposits
+          const deposits = allTransactions
+            .filter(t => t.transactionType === 'deposit')
+            .filter(d => isDateInRange(d.withdrawalDate, fromDate, toDate));
+          
+          console.log('Filtered deposits:', deposits);
+          setCashDeposits(deposits);
+        } else {
+          setCashDeposits([]);
+        }
+      } catch (depositError) {
+        console.error('Error fetching deposits:', depositError);
+        setCashDeposits([]);
+      }
 
       setHasSearched(true);
       setLoading(false);
@@ -396,6 +426,15 @@ function CashSummaryReport() {
               </div>
             </div>
 
+            <div className="csr-summary-card csr-card-teal">
+              <div className="csr-summary-icon">🏦</div>
+              <div className="csr-summary-content">
+                <div className="csr-summary-label">Total Cash Deposited</div>
+                <div className="csr-summary-value">{formatCurrency(summary.totalDeposited)}</div>
+                <div className="csr-summary-meta">{summary.depositCount} deposit{summary.depositCount !== 1 ? 's' : ''}</div>
+              </div>
+            </div>
+
             <div className={`csr-summary-card ${summary.availableBalance >= 0 ? 'csr-card-green' : 'csr-card-red'}`}>
               <div className="csr-summary-icon">{summary.availableBalance >= 0 ? '✅' : '⚠️'}</div>
               <div className="csr-summary-content">
@@ -448,6 +487,54 @@ function CashSummaryReport() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Cash Deposits Section */}
+          <div className="csr-section">
+            <div className="csr-section-header">
+              <h2 className="csr-section-title">Cash Deposits ({summary.depositCount})</h2>
+            </div>
+            {cashDeposits.length > 0 ? (
+              <div className="csr-table-wrapper">
+                <table className="csr-table">
+                  <thead>
+                    <tr>
+                      <th>Deposit ID</th>
+                      <th>Date</th>
+                      <th>Bank Name</th>
+                      <th className="csr-text-right">Amount</th>
+                      <th>Recorded By</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cashDeposits.map(deposit => (
+                      <tr key={deposit.withdrawalId}>
+                        <td data-label="Deposit ID">
+                          <span className="csr-record-id">{deposit.withdrawalId}</span>
+                        </td>
+                        <td data-label="Date">{formatDate(deposit.withdrawalDate)}</td>
+                        <td data-label="Bank Name">{deposit.bankName}</td>
+                        <td data-label="Amount" className="csr-amount-cell">
+                          {formatCurrency(deposit.amount)}
+                        </td>
+                        <td data-label="Recorded By">{deposit.createdByName || deposit.createdBy || '-'}</td>
+                        <td data-label="Notes">{deposit.notes || '-'}</td>
+                      </tr>
+                    ))}
+                    <tr className="csr-total-row">
+                      <td colSpan="3"><strong>TOTAL</strong></td>
+                      <td className="csr-amount-cell"><strong>{formatCurrency(summary.totalDeposited)}</strong></td>
+                      <td colSpan="2"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: '#9ca3af' }}>
+                No cash deposits recorded for the selected date range
+              </div>
+            )}
           </div>
 
           {/* Petty Cash Assignments Section */}

@@ -96,7 +96,10 @@
   cursor: pointer;
   transition: all 0.2s ease;
   font-weight: 600;
-  min-width: 160px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .pcr-date-input:hover {
@@ -126,12 +129,25 @@
   align-items: flex-end;
   gap: 1.25rem;
   flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.pcr-filter-main {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex: 1 1 320px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .pcr-filter-field {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .pcr-filter-label {
@@ -151,6 +167,29 @@
   font-weight: 300;
   padding-bottom: 0.5rem;
   align-self: flex-end;
+}
+
+.pcr-filter-checkbox {
+  flex: 1 1 100%;
+  justify-content: flex-end;
+}
+
+.pcr-filter-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+  margin: 0;
+  padding-bottom: 0.5rem;
+}
+
+.pcr-filter-checkbox-label input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .pcr-generate-btn {
@@ -376,10 +415,13 @@
   gap: 1rem;
 }
 
-.pcr-export-buttons {
+.pcr-filter-panel .pcr-export-buttons {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .pcr-btn {
@@ -702,6 +744,17 @@
     align-items: stretch;
   }
 
+  .pcr-filter-main {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .pcr-filter-field {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
   .pcr-filter-sep {
     display: none;
   }
@@ -709,6 +762,12 @@
   .pcr-generate-btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .pcr-filter-panel .pcr-export-buttons {
+    margin-left: 0;
+    width: 100%;
+    flex-direction: column;
   }
 
   .pcr-controls {
@@ -724,6 +783,29 @@
 @media (max-width: 768px) {
   .pcr-container {
     padding: 1rem;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  .pcr-filter-panel {
+    padding: 1rem;
+    overflow: hidden;
+  }
+
+  .pcr-filter-main {
+    gap: 0.75rem;
+  }
+
+  .pcr-filter-panel .pcr-export-buttons {
+    gap: 0.75rem;
+  }
+
+  .pcr-generate-btn,
+  .pcr-filter-panel .pcr-btn {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
   }
 
   .pcr-title {

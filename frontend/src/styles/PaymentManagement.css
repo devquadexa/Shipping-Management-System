@@ -6,6 +6,10 @@
 .payment-management-container {
   padding: 0;
   margin: 0;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* ── Header ─────────────────────────────────────────────── */
@@ -216,6 +220,10 @@
   padding: 20px 24px;
   margin-bottom: 20px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .pm-tabs {
@@ -224,12 +232,19 @@
   margin-bottom: 20px;
   border-bottom: 2px solid #e5e7eb;
   padding-bottom: 0;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .pm-tab {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 12px 22px;
   background: none;
   border: none;
@@ -267,8 +282,8 @@
 }
 
 .pm-search {
-  flex: 1;
-  min-width: 280px;
+  flex: 1 1 200px;
+  min-width: 0;
   position: relative;
 }
 
@@ -306,7 +321,9 @@
   color: #374151;
   background: #f9fafb;
   cursor: pointer;
-  min-width: 170px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   transition: all 0.2s;
 }
 
@@ -674,10 +691,49 @@
 }
 
 @media (max-width: 768px) {
+  .pm-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .pm-refresh-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pm-controls {
+    padding: 1rem;
+  }
+
+  .pm-tabs {
+    margin-bottom: 1rem;
+  }
+
+  .pm-tab {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
   .pm-summary-grid { grid-template-columns: 1fr 1fr; }
   .pm-detail-grid  { grid-template-columns: 1fr; }
-  .pm-filters      { flex-direction: column; }
-  .pm-search       { min-width: 100%; }
+  .pm-filters {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .pm-search {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .pm-filter-select {
+    width: 100%;
+    flex: 0 0 auto;
+  }
 
   .pm-table thead  { display: none; }
   .pm-table tbody tr {

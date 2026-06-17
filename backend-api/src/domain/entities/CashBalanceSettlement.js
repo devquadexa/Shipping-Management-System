@@ -177,6 +177,8 @@ class CashBalanceSettlement {
       notes: this.notes,
       managerNotes: this.managerNotes,
       relatedAssignments: this.relatedAssignments,
+      jobId: this.jobId || null,
+      cusdecNumber: this.cusdecNumber || null,
       createdBy: this.createdBy,
       createdDate: this.createdDate,
       updatedBy: this.updatedBy,

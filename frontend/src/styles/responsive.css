@@ -315,6 +315,65 @@
   }
 }
 
+/* Billing Page Mobile - Buttons as Icons */
+@media (max-width: 768px) {
+  /* Invoice action buttons - icons only */
+  .action-buttons .btn,
+  .invoice-row-actions .btn,
+  .action-btns .action-btn {
+    background: none !important;
+    border: none !important;
+    padding: 0.4rem !important;
+    font-size: 1.2rem !important;
+    color: #101036 !important;
+    min-width: auto !important;
+    width: auto !important;
+    height: auto !important;
+    box-shadow: none !important;
+    transition: opacity 0.2s ease !important;
+  }
+
+  .action-buttons .btn:hover,
+  .invoice-row-actions .btn:hover,
+  .action-btns .action-btn:hover {
+    opacity: 0.7 !important;
+    background: none !important;
+  }
+
+  /* Pay items table action buttons */
+  .pay-items-review-table .action-btns .action-btn {
+    background: none !important;
+    border: none !important;
+    color: #101036 !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0.3rem !important;
+    font-size: 1rem !important;
+  }
+
+  .pay-items-review-table .action-btns .edit-btn {
+    background: none !important;
+    border: none !important;
+    color: #ea580c !important;
+  }
+
+  .pay-items-review-table .action-btns .edit-btn:hover {
+    color: #b83a07 !important;
+    background: none !important;
+  }
+
+  .pay-items-review-table .action-btns .remove-btn {
+    background: none !important;
+    border: none !important;
+    color: #dc2626 !important;
+  }
+
+  .pay-items-review-table .action-btns .remove-btn:hover {
+    color: #9d1f1f !important;
+    background: none !important;
+  }
+}
+
 /* Accessibility - High contrast mode */
 @media (prefers-contrast: high) {
   .card {

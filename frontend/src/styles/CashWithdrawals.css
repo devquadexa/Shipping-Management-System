@@ -107,3 +107,34 @@
     font-size: 18px;
   }
 }
+
+
+/* Radio Group Styles */
+.radio-group {
+  display: flex;
+  gap: 30px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: fit-content;
+}
+
+.radio-label input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.radio-label span {
+  color: #333;
+}
