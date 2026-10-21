@@ -4,6 +4,7 @@ import { jobService } from '../api/services/jobService';
 import { authService } from '../api/services/authService';
 import { customerService } from '../api/services/customerService';
 import { cashWithdrawalService } from '../api/services/cashWithdrawalService';
+import { otherExpenseService } from '../api/services/otherExpenseService';
 import CashWithdrawalModal from './CashWithdrawalModal';
 import Pagination from './Pagination';
 import '../styles/PettyCash.css';
@@ -77,12 +78,16 @@ function PettyCash() {
     notes: ''
   });
 
-  // Cash Withdrawal states
+  // Cash Withdrawal & Daily Ledger states
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
   const [cashWithdrawals, setCashWithdrawals] = useState([]);
   const [withdrawalsCollapsed, setWithdrawalsCollapsed] = useState(false);
   const [withdrawalFilterMonth, setWithdrawalFilterMonth] = useState(new Date().getMonth() + 1);
   const [withdrawalFilterYear, setWithdrawalFilterYear] = useState(new Date().getFullYear());
+  const [otherExpenses, setOtherExpenses] = useState([]);
+  const [cashSettlements, setCashSettlements] = useState([]);
+  const [ledgerViewMode, setLedgerViewMode] = useState('daily'); // 'daily' or 'withdrawals'
+  const [expandedLedgerDates, setExpandedLedgerDates] = useState(new Set());
 
   // User Petty Cash Summary filter
   const [userSummaryFilterMonth, setUserSummaryFilterMonth] = useState(new Date().getMonth() + 1);
@@ -97,6 +102,8 @@ function PettyCash() {
       fetchUsers();
       fetchOverallBalance();
       fetchCashWithdrawals();
+      fetchOtherExpenses();
+      fetchCashSettlements();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -219,6 +226,43 @@ function PettyCash() {
     }
   };
 
+  const fetchOtherExpenses = async () => {
+    try {
+      const data = await otherExpenseService.getAll();
+      setOtherExpenses(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching other expenses for cash ledger:', error);
+    }
+  };
+
+  const fetchCashSettlements = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/cash-balance-settlements`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const json = await response.json();
+        setCashSettlements(json.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching cash settlements for cash ledger:', error);
+    }
+  };
+
+  const toggleLedgerDate = (dKey) => {
+    setExpandedLedgerDates(prev => {
+      const next = new Set(prev);
+      if (next.has(dKey)) {
+        next.delete(dKey);
+      } else {
+        next.add(dKey);
+      }
+      return next;
+    });
+  };
+
   const getFilteredCashWithdrawals = () => {
     return cashWithdrawals.filter(withdrawal => {
       const withdrawalDate = new Date(withdrawal.withdrawalDate);
@@ -229,6 +273,160 @@ function PettyCash() {
     });
   };
 
+  const getDailyCashLedger = () => {
+    const toDateKey = (val) => {
+      if (!val) return null;
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return null;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const targetMonth = withdrawalFilterMonth;
+    const targetYear = withdrawalFilterYear;
+    const targetMonthPrefix = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+    const monthStartKey = `${targetMonthPrefix}-01`;
+    const nextMonthYear = targetMonth === 12 ? targetYear + 1 : targetYear;
+    const nextMonth = targetMonth === 12 ? 1 : targetMonth + 1;
+    const nextMonthStartKey = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01`;
+
+    let priorBalance = 0;
+    const monthDatesMap = {};
+
+    const getOrCreateDateBucket = (dKey) => {
+      if (!monthDatesMap[dKey]) {
+        monthDatesMap[dKey] = {
+          dateKey: dKey,
+          withdrawals: [],
+          assignments: [],
+          expenses: [],
+          returns: []
+        };
+      }
+      return monthDatesMap[dKey];
+    };
+
+    // 1. Process Cash Withdrawals / Deposits
+    (cashWithdrawals || []).forEach(w => {
+      const dKey = toDateKey(w.withdrawalDate || w.createdDate);
+      if (!dKey) return;
+      const amount = parseFloat(w.amount || 0);
+      const isDeposit = w.transactionType === 'deposit';
+      const netAmount = isDeposit ? -amount : amount;
+
+      if (dKey < monthStartKey) {
+        priorBalance += netAmount;
+      } else if (dKey < nextMonthStartKey) {
+        const bucket = getOrCreateDateBucket(dKey);
+        bucket.withdrawals.push(w);
+      }
+    });
+
+    // 2. Process Petty Cash Assignments
+    (assignments || []).forEach(a => {
+      const dKey = toDateKey(a.assignedDate || a.createdDate);
+      if (!dKey) return;
+      const amount = parseFloat(a.assignedAmount || 0);
+
+      if (dKey < monthStartKey) {
+        priorBalance -= amount;
+      } else if (dKey < nextMonthStartKey) {
+        const bucket = getOrCreateDateBucket(dKey);
+        bucket.assignments.push(a);
+      }
+    });
+
+    // 3. Process Other Expenses
+    (otherExpenses || []).forEach(e => {
+      const dKey = toDateKey(e.expenseDate || e.createdDate);
+      if (!dKey) return;
+      const amount = parseFloat(e.amount || 0);
+
+      if (dKey < monthStartKey) {
+        priorBalance -= amount;
+      } else if (dKey < nextMonthStartKey) {
+        const bucket = getOrCreateDateBucket(dKey);
+        bucket.expenses.push(e);
+      }
+    });
+
+    // 4. Process Petty Cash Returns (CashBalanceSettlements with settlementType === 'BALANCE_RETURN')
+    (cashSettlements || []).forEach(s => {
+      if (s.settlementType !== 'BALANCE_RETURN' || s.status === 'REJECTED') return;
+      const dKey = toDateKey(s.completedDate || s.approvedDate || s.requestDate || s.createdDate);
+      if (!dKey) return;
+      const amount = parseFloat(s.amount || 0);
+
+      if (dKey < monthStartKey) {
+        priorBalance += amount;
+      } else if (dKey < nextMonthStartKey) {
+        const bucket = getOrCreateDateBucket(dKey);
+        bucket.returns.push(s);
+      }
+    });
+
+    const sortedDateKeys = Object.keys(monthDatesMap).sort();
+    let runningBalance = priorBalance;
+    const ledgerRows = [];
+
+    sortedDateKeys.forEach(dKey => {
+      const bucket = monthDatesMap[dKey];
+      const balanceFromPreviousDay = runningBalance;
+
+      const withdrawalAmount = bucket.withdrawals.reduce((sum, w) => {
+        const amt = parseFloat(w.amount || 0);
+        return sum + (w.transactionType === 'deposit' ? -amt : amt);
+      }, 0);
+
+      const pettyCashAmount = bucket.assignments.reduce((sum, a) => {
+        return sum + parseFloat(a.assignedAmount || 0);
+      }, 0);
+
+      const otherExpenseAmount = bucket.expenses.reduce((sum, e) => {
+        return sum + parseFloat(e.amount || 0);
+      }, 0);
+
+      const pettyCashReturnAmount = bucket.returns.reduce((sum, r) => {
+        return sum + parseFloat(r.amount || 0);
+      }, 0);
+
+      const dayClosingBalance = balanceFromPreviousDay + withdrawalAmount + pettyCashReturnAmount - pettyCashAmount - otherExpenseAmount;
+      runningBalance = dayClosingBalance;
+
+      const [yearStr, monthStr, dayStr] = dKey.split('-');
+      const formattedDate = `${parseInt(monthStr, 10)}/${parseInt(dayStr, 10)}/${yearStr}`;
+
+      ledgerRows.push({
+        dateKey: dKey,
+        dateFormatted: formattedDate,
+        balanceFromPreviousDay,
+        withdrawalAmount,
+        pettyCashAmount,
+        otherExpenseAmount,
+        pettyCashReturnAmount,
+        balance: dayClosingBalance,
+        withdrawals: bucket.withdrawals,
+        assignments: bucket.assignments,
+        expenses: bucket.expenses,
+        returns: bucket.returns,
+      });
+    });
+
+    return {
+      priorBalance,
+      endingBalance: runningBalance,
+      rows: ledgerRows,
+      totals: {
+        totalWithdrawals: ledgerRows.reduce((sum, r) => sum + r.withdrawalAmount, 0),
+        totalPettyCash: ledgerRows.reduce((sum, r) => sum + r.pettyCashAmount, 0),
+        totalOtherExpense: ledgerRows.reduce((sum, r) => sum + r.otherExpenseAmount, 0),
+        totalPettyCashReturn: ledgerRows.reduce((sum, r) => sum + r.pettyCashReturnAmount, 0),
+      }
+    };
+  };
+
   const handleWithdrawalSubmit = async (withdrawalData) => {
     try {
       await cashWithdrawalService.create(withdrawalData);
@@ -237,6 +435,8 @@ function PettyCash() {
       setShowWithdrawalModal(false);
       fetchCashWithdrawals();
       fetchOverallBalance();
+      fetchOtherExpenses();
+      fetchCashSettlements();
     } catch (error) {
       console.error('Error creating cash withdrawal:', error);
       setMessage('Error recording cash withdrawal');
@@ -1786,140 +1986,456 @@ function PettyCash() {
         </div>
       )}
 
-      {/* Cash Withdrawals Section */}
-      {(user?.role === 'Admin' || user?.role === 'Super Admin') && (
-        <div className="card">
-          <div className="card-header collapsible-header" onClick={() => setWithdrawalsCollapsed(c => !c)}>
-            <h2>Cash Withdrawals / Deposits ({getFilteredCashWithdrawals().length})</h2>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowWithdrawalModal(true);
-                }} 
-                className="btn btn-primary"
-              >
-                + Record Withdrawal / Deposit
-              </button>
-              <svg
-                className={`collapse-arrow ${withdrawalsCollapsed ? 'collapsed' : ''}`}
-                width="20" height="20" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </div>
-          </div>
+      {/* Cash Withdrawals & Daily Ledger Section */}
+      {(user?.role === 'Admin' || user?.role === 'Super Admin') && (() => {
+        const dailyLedgerData = getDailyCashLedger();
+        const filteredWithdrawals = getFilteredCashWithdrawals();
 
-          {!withdrawalsCollapsed && (
-            <div className="card-body">
-              {/* Month and Year Filters */}
-              <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Month</label>
-                  <select 
-                    value={withdrawalFilterMonth} 
-                    onChange={(e) => setWithdrawalFilterMonth(parseInt(e.target.value))}
-                    style={{
-                      padding: '8px 12px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value={1}>January</option>
-                    <option value={2}>February</option>
-                    <option value={3}>March</option>
-                    <option value={4}>April</option>
-                    <option value={5}>May</option>
-                    <option value={6}>June</option>
-                    <option value={7}>July</option>
-                    <option value={8}>August</option>
-                    <option value={9}>September</option>
-                    <option value={10}>October</option>
-                    <option value={11}>November</option>
-                    <option value={12}>December</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Year</label>
-                  <select 
-                    value={withdrawalFilterYear} 
-                    onChange={(e) => setWithdrawalFilterYear(parseInt(e.target.value))}
-                    style={{
-                      padding: '8px 12px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {[2024, 2025, 2026, 2027].map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
+        return (
+          <div className="card">
+            <div className="card-header collapsible-header" onClick={() => setWithdrawalsCollapsed(c => !c)}>
+              <h2>
+                {ledgerViewMode === 'daily' 
+                  ? `Daily Cash Ledger (${dailyLedgerData.rows.length} ${dailyLedgerData.rows.length === 1 ? 'day' : 'days'})` 
+                  : `Cash Withdrawals / Deposits (${filteredWithdrawals.length})`}
+              </h2>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowWithdrawalModal(true);
+                  }} 
+                  className="btn btn-primary"
+                >
+                  + Record Withdrawal / Deposit
+                </button>
+                <svg
+                  className={`collapse-arrow ${withdrawalsCollapsed ? 'collapsed' : ''}`}
+                  width="20" height="20" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </div>
-
-              {getFilteredCashWithdrawals().length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
-                  No cash withdrawals recorded for this period
-                </p>
-              ) : (
-                <div className="assignments-table-wrapper">
-                  <table className="assignments-table-modern">
-                    <thead>
-                      <tr>
-                        <th style={{ width: '160px' }}>Withdrawal ID</th>
-                        <th style={{ width: '100px' }}>Type</th>
-                        <th style={{ width: '140px' }}>Date</th>
-                        <th style={{ width: '220px' }}>Bank Name</th>
-                        <th style={{ width: '180px' }}>Amount</th>
-                        <th style={{ width: '200px' }}>Recorded By</th>
-                        <th style={{ minWidth: '250px' }}>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getFilteredCashWithdrawals().map((withdrawal) => (
-                        <tr key={withdrawal.withdrawalId} className="assignment-row">
-                          <td>
-                            <span className="assignment-id">{withdrawal.withdrawalId}</span>
-                          </td>
-                          <td>
-                            <span className={`status-badge ${withdrawal.transactionType === 'withdrawal' ? 'status-unpaid' : 'status-completed'}`}>
-                              {withdrawal.transactionType === 'withdrawal' ? 'Withdrawal' : 'Deposit'}
-                            </span>
-                          </td>
-                          <td>{new Date(withdrawal.withdrawalDate).toLocaleDateString()}</td>
-                          <td>{withdrawal.bankName}</td>
-                          <td>
-                            <span className="amount-badge">
-                              LKR {formatAmount(withdrawal.amount)}
-                            </span>
-                          </td>
-                          <td>
-                            <span className="assigned-to-name">
-                              {withdrawal.createdByName || withdrawal.createdBy}
-                            </span>
-                          </td>
-                          <td style={{ color: withdrawal.notes ? '#374151' : '#9ca3af' }}>
-                            {withdrawal.notes || 'No notes'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
-          )}
-        </div>
-      )}
+
+            {!withdrawalsCollapsed && (
+              <div className="card-body">
+                {/* Month/Year Filters + View Mode Toggle */}
+                <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Month</label>
+                    <select 
+                      value={withdrawalFilterMonth} 
+                      onChange={(e) => setWithdrawalFilterMonth(parseInt(e.target.value))}
+                      style={{
+                        padding: '8px 12px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={1}>January</option>
+                      <option value={2}>February</option>
+                      <option value={3}>March</option>
+                      <option value={4}>April</option>
+                      <option value={5}>May</option>
+                      <option value={6}>June</option>
+                      <option value={7}>July</option>
+                      <option value={8}>August</option>
+                      <option value={9}>September</option>
+                      <option value={10}>October</option>
+                      <option value={11}>November</option>
+                      <option value={12}>December</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>Year</label>
+                    <select 
+                      value={withdrawalFilterYear} 
+                      onChange={(e) => setWithdrawalFilterYear(parseInt(e.target.value))}
+                      style={{
+                        padding: '8px 12px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {[2024, 2025, 2026, 2027].map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* View Mode Toggle */}
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-end', height: '100%', paddingTop: '20px' }}>
+                    <div className="ledger-view-toggle">
+                      <button
+                        type="button"
+                        className={`ledger-toggle-btn ${ledgerViewMode === 'daily' ? 'active' : ''}`}
+                        onClick={() => setLedgerViewMode('daily')}
+                      >
+                        📅 Daily Cash Ledger
+                      </button>
+                      <button
+                        type="button"
+                        className={`ledger-toggle-btn ${ledgerViewMode === 'withdrawals' ? 'active' : ''}`}
+                        onClick={() => setLedgerViewMode('withdrawals')}
+                      >
+                        📋 Withdrawals / Deposits List
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {ledgerViewMode === 'daily' ? (
+                  dailyLedgerData.rows.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
+                      No cash transactions recorded for this period
+                    </p>
+                  ) : (
+                    <div className="assignments-table-wrapper">
+                      <table className="assignments-table-modern ledger-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: '120px' }}>Date</th>
+                            <th style={{ width: '180px', textAlign: 'right' }}>Balance from Previous Day</th>
+                            <th style={{ width: '160px', textAlign: 'right' }}>Withdrawal Amount</th>
+                            <th style={{ width: '150px', textAlign: 'right' }}>Petty Cash</th>
+                            <th style={{ width: '150px', textAlign: 'right' }}>Other Expense</th>
+                            <th style={{ width: '160px', textAlign: 'right' }}>Petty Cash Return</th>
+                            <th style={{ width: '170px', textAlign: 'right' }}>Balance</th>
+                            <th style={{ width: '80px', textAlign: 'center' }}>Details</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dailyLedgerData.rows.map((row) => {
+                            const isExpanded = expandedLedgerDates.has(row.dateKey);
+                            return (
+                              <React.Fragment key={row.dateKey}>
+                                <tr 
+                                  className={`assignment-row ${isExpanded ? 'expanded' : ''}`}
+                                  onClick={() => toggleLedgerDate(row.dateKey)}
+                                  style={{ cursor: 'pointer' }}
+                                  title="Click to view transaction breakdown for this day"
+                                >
+                                  <td>
+                                    <span className="ledger-date-cell">
+                                      {row.dateFormatted}
+                                    </span>
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    <span className="amount-neutral">
+                                      LKR {formatAmount(row.balanceFromPreviousDay)}
+                                    </span>
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    {row.withdrawalAmount > 0 ? (
+                                      <span className="amount-badge amount-positive">
+                                        +LKR {formatAmount(row.withdrawalAmount)}
+                                      </span>
+                                    ) : row.withdrawalAmount < 0 ? (
+                                      <span className="amount-badge amount-negative">
+                                        -LKR {formatAmount(Math.abs(row.withdrawalAmount))}
+                                      </span>
+                                    ) : (
+                                      <span className="amount-zero">—</span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    {row.pettyCashAmount > 0 ? (
+                                      <span className="amount-badge amount-expense">
+                                        LKR {formatAmount(row.pettyCashAmount)}
+                                      </span>
+                                    ) : (
+                                      <span className="amount-zero">—</span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    {row.otherExpenseAmount > 0 ? (
+                                      <span className="amount-badge amount-other-expense">
+                                        LKR {formatAmount(row.otherExpenseAmount)}
+                                      </span>
+                                    ) : (
+                                      <span className="amount-zero">—</span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    {row.pettyCashReturnAmount > 0 ? (
+                                      <span className="amount-badge amount-return">
+                                        +LKR {formatAmount(row.pettyCashReturnAmount)}
+                                      </span>
+                                    ) : (
+                                      <span className="amount-zero">—</span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    <span className={`ledger-balance-badge ${row.balance >= 0 ? 'balance-positive' : 'balance-negative'}`}>
+                                      LKR {formatAmount(row.balance)}
+                                    </span>
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <button 
+                                      type="button" 
+                                      className="btn-expand-row" 
+                                      title="Toggle day details"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleLedgerDate(row.dateKey);
+                                      }}
+                                    >
+                                      <svg 
+                                        width="14" 
+                                        height="14" 
+                                        viewBox="0 0 24 24" 
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        strokeWidth="2.5"
+                                        style={{ 
+                                          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                          transition: 'transform 0.2s ease'
+                                        }}
+                                      >
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                      </svg>
+                                    </button>
+                                  </td>
+                                </tr>
+
+                                {/* Expanded Day Breakdown */}
+                                {isExpanded && (
+                                  <tr className="ledger-expanded-details-row">
+                                    <td colSpan="8">
+                                      <div className="ledger-breakdown-card">
+                                        <div className="ledger-breakdown-header">
+                                          <span>📌 Breakdown for {row.dateFormatted}</span>
+                                          <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#64748b' }}>
+                                            (Closing Balance: LKR {formatAmount(row.balance)})
+                                          </span>
+                                        </div>
+
+                                        <div className="ledger-breakdown-grid">
+                                          {/* Cash Withdrawals / Deposits */}
+                                          {row.withdrawals.length > 0 && (
+                                            <div className="ledger-subcard">
+                                              <div className="ledger-subcard-title" style={{ color: '#047857' }}>
+                                                <span>💳 Cash Withdrawals / Deposits ({row.withdrawals.length})</span>
+                                                <span>LKR {formatAmount(row.withdrawalAmount)}</span>
+                                              </div>
+                                              <div className="ledger-subcard-list">
+                                                {row.withdrawals.map((w, idx) => (
+                                                  <div key={w.withdrawalId || idx} className="ledger-subcard-item">
+                                                    <div>
+                                                      <div className="ledger-subcard-item-title">
+                                                        {w.withdrawalId} • {w.bankName}
+                                                      </div>
+                                                      <div className="ledger-subcard-item-desc">
+                                                        {w.transactionType === 'withdrawal' ? 'Withdrawal' : 'Deposit'} {w.notes ? `• ${w.notes}` : ''}
+                                                      </div>
+                                                    </div>
+                                                    <div className={`ledger-subcard-item-amount ${w.transactionType === 'deposit' ? 'text-danger' : 'text-success'}`}>
+                                                      {w.transactionType === 'deposit' ? '-' : '+'}LKR {formatAmount(w.amount)}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Petty Cash Assignments */}
+                                          {row.assignments.length > 0 && (
+                                            <div className="ledger-subcard">
+                                              <div className="ledger-subcard-title" style={{ color: '#c2410c' }}>
+                                                <span>💼 Petty Cash Issued ({row.assignments.length})</span>
+                                                <span>LKR {formatAmount(row.pettyCashAmount)}</span>
+                                              </div>
+                                              <div className="ledger-subcard-list">
+                                                {row.assignments.map((a, idx) => (
+                                                  <div key={a.assignmentId || idx} className="ledger-subcard-item">
+                                                    <div>
+                                                      <div className="ledger-subcard-item-title">
+                                                        #{a.assignmentId} • Job: {a.jobId}
+                                                      </div>
+                                                      <div className="ledger-subcard-item-desc">
+                                                        To: {a.assignedToName || a.assignedTo} • {a.status}
+                                                      </div>
+                                                    </div>
+                                                    <div className="ledger-subcard-item-amount text-danger">
+                                                      LKR {formatAmount(a.assignedAmount)}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Other Expenses */}
+                                          {row.expenses.length > 0 && (
+                                            <div className="ledger-subcard">
+                                              <div className="ledger-subcard-title" style={{ color: '#7c3aed' }}>
+                                                <span>🧾 Other Expenses ({row.expenses.length})</span>
+                                                <span>LKR {formatAmount(row.otherExpenseAmount)}</span>
+                                              </div>
+                                              <div className="ledger-subcard-list">
+                                                {row.expenses.map((e, idx) => (
+                                                  <div key={e.expenseId || idx} className="ledger-subcard-item">
+                                                    <div>
+                                                      <div className="ledger-subcard-item-title">
+                                                        {e.expenseId} • {e.category}
+                                                      </div>
+                                                      <div className="ledger-subcard-item-desc">
+                                                        {e.description || 'No description'} {e.paymentMethod ? `• ${e.paymentMethod}` : ''}
+                                                      </div>
+                                                    </div>
+                                                    <div className="ledger-subcard-item-amount text-danger">
+                                                      LKR {formatAmount(e.amount)}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Petty Cash Returns */}
+                                          {row.returns.length > 0 && (
+                                            <div className="ledger-subcard">
+                                              <div className="ledger-subcard-title" style={{ color: '#0d9488' }}>
+                                                <span>💰 Petty Cash Returned ({row.returns.length})</span>
+                                                <span>+LKR {formatAmount(row.pettyCashReturnAmount)}</span>
+                                              </div>
+                                              <div className="ledger-subcard-list">
+                                                {row.returns.map((r, idx) => (
+                                                  <div key={r.settlementId || idx} className="ledger-subcard-item">
+                                                    <div>
+                                                      <div className="ledger-subcard-item-title">
+                                                        {r.settlementId} • {r.userName || 'Waff Clerk'}
+                                                      </div>
+                                                      <div className="ledger-subcard-item-desc">
+                                                        {r.notes || 'Balance Return'} • {r.status}
+                                                      </div>
+                                                    </div>
+                                                    <div className="ledger-subcard-item-amount text-success">
+                                                      +LKR {formatAmount(r.amount)}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+
+                          {/* Period Total Row */}
+                          <tr className="ledger-total-row">
+                            <td>
+                              <strong>TOTAL</strong>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <strong>LKR {formatAmount(dailyLedgerData.priorBalance)}</strong>
+                              <span className="ledger-sub-label">(Opening)</span>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <strong style={{ color: '#047857' }}>
+                                LKR {formatAmount(dailyLedgerData.totals.totalWithdrawals)}
+                              </strong>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <strong style={{ color: '#c2410c' }}>
+                                LKR {formatAmount(dailyLedgerData.totals.totalPettyCash)}
+                              </strong>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <strong style={{ color: '#7c3aed' }}>
+                                LKR {formatAmount(dailyLedgerData.totals.totalOtherExpense)}
+                              </strong>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <strong style={{ color: '#15803d' }}>
+                                LKR {formatAmount(dailyLedgerData.totals.totalPettyCashReturn)}
+                              </strong>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <strong className={dailyLedgerData.endingBalance >= 0 ? 'text-success' : 'text-danger'}>
+                                LKR {formatAmount(dailyLedgerData.endingBalance)}
+                              </strong>
+                              <span className="ledger-sub-label">(Closing)</span>
+                            </td>
+                            <td></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : (
+                  /* Original Withdrawals / Deposits List View */
+                  filteredWithdrawals.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
+                      No cash withdrawals recorded for this period
+                    </p>
+                  ) : (
+                    <div className="assignments-table-wrapper">
+                      <table className="assignments-table-modern">
+                        <thead>
+                          <tr>
+                            <th style={{ width: '160px' }}>Withdrawal ID</th>
+                            <th style={{ width: '100px' }}>Type</th>
+                            <th style={{ width: '140px' }}>Date</th>
+                            <th style={{ width: '220px' }}>Bank Name</th>
+                            <th style={{ width: '180px' }}>Amount</th>
+                            <th style={{ width: '200px' }}>Recorded By</th>
+                            <th style={{ minWidth: '250px' }}>Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredWithdrawals.map((withdrawal) => (
+                            <tr key={withdrawal.withdrawalId} className="assignment-row">
+                              <td>
+                                <span className="assignment-id">{withdrawal.withdrawalId}</span>
+                              </td>
+                              <td>
+                                <span className={`status-badge ${withdrawal.transactionType === 'withdrawal' ? 'status-unpaid' : 'status-completed'}`}>
+                                  {withdrawal.transactionType === 'withdrawal' ? 'Withdrawal' : 'Deposit'}
+                                </span>
+                              </td>
+                              <td>{new Date(withdrawal.withdrawalDate).toLocaleDateString()}</td>
+                              <td>{withdrawal.bankName}</td>
+                              <td>
+                                <span className="amount-badge">
+                                  LKR {formatAmount(withdrawal.amount)}
+                                </span>
+                              </td>
+                              <td>
+                                <span className="assigned-to-name">
+                                  {withdrawal.createdByName || withdrawal.createdBy}
+                                </span>
+                              </td>
+                              <td style={{ color: withdrawal.notes ? '#374151' : '#9ca3af' }}>
+                                {withdrawal.notes || 'No notes'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Management Settlement Section */}
       {(user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Manager') && (
-        <ManagementSettlementSection user={user} />
+        <ManagementSettlementSection user={user} onSettlementUpdated={fetchCashSettlements} />
       )}
 
       <div className="card">
@@ -3344,7 +3860,7 @@ function PettyCash() {
 }
 
 // Management Settlement Section Component
-const ManagementSettlementSection = ({ user }) => {
+const ManagementSettlementSection = ({ user, onSettlementUpdated }) => {
   const [settlements, setSettlements] = useState([]);
   const [activeTab, setActiveTab] = useState('pending');
   const [loading, setLoading] = useState(false);
@@ -3427,6 +3943,7 @@ const ManagementSettlementSection = ({ user }) => {
       if (response.ok) {
         setMessage('Settlement approved successfully');
         fetchSettlements();
+        if (onSettlementUpdated) onSettlementUpdated();
         setTimeout(() => setMessage(''), 3000);
       } else {
         const data = await response.json();
@@ -3463,6 +3980,7 @@ const ManagementSettlementSection = ({ user }) => {
       if (response.ok) {
         setMessage('Settlement rejected successfully');
         fetchSettlements();
+        if (onSettlementUpdated) onSettlementUpdated();
         setTimeout(() => setMessage(''), 3000);
       } else {
         const data = await response.json();

@@ -138,3 +138,248 @@
 .radio-label span {
   color: #333;
 }
+
+/* Daily Cash Ledger Styles */
+.ledger-view-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.ledger-toggle-btn {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ledger-toggle-btn:hover {
+  color: #1e293b;
+}
+
+.ledger-toggle-btn.active {
+  background: #ffffff;
+  color: #1e40af;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ledger-table thead th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.ledger-table tbody td {
+  padding: 12px 14px;
+  font-size: 13.5px;
+  vertical-align: middle;
+}
+
+.ledger-date-cell {
+  font-weight: 600;
+  color: #1e293b;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.amount-neutral {
+  font-weight: 500;
+  color: #475569;
+  font-family: inherit;
+}
+
+.amount-positive {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+  font-weight: 600;
+}
+
+.amount-negative {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+  border: 1px solid #fecaca !important;
+  font-weight: 600;
+}
+
+.amount-expense {
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid #fed7aa !important;
+  font-weight: 600;
+}
+
+.amount-other-expense {
+  background: #f5f3ff !important;
+  color: #7c3aed !important;
+  border: 1px solid #ddd6fe !important;
+  font-weight: 600;
+}
+
+.amount-return {
+  background: #f0fdf4 !important;
+  color: #15803d !important;
+  border: 1px solid #bbf7d0 !important;
+  font-weight: 600;
+}
+
+.amount-zero {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.ledger-balance-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.ledger-balance-badge.balance-positive {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.ledger-balance-badge.balance-negative {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.ledger-total-row {
+  background: #f8fafc !important;
+  border-top: 2px solid #cbd5e1 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  font-weight: 700;
+}
+
+.ledger-total-row td {
+  padding: 14px 14px !important;
+  font-size: 14px;
+}
+
+.ledger-sub-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.btn-expand-row {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+
+.btn-expand-row:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+/* Expanded Day Details Breakdown */
+.ledger-expanded-details-row {
+  background: #f8fafc;
+}
+
+.ledger-expanded-details-row td {
+  padding: 0 !important;
+}
+
+.ledger-breakdown-card {
+  padding: 18px 24px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-top: 1px dashed #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ledger-breakdown-header {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ledger-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.ledger-subcard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ledger-subcard-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ledger-subcard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.ledger-subcard-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+
+.ledger-subcard-item-title {
+  font-weight: 600;
+  color: #334155;
+}
+
+.ledger-subcard-item-desc {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.ledger-subcard-item-amount {
+  font-weight: 700;
+  white-space: nowrap;
+}
